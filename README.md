@@ -359,6 +359,7 @@ cargo xtask bench --level 3             # common setups only
 cargo xtask bench --check               # every plugin has a scenario (no dnsperf needed)
 cargo xtask loadgen -m doq -p 853 -d queries.txt -l 10  # DoQ/DoH3/gRPC load (dnsperf-style output)
 cargo xtask k8s-cases                   # regenerate the upstream kubernetes test cases (Go)
+cargo xtask plugin-cases                # regenerate the upstream plugin table tests (Go), see docs/plugin-cases.md
 cargo xtask k8s-bench                   # kubernetes plugin at 1k/10k/50k services
 # live-cluster comparison (workloads in namespaces testns/other):
 kubectl --context CTX apply -f bench/k8s/workloads.yaml

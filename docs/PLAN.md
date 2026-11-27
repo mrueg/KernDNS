@@ -535,8 +535,13 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
    through `$KERNDNS_CHAOS_VERSION`.
 2. **`coredns/ci` end-to-end tests** (kind-based, including Kubernetes):
    a nightly job with the KernDNS image.
-3. **Plugin unit tests:** the table tests from each plugin's `*_test.go` are
-   ported to Rust, and each plugin lists which upstream files it covers.
+3. **Plugin unit tests** (`cargo xtask plugin-cases`, done): the tables of
+   each plugin's `*_test.go` are extracted from the Go source into JSON
+   fixtures and replayed against KernDNS through a Corefile
+   (`crates/server/tests/plugin_cases`), with `test.SortAndCheck`'s
+   semantics. Every table runs or is listed with a reason, and every row
+   passes or is an expected failure with a reason; per-plugin coverage is
+   in [plugin-cases.md](plugin-cases.md).
 4. **Differential testing** (`cargo xtask difftest`): same Corefile and
    fixtures against CoreDNS and KernDNS, a query corpus including fuzzed
    queries, diffs normalised for TTL and RRset order. A plugin becomes the
