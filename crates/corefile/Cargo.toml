@@ -1,0 +1,10 @@
+[package]
+name = "kerndns-corefile"
+description = "Corefile (Caddyfile dialect) lexer, parser and token dispenser for KernDNS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+glob.workspace = true
