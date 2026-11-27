@@ -115,6 +115,9 @@ fn new_template(name: &str, text: &str) -> Result<Template, String> {
     Template::parse(name, text)
 }
 
+/// The default `match`, compiled once.
+static MATCH_ALL: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(".*").expect("valid regex"));
+
 /// Parse all `template` directives of a server block, like `templateParse`.
 /// Returns the handler's zones and the templates.
 pub fn template_parse(c: &mut Controller<'_>) -> Result<(Vec<String>, Vec<Tmpl>), SetupError> {
@@ -241,7 +244,7 @@ pub fn template_parse(c: &mut Controller<'_>) -> Result<(Vec<String>, Vec<Tmpl>)
             }
         }
         if t.regex.is_empty() {
-            t.regex.push(Regex::new(".*").expect("valid regex"));
+            t.regex.push(MATCH_ALL.clone());
         }
         templates.push(t);
     }
@@ -277,7 +280,7 @@ pub struct TemplateHandler {
 }
 
 enum Match<'a> {
-    Yes(Data<'a>),
+    Yes(Box<Data<'a>>),
     No { fallthrough: bool },
 }
 
@@ -320,7 +323,7 @@ impl Tmpl {
             }
             let class = if qclass != DNSClass::ANY { qclass } else { self.qclass };
             let typ = if qtype != RecordType::ANY { qtype } else { self.qtype };
-            return Match::Yes(Data {
+            return Match::Yes(Box::new(Data {
                 zone: zone.to_string(),
                 name: qname.to_string(),
                 regex: re.as_str().to_string(),
@@ -336,7 +339,7 @@ impl Tmpl {
                 }),
                 remote: req.ip().to_string(),
                 meta: Some(&ctx.metadata),
-            });
+            }));
         }
         Match::No {
             fallthrough: self.fall.through(qname),
@@ -397,7 +400,7 @@ impl Handler for TemplateHandler {
 
         for t in self.templates.iter() {
             let data = match t.matches(ctx, req, &qname) {
-                Match::Yes(d) => d,
+                Match::Yes(d) => *d,
                 Match::No { fallthrough: false } => return Ok(ResponseCode::ServFail),
                 Match::No { fallthrough: true } => continue,
             };
