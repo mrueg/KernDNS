@@ -48,7 +48,7 @@ Milestones **M0**, **M1** and **M2** are done.
 | CoreDNS integration tests against KernDNS | 106 pass, 1 expected failure, 11 skipped (Go internals, checks of the Go source, a shared in-process metrics registry), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 (`TestDynUpdateKeaLifecycle` skips without Kea; `TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself) |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin and level 3 common setups, see below |
-| `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
+| `kubernetes` + `k8s_external` | every option of CoreDNS 1.15.0 incl. `multicluster`, `zonal`, `apiserver_*` limits, zone transfers, `kubernetes/*` metadata and `coredns_kubernetes_*` metrics ([parity table](docs/PLAN.md#parity-with-coredns-1150-pluginkubernetes-plugink8s_external)); CoreDNS's own tests replay with identical results (130 kubernetes and 38 k8s_external handler cases, transfers, metadata); 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants); coredns/ci's end-to-end tests run in CI ([expectations](go/compat/expectations-kind.txt)) |
 | Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `etcd`) | done (M3) |
 
 ### Benchmarks

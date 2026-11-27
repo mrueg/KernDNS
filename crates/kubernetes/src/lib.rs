@@ -15,17 +15,24 @@
 //!     noendpoints
 //!     fallthrough [ZONES...]
 //!     ignore empty_service
+//!     multicluster [ZONES...]
+//!     zonal
 //!     startup_timeout DURATION
+//!     apiserver_qps QPS
+//!     apiserver_burst BURST
+//!     apiserver_max_inflight MAX
 //! }
 //! ```
 //!
-//! Not ported yet (rejected with an error): `multicluster`, `zonal` and the
-//! `apiserver_*` client limits. Zone transfers go through `transfer`
-//! ([`xfr`]).
+//! Zone transfers go through `transfer` ([`xfr`]); with `metadata` the
+//! plugin publishes the `kubernetes/*` metadata ([`KubernetesMetadata`]).
 
 mod autopath;
+pub mod client;
 pub mod controller;
 pub mod external;
+pub mod mcs;
+pub mod metrics;
 pub mod object;
 pub mod parse;
 pub mod xfr;
@@ -36,6 +43,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use kerndns_core::duration::parse_duration;
+use kerndns_core::plugin::{Metadata, MetadataProvider};
 use kerndns_core::proto::op::{Message, MessageType, OpCode, ResponseCode};
 use kerndns_core::proto::rr::{Record, RecordType};
 use kerndns_core::transfer::TransferRegistry;
@@ -63,13 +71,19 @@ pub enum Error {
     InvalidRequest,
 }
 
-impl From<Error> for BackendError {
-    fn from(e: Error) -> Self {
-        BackendError::NameError(match e {
+impl Error {
+    pub fn message(self) -> &'static str {
+        match self {
             Error::NoItems => "no items found",
             Error::NsNotExposed => "namespace is not exposed",
             Error::InvalidRequest => "invalid query name",
-        })
+        }
+    }
+}
+
+impl From<Error> for BackendError {
+    fn from(e: Error) -> Self {
+        BackendError::NameError(e.message())
     }
 }
 
@@ -98,6 +112,10 @@ pub struct Kubernetes {
     pub upstream_override: Option<UpstreamFn>,
     /// The local search path from `/etc/resolv.conf`, for `autopath`.
     pub auto_path_search: Vec<String>,
+    /// `multicluster`: zones answered from ServiceImports.
+    pub multicluster_zones: Vec<String>,
+    /// `zonal`: zone-scoped names for headless services.
+    pub zonal: bool,
 }
 
 impl Kubernetes {
@@ -116,7 +134,15 @@ impl Kubernetes {
             api: RwLock::new(None),
             upstream_override: None,
             auto_path_search: Vec::new(),
+            multicluster_zones: Vec::new(),
+            zonal: false,
         }
+    }
+
+    /// `isMultiClusterZone` (`plugin.Zones.Contains`: the zone or below).
+    pub fn is_multicluster_zone(&self, zone: &str) -> bool {
+        let zone = zone.to_ascii_lowercase();
+        self.multicluster_zones.iter().any(|z| zones::is_subdomain(z, &zone))
     }
 
     pub fn set_api(&self, api: Arc<dyn DnsController>) {
@@ -231,6 +257,10 @@ impl Kubernetes {
                     continue;
                 }
             }
+            // zone-scoped names exist for headless services only
+            if !r.zone.is_empty() && !svc.headless() {
+                continue;
+            }
             if svc.is_external_name() {
                 if !r.endpoint.is_empty() || !r.port.is_empty() || !r.protocol.is_empty() {
                     continue;
@@ -248,15 +278,118 @@ impl Kubernetes {
                 continue;
             }
             if svc.headless() || !r.endpoint.is_empty() {
+                if !r.zone.is_empty() {
+                    // the name exists: no endpoints in the zone is NODATA
+                    found = true;
+                }
                 let eps = endpoints.get_or_insert_with(|| api.ep_index(&idx));
+                let mut add_for_zone = |topo_zone: &str| {
+                    let mut added = 0;
+                    for ep in eps.iter() {
+                        if object::Service::key(&svc.name, &svc.namespace) != ep.index {
+                            continue;
+                        }
+                        for sub in &ep.subsets {
+                            for addr in &sub.addresses {
+                                if !topo_zone.is_empty()
+                                    && ep.zones.get(&addr.ip).map(String::as_str) != Some(topo_zone)
+                                {
+                                    continue;
+                                }
+                                let hostname = self.endpoint_hostname(addr);
+                                if !r.endpoint.is_empty() && !r.endpoint.eq_ignore_ascii_case(&hostname) {
+                                    continue;
+                                }
+                                for p in &sub.ports {
+                                    if !match_port_and_protocol(&r.port, &p.name, &r.protocol, &p.protocol) {
+                                        continue;
+                                    }
+                                    services.push(Service {
+                                        host: addr.ip.clone(),
+                                        port: p.port,
+                                        ttl: self.ttl,
+                                        key: format!("{zone_path}/{SVC}/{}/{}/{hostname}", svc.namespace, svc.name),
+                                        ..Default::default()
+                                    });
+                                    found = true;
+                                    added += 1;
+                                }
+                            }
+                        }
+                    }
+                    added
+                };
+                // `prefer` falls back to the whole service
+                if add_for_zone(&r.zone) == 0 && r.zone_prefer {
+                    add_for_zone("");
+                }
+                continue;
+            }
+            for p in &svc.ports {
+                if !match_port_and_protocol(&r.port, &p.name, &r.protocol, &p.protocol) {
+                    continue;
+                }
+                found = true;
+                for ip in &svc.cluster_ips {
+                    services.push(Service {
+                        host: ip.clone(),
+                        port: p.port,
+                        ttl: self.ttl,
+                        key: format!("{zone_path}/{SVC}/{}/{}", svc.namespace, svc.name),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+        if found { Ok(services) } else { Err(Error::NoItems) }
+    }
+
+    /// `findMultiClusterServices`: like [`Self::find_services`] from
+    /// ServiceImports and multicluster EndpointSlices.
+    fn find_multicluster_services(&self, r: &RecordRequest, zone: &str) -> Result<Vec<Service>, Error> {
+        if !self.namespace_exposed(&r.namespace) {
+            return Err(Error::NoItems);
+        }
+        if r.service.is_empty() {
+            return Ok(Vec::new());
+        }
+        let Some(api) = self.api() else {
+            return Err(Error::NoItems);
+        };
+        let idx = object::Service::key(&r.service, &r.namespace);
+        let zone_path = backend::path(zone, COREDNS);
+        let mut found = false;
+        let mut services = Vec::new();
+        let mut endpoints: Option<Vec<Arc<object::MultiClusterEndpoints>>> = None;
+
+        for svc in api.svc_import_index(&idx) {
+            if !svc.namespace.eq_ignore_ascii_case(&r.namespace) || !svc.name.eq_ignore_ascii_case(&r.service) {
+                continue;
+            }
+            if self.ignore_empty_service && !svc.headless() {
+                let pods: usize = api
+                    .mc_ep_index(&idx)
+                    .iter()
+                    .flat_map(|e| &e.endpoints.subsets)
+                    .map(|s| s.addresses.len())
+                    .sum();
+                if pods == 0 {
+                    continue;
+                }
+            }
+            if svc.headless() || !r.endpoint.is_empty() {
+                let eps = endpoints.get_or_insert_with(|| api.mc_ep_index(&idx));
                 for ep in eps.iter() {
-                    if object::Service::key(&svc.name, &svc.namespace) != ep.index {
+                    if object::Service::key(&svc.name, &svc.namespace) != ep.endpoints.index {
                         continue;
                     }
-                    for sub in &ep.subsets {
+                    for sub in &ep.endpoints.subsets {
                         for addr in &sub.addresses {
                             let hostname = self.endpoint_hostname(addr);
-                            if !r.endpoint.is_empty() && !r.endpoint.eq_ignore_ascii_case(&hostname) {
+                            if !r.endpoint.is_empty()
+                                && (!r.cluster.eq_ignore_ascii_case(&ep.cluster_id)
+                                    || !r.endpoint.eq_ignore_ascii_case(&hostname))
+                            {
                                 continue;
                             }
                             for p in &sub.ports {
@@ -267,7 +400,10 @@ impl Kubernetes {
                                     host: addr.ip.clone(),
                                     port: p.port,
                                     ttl: self.ttl,
-                                    key: format!("{zone_path}/{SVC}/{}/{}/{hostname}", svc.namespace, svc.name),
+                                    key: format!(
+                                        "{zone_path}/{SVC}/{}/{}/{}/{hostname}",
+                                        svc.namespace, svc.name, ep.cluster_id
+                                    ),
                                     ..Default::default()
                                 });
                                 found = true;
@@ -298,7 +434,8 @@ impl Kubernetes {
 
     /// `Records`.
     fn records_for(&self, st: &State) -> Result<Vec<Service>, Error> {
-        let r = parse_request(st.name_ref(), &st.zone)?;
+        let multicluster = self.is_multicluster_zone(&st.zone);
+        let r = parse_request(st.name_ref(), &st.zone, multicluster, self.zonal)?;
         if r.pod_or_svc.is_empty() {
             return Ok(Vec::new());
         }
@@ -310,8 +447,10 @@ impl Kubernetes {
         }
         if r.pod_or_svc == POD {
             self.find_pods(&r, &st.zone)
-        } else {
+        } else if !multicluster {
             self.find_services(&r, &st.zone)
+        } else {
+            self.find_multicluster_services(&r, &st.zone)
         }
     }
 
@@ -471,6 +610,15 @@ impl ServiceBackend for Kubernetes {
                 let services = self.records_for(st);
                 return match services {
                     Ok(s) if !s.is_empty() => Ok(Vec::new()),
+                    // a zone-scoped name that exists but is empty is NODATA
+                    // for every type
+                    Ok(_)
+                        if self.zonal
+                            && parse_request(st.name_ref(), &st.zone, self.is_multicluster_zone(&st.zone), true)
+                                .is_ok_and(|r| !r.zone.is_empty()) =>
+                    {
+                        Ok(Vec::new())
+                    }
                     _ => Err(Error::NoItems.into()),
                 };
             }
@@ -538,8 +686,17 @@ impl ServiceBackend for Kubernetes {
         self.records_for(st).map_err(Into::into)
     }
 
-    fn serial(&self, _st: &State) -> u32 {
-        self.api().map(|a| a.modified() as u32).unwrap_or(0)
+    fn serial(&self, st: &State) -> u32 {
+        let multicluster = self.is_multicluster_zone(&st.zone);
+        self.api()
+            .map(|a| {
+                if multicluster {
+                    a.modified_multicluster() as u32
+                } else {
+                    a.modified() as u32
+                }
+            })
+            .unwrap_or(0)
     }
 
     fn min_ttl(&self, _st: &State) -> u32 {
@@ -661,6 +818,47 @@ fn bound_ips(listen_hosts: &[String]) -> Vec<IpAddr> {
         listen_hosts.iter().filter_map(|h| h.parse().ok()).collect()
     };
     hosts.into_iter().filter(|ip| !ip.is_loopback()).collect()
+}
+
+/// The `kubernetes/*` metadata (`Kubernetes.Metadata`).
+pub struct KubernetesMetadata(pub Arc<Kubernetes>);
+
+impl MetadataProvider for KubernetesMetadata {
+    fn metadata(&self, ctx: &mut Context, req: &Request) {
+        let k = &self.0;
+        let md = &mut ctx.metadata;
+        if let Some(pod) = k.pod_with_ip(&req.ip().to_string()) {
+            md.insert("kubernetes/client-namespace".into(), pod.namespace.clone());
+            md.insert("kubernetes/client-pod-name".into(), pod.name.clone());
+            for (l, v) in &pod.labels {
+                md.insert(format!("kubernetes/client-label/{l}"), v.clone());
+            }
+        }
+        let name = req.name();
+        let Some(zone) = zones::matches(&k.zones, &name) else {
+            return;
+        };
+        // CoreDNS checks the multicluster zones against the request's zone,
+        // which the server leaves empty when it collects metadata: names in
+        // multicluster zones are parsed as plain cluster names
+        let multicluster = false;
+        let r = match parse_request(&name, zone, multicluster, k.zonal) {
+            Ok(r) => r,
+            Err(e) => {
+                md.insert("kubernetes/parse-error".into(), e.message().into());
+                return;
+            }
+        };
+        md.insert("kubernetes/port-name".into(), r.port);
+        md.insert("kubernetes/protocol".into(), r.protocol);
+        md.insert("kubernetes/endpoint".into(), r.endpoint);
+        if k.zonal {
+            md.insert("kubernetes/zone".into(), r.zone);
+        }
+        md.insert("kubernetes/service".into(), r.service);
+        md.insert("kubernetes/namespace".into(), r.namespace);
+        md.insert("kubernetes/kind".into(), r.pod_or_svc);
+    }
 }
 
 pub struct Setup;
@@ -789,8 +987,40 @@ impl PluginFactory for Setup {
                             parse_duration(d).map_err(|e| err(format!("failed to parse startup_timeout: {d}, {e}")))?,
                         );
                     }
-                    "multicluster" | "zonal" | "apiserver_qps" | "apiserver_burst" | "apiserver_max_inflight" => {
-                        return Err(err(format!("'{opt}' is not supported by KernDNS yet")));
+                    "zonal" => {
+                        if !a.is_empty() {
+                            return Err(c.arg_err());
+                        }
+                        kk.zonal = true;
+                    }
+                    "multicluster" => kk.multicluster_zones = zones::origins_from_args_or_server_block(&a, &[]),
+                    "apiserver_qps" => {
+                        let [q] = a.as_slice() else { return Err(c.arg_err()) };
+                        let qps: f32 = q.parse().map_err(|_| {
+                            c.errf(format!(
+                                "invalid apiserver_qps {q:?}: strconv.ParseFloat: parsing {q:?}: invalid syntax"
+                            ))
+                        })?;
+                        if qps < 0.0 {
+                            return Err(c.errf("apiserver_qps must be >= 0"));
+                        }
+                        cs.opts.limits.qps = qps;
+                    }
+                    "apiserver_burst" | "apiserver_max_inflight" => {
+                        let [n] = a.as_slice() else { return Err(c.arg_err()) };
+                        let v: i64 = n.parse().map_err(|_| {
+                            c.errf(format!(
+                                "invalid {opt} {n:?}: strconv.Atoi: parsing {n:?}: invalid syntax"
+                            ))
+                        })?;
+                        if v < 0 {
+                            return Err(c.errf(format!("{opt} must be >= 0")));
+                        }
+                        if opt == "apiserver_burst" {
+                            cs.opts.limits.burst = v as usize;
+                        } else {
+                            cs.opts.limits.max_inflight = v as usize;
+                        }
                     }
                     other => {
                         let msg = format!("unknown property '{other}'");
@@ -801,10 +1031,25 @@ impl PluginFactory for Setup {
             if !kk.namespaces.is_empty() && cs.opts.namespace_label_selector.is_some() {
                 return Err(c.errf("namespaces and namespace_labels cannot both be set"));
             }
+            for z in &kk.multicluster_zones {
+                if !kk.zones.contains(z) {
+                    let msg = format!(
+                        "is not authoritative for the multicluster zone {z} (authoritative zones: [{}])",
+                        kk.zones.join(" ")
+                    );
+                    return Err(c.errf(msg));
+                }
+            }
+            if kk.zonal && !cs.opts.watch_endpoints {
+                return Err(c.errf("zonal requires the endpoint cache; remove noendpoints"));
+            }
             k = Some(kk);
         }
         let Some(k) = k else { return Err(c.arg_err()) };
         cs.opts.watch_pods = k.pod_mode == PodMode::Verified;
+        cs.opts.zonal = k.zonal;
+        cs.opts.multicluster = !k.multicluster_zones.is_empty();
+        metrics::init();
         let k = Arc::new(k);
         // k8s_external (set up earlier in the block) reads it from here
         external::slot(c.config).set(k.clone());
@@ -812,6 +1057,8 @@ impl PluginFactory for Setup {
         kerndns_plugins::autopath::AutoPathers::of(c.config).register("kubernetes", k.clone());
         // zone transfers through `transfer`
         TransferRegistry::of(c.config).add_source(Arc::new(xfr::KubeTransfer(k.clone())));
+        // kubernetes/* metadata for `metadata`
+        Metadata::of(c.config).add_provider(Arc::new(KubernetesMetadata(k.clone())));
 
         let listen_hosts = c.config.listen_hosts.clone();
         let tasks: Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>> = Arc::default();
@@ -841,8 +1088,15 @@ async fn start_api(
     tasks: &Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 ) -> Result<(), String> {
     let config = client_config(&cs).await?;
-    let client = kube::Client::try_from(config)
-        .map_err(|e| format!("failed to create kubernetes notification controller: {e}"))?;
+    let host = config
+        .cluster_url
+        .authority()
+        .map(|a| a.to_string())
+        .unwrap_or_default();
+    let client = kube::client::ClientBuilder::try_from(config)
+        .map_err(|e| format!("failed to create kubernetes notification controller: {e}"))?
+        .with_layer(&client::ClientLayer::new(cs.opts.limits, &host))
+        .build();
     let ctl = KubeController::new(cs.opts.clone());
     tasks.lock().unwrap().extend(ctl.run(client));
     k.set_api(ctl.clone());
@@ -893,4 +1147,91 @@ async fn client_config(cs: &ClientSettings) -> Result<kube::Config, String> {
         config.auth_info.client_key = Some(key.clone());
     }
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kerndns_core::corefile::{Dispenser, parse};
+    use kerndns_core::{BlockConfig, Hooks, ZoneAddr};
+
+    /// Run the setup of `kubernetes` in `.:53 { ... }`; the parsed plugin
+    /// or the error.
+    fn setup(directive: &str) -> Result<Arc<Kubernetes>, String> {
+        let blocks = parse(&format!(".:53 {{\n{directive}\n}}"), "Corefile").expect("parses");
+        let mut cfg = BlockConfig::new(ZoneAddr::parse(".:53", "53").unwrap());
+        let mut hooks = Hooks::default();
+        let res = {
+            let mut c = Controller::new(
+                "kubernetes",
+                Dispenser::new(blocks[0].tokens_for("kubernetes")),
+                &mut cfg,
+                &mut hooks,
+                ".".into(),
+            );
+            Setup.setup(&mut c).map_err(|e| e.to_string())
+        };
+        res.map(|_| external::slot(&mut cfg).get().cloned().expect("set up"))
+    }
+
+    /// setup_test.go TestKubernetesParseMulticluster.
+    #[test]
+    fn parse_multicluster() {
+        let k = setup("kubernetes coredns.local clusterset.local {\n multicluster clusterset.local\n}").unwrap();
+        assert_eq!(k.multicluster_zones, ["clusterset.local."]);
+        let e = setup("kubernetes coredns.local {\n multicluster clusterset.local\n}")
+            .err()
+            .unwrap();
+        assert!(
+            e.contains("Error during parsing: is not authoritative for the multicluster zone clusterset.local."),
+            "{e}"
+        );
+        let e = setup("kubernetes coredns.local clusterset.local {\n multicluster clusterset.local test.local\n}")
+            .err()
+            .unwrap();
+        assert!(
+            e.contains("is not authoritative for the multicluster zone test.local."),
+            "{e}"
+        );
+        let k = setup("kubernetes coredns.local {\n multicluster\n}").unwrap();
+        assert!(k.multicluster_zones.is_empty());
+    }
+
+    /// setup_test.go TestKubernetesParseAPIRateLimiting.
+    #[test]
+    fn parse_api_limits() {
+        assert!(
+            setup(
+                "kubernetes coredns.local {\n apiserver_qps 50.0\n apiserver_burst 100\n apiserver_max_inflight 25\n}"
+            )
+            .is_ok()
+        );
+        for (opt, err) in [
+            ("apiserver_qps -10", "apiserver_qps must be >= 0"),
+            ("apiserver_burst -5", "apiserver_burst must be >= 0"),
+            ("apiserver_max_inflight -1", "apiserver_max_inflight must be >= 0"),
+            ("apiserver_qps fast", "invalid apiserver_qps \"fast\""),
+            ("apiserver_burst", "Wrong argument count"),
+        ] {
+            let e = setup(&format!("kubernetes coredns.local {{\n {opt}\n}}"))
+                .err()
+                .unwrap();
+            assert!(e.contains(err), "{opt}: {e}");
+        }
+    }
+
+    /// setup_test.go TestKubernetesParseZonal.
+    #[test]
+    fn parse_zonal() {
+        assert!(setup("kubernetes coredns.local {\n zonal\n}").unwrap().zonal);
+        assert!(setup("kubernetes coredns.local {\n zonal us-west-2a\n}").is_err());
+        let e = setup("kubernetes coredns.local {\n zonal\n noendpoints\n}")
+            .err()
+            .unwrap();
+        assert!(
+            e.contains("zonal requires the endpoint cache; remove noendpoints"),
+            "{e}"
+        );
+        assert!(!setup("kubernetes coredns.local").unwrap().zonal);
+    }
 }

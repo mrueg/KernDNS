@@ -20,7 +20,7 @@ pub(crate) fn search_from_resolv_conf() -> Vec<String> {
 
 impl Kubernetes {
     /// `podWithIP`: the pod with the client's address (`pods verified` only).
-    fn pod_with_ip(&self, ip: &str) -> Option<Arc<Pod>> {
+    pub(crate) fn pod_with_ip(&self, ip: &str) -> Option<Arc<Pod>> {
         if self.pod_mode != PodMode::Verified {
             return None;
         }
@@ -106,6 +106,7 @@ mod tests {
                 pod_ips: vec!["10.240.0.1".into()],
                 name: "client".into(),
                 namespace: "podns".into(),
+                ..Default::default()
             })]
         }
         fn ep_index(&self, _: &str) -> Vec<Arc<Endpoints>> {

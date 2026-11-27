@@ -8,12 +8,14 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use kerndns_core::plugin::MetadataProvider;
 use kerndns_core::proto::op::{Edns, Message, MessageType, OpCode, Query, ResponseCode};
 use kerndns_core::proto::rr::{Name, Record, RecordType};
 use kerndns_core::proto::serialize::binary::{BinDecodable, BinDecoder};
 use kerndns_core::{CaptureWriter, Context, Handler, HandlerResult, Protocol, Request, ResponseWriter, async_trait};
+use kerndns_kubernetes::KubernetesMetadata;
 use kerndns_kubernetes::controller::DnsController;
-use kerndns_kubernetes::object::{Endpoints, Pod, Service};
+use kerndns_kubernetes::object::{Endpoints, MultiClusterEndpoints, Pod, Service, ServiceImport};
 use kerndns_kubernetes::{Kubernetes, KubernetesHandler, PodMode};
 use serde::Deserialize;
 
@@ -54,7 +56,23 @@ struct Suite {
     ignore_empty_service: bool,
     not_synced: bool,
     local_ips: Option<Vec<String>>,
+    multicluster_zones: Option<Vec<String>>,
+    zonal: bool,
+    /// "" (`APIConnServeTest`) or "zonal" (`APIConnZonalTest`)
+    api: String,
     cases: Vec<Case>,
+}
+
+/// One metadata_test.go case.
+#[derive(Deserialize)]
+struct MetadataCase {
+    qname: String,
+    qtype: u16,
+    remote_ip: String,
+    zones: Vec<String>,
+    multicluster_zones: Option<Vec<String>>,
+    pod_mode: String,
+    metadata: HashMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +83,11 @@ struct Data {
     missing_namespaces: Vec<String>,
     suites: Vec<Suite>,
     transfers: Vec<Xfr>,
+    service_imports: HashMap<String, Vec<ServiceImport>>,
+    mc_endpoints: HashMap<String, Vec<MultiClusterEndpoints>>,
+    zonal_services: HashMap<String, Vec<Service>>,
+    zonal_endpoints: HashMap<String, Vec<Endpoints>>,
+    metadata: Vec<MetadataCase>,
 }
 
 /// One `Transfer` call and the records it streamed.
@@ -72,6 +95,7 @@ struct Data {
 struct Xfr {
     name: String,
     zones: Vec<String>,
+    multicluster_zones: Option<Vec<String>>,
     namespaces: Vec<String>,
     local_ips: Vec<String>,
     zone: String,
@@ -87,6 +111,9 @@ struct Fake {
     pods: Vec<Arc<Pod>>,
     missing: HashSet<String>,
     synced: bool,
+    imports: HashMap<String, Vec<Arc<ServiceImport>>>,
+    mc_eps: HashMap<String, Vec<Arc<MultiClusterEndpoints>>>,
+    serial: i64,
 }
 
 impl DnsController for Fake {
@@ -119,7 +146,16 @@ impl DnsController for Fake {
         self.synced
     }
     fn modified(&self) -> i64 {
-        3
+        self.serial
+    }
+    fn svc_import_index(&self, idx: &str) -> Vec<Arc<ServiceImport>> {
+        self.imports.get(idx).cloned().unwrap_or_default()
+    }
+    fn service_import_list(&self) -> Vec<Arc<ServiceImport>> {
+        self.imports.values().flatten().cloned().collect()
+    }
+    fn mc_ep_index(&self, idx: &str) -> Vec<Arc<MultiClusterEndpoints>> {
+        self.mc_eps.get(idx).cloned().unwrap_or_default()
     }
     fn service_list(&self) -> Vec<Arc<Service>> {
         self.services.values().flatten().cloned().collect()
@@ -171,6 +207,10 @@ struct Objects {
     endpoints: HashMap<String, Vec<Arc<Endpoints>>>,
     pods: Vec<Arc<Pod>>,
     missing: HashSet<String>,
+    imports: HashMap<String, Vec<Arc<ServiceImport>>>,
+    mc_eps: HashMap<String, Vec<Arc<MultiClusterEndpoints>>>,
+    zonal_services: HashMap<String, Vec<Arc<Service>>>,
+    zonal_endpoints: HashMap<String, Vec<Arc<Endpoints>>>,
 }
 
 impl Objects {
@@ -181,11 +221,34 @@ impl Objects {
             pods: self.pods.clone(),
             missing: self.missing.clone(),
             synced,
+            imports: self.imports.clone(),
+            mc_eps: self.mc_eps.clone(),
+            serial: 3,
+        }
+    }
+
+    /// `APIConnZonalTest`.
+    fn zonal_fake(&self) -> Fake {
+        Fake {
+            services: self.zonal_services.clone(),
+            endpoints: self.zonal_endpoints.clone(),
+            pods: Vec::new(),
+            missing: HashSet::new(),
+            synced: true,
+            imports: HashMap::new(),
+            mc_eps: HashMap::new(),
+            serial: 1499347823,
         }
     }
 }
 
-fn load() -> (Objects, Vec<Suite>, Vec<Xfr>) {
+fn arcs<T>(m: HashMap<String, Vec<T>>) -> HashMap<String, Vec<Arc<T>>> {
+    m.into_iter()
+        .map(|(k, v)| (k, v.into_iter().map(Arc::new).collect()))
+        .collect()
+}
+
+fn load() -> (Objects, Vec<Suite>, Vec<Xfr>, Vec<MetadataCase>) {
     let data: Data =
         serde_json::from_str(include_str!("../testdata/upstream_cases.json")).expect("valid upstream_cases.json");
     let wrap = |m: HashMap<String, Vec<Service>>| {
@@ -212,25 +275,46 @@ fn load() -> (Objects, Vec<Suite>, Vec<Xfr>) {
         .collect();
     let pods: Vec<Arc<Pod>> = data.pods.into_iter().map(Arc::new).collect();
     let missing: HashSet<String> = data.missing_namespaces.into_iter().collect();
+    let imports = data
+        .service_imports
+        .into_iter()
+        .map(|(k, v)| {
+            let v = v
+                .into_iter()
+                .map(|mut s| {
+                    if s.index.is_empty() {
+                        s.index = k.clone();
+                    }
+                    Arc::new(s)
+                })
+                .collect();
+            (k, v)
+        })
+        .collect();
     let objects = Objects {
         services,
         endpoints,
         pods,
         missing,
+        imports,
+        mc_eps: arcs(data.mc_endpoints),
+        zonal_services: wrap(data.zonal_services),
+        zonal_endpoints: arcs(data.zonal_endpoints),
     };
-    (objects, data.suites, data.transfers)
+    (objects, data.suites, data.transfers, data.metadata)
 }
 
 /// xfr_test.go: every Transfer call streams the same records, in the same
 /// order, as the Go plugin.
 #[test]
 fn upstream_kubernetes_transfers() {
-    let (objects, _, transfers) = load();
+    let (objects, _, transfers, _) = load();
     assert!(!transfers.is_empty());
     let mut failures = Vec::new();
     for x in &transfers {
         let mut k = Kubernetes::new(x.zones.clone());
         k.namespaces = x.namespaces.iter().cloned().collect();
+        k.multicluster_zones = x.multicluster_zones.clone().unwrap_or_default();
         *k.local_ips.write().unwrap() = x.local_ips.iter().map(|s| s.parse().unwrap()).collect();
         k.set_api(Arc::new(objects.fake(true)));
         let got = k.transfer(&x.zone, x.serial);
@@ -270,13 +354,17 @@ fn upstream_kubernetes_transfers() {
 
 #[tokio::test]
 async fn upstream_kubernetes_cases() {
-    let (objects, suites, _) = load();
+    let (objects, suites, _, _) = load();
     let mut failures = Vec::new();
     let mut total = 0;
     for suite in &suites {
         for (i, case) in suite.cases.iter().enumerate() {
             total += 1;
-            let fake = objects.fake(!suite.not_synced);
+            let fake = if suite.api == "zonal" {
+                objects.zonal_fake()
+            } else {
+                objects.fake(!suite.not_synced)
+            };
             let mut k = Kubernetes::new(suite.zones.clone());
             k.namespaces = suite.namespaces.clone().unwrap_or_default().into_iter().collect();
             k.pod_mode = match suite.pod_mode.as_str() {
@@ -285,6 +373,8 @@ async fn upstream_kubernetes_cases() {
                 _ => PodMode::Disabled,
             };
             k.ignore_empty_service = suite.ignore_empty_service;
+            k.multicluster_zones = suite.multicluster_zones.clone().unwrap_or_default();
+            k.zonal = suite.zonal;
             *k.local_ips.write().unwrap() = suite
                 .local_ips
                 .clone()
@@ -384,4 +474,36 @@ async fn upstream_kubernetes_cases() {
         failures.join("\n  ")
     );
     eprintln!("{total} upstream cases match the Go plugin");
+}
+
+/// metadata_test.go: the same `kubernetes/*` metadata as the Go plugin,
+/// collected like the server does.
+#[test]
+fn upstream_kubernetes_metadata() {
+    let (objects, _, _, cases) = load();
+    assert!(!cases.is_empty());
+    for c in &cases {
+        let mut k = Kubernetes::new(c.zones.clone());
+        k.multicluster_zones = c.multicluster_zones.clone().unwrap_or_default();
+        k.pod_mode = if c.pod_mode == "verified" {
+            PodMode::Verified
+        } else {
+            PodMode::Disabled
+        };
+        k.set_api(Arc::new(objects.fake(true)));
+        let mut m = Message::new(1, MessageType::Query, OpCode::Query);
+        m.add_query(Query::query(
+            Name::from_ascii(&c.qname).unwrap(),
+            RecordType::from(c.qtype),
+        ));
+        let req = Request::new(
+            m,
+            "127.0.0.1:53".parse().unwrap(),
+            format!("{}:40212", c.remote_ip).parse().unwrap(),
+            Protocol::Udp,
+        );
+        let mut ctx = Context::new(".", "dns://:53");
+        KubernetesMetadata(Arc::new(k)).metadata(&mut ctx, &req);
+        assert_eq!(ctx.metadata, c.metadata, "{} from {}", c.qname, c.remote_ip);
+    }
 }

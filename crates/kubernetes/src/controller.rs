@@ -1,5 +1,6 @@
-//! The Kubernetes API side: watches Services, EndpointSlices, Namespaces
-//! and (with `pods verified`) Pods, converts every object to the minimal
+//! The Kubernetes API side: watches Services, EndpointSlices, Namespaces,
+//! (with `pods verified`) Pods and (with `multicluster`) ServiceImports and
+//! multicluster EndpointSlices, converts every object to the minimal
 //! form in [`crate::object`] and keeps the indexes the plugin queries. A
 //! port of `plugin/kubernetes/controller.go` built on kube-rs watchers.
 
@@ -14,7 +15,7 @@ use kube::runtime::WatchStreamExt;
 use kube::runtime::watcher::{self, Event};
 use kube::{Api, Client};
 
-use crate::object::{Endpoints, Pod, Service, convert};
+use crate::object::{Endpoints, MultiClusterEndpoints, Pod, Service, ServiceImport, convert};
 
 /// What the plugin needs from the API (`dnsController`).
 pub trait DnsController: Send + Sync {
@@ -38,8 +39,24 @@ pub trait DnsController: Send + Sync {
     fn modified_external(&self) -> i64 {
         self.modified()
     }
+    /// Unix time of the last change to multicluster services
+    /// (`ModifiedMultiCluster`, the SOA serial of `multicluster` zones).
+    fn modified_multicluster(&self) -> i64 {
+        self.modified()
+    }
     fn service_list(&self) -> Vec<Arc<Service>>;
     fn endpoints_list(&self) -> Vec<Arc<Endpoints>>;
+    /// ServiceImports by `name.namespace` (`multicluster`).
+    fn svc_import_index(&self, _idx: &str) -> Vec<Arc<ServiceImport>> {
+        Vec::new()
+    }
+    fn service_import_list(&self) -> Vec<Arc<ServiceImport>> {
+        Vec::new()
+    }
+    /// Multicluster EndpointSlices of the ServiceImport `name.namespace`.
+    fn mc_ep_index(&self, _idx: &str) -> Vec<Arc<MultiClusterEndpoints>> {
+        Vec::new()
+    }
 }
 
 /// Objects keyed by `namespace/name`, with secondary indexes. The key is
@@ -111,6 +128,24 @@ impl Indexed for Endpoints {
     }
 }
 
+impl Indexed for ServiceImport {
+    fn index_key(&self) -> Option<String> {
+        Some(self.index.clone())
+    }
+    fn ips(&self) -> Vec<String> {
+        Vec::new()
+    }
+}
+
+impl Indexed for MultiClusterEndpoints {
+    fn index_key(&self) -> Option<String> {
+        Some(self.endpoints.index.clone())
+    }
+    fn ips(&self) -> Vec<String> {
+        Vec::new()
+    }
+}
+
 impl Indexed for Pod {
     fn index_key(&self) -> Option<String> {
         None
@@ -125,16 +160,24 @@ impl Indexed for Pod {
 pub struct Change {
     pub internal: bool,
     pub external: bool,
+    pub multicluster: bool,
 }
 
 impl Change {
     const NONE: Change = Change {
         internal: false,
         external: false,
+        multicluster: false,
     };
     const INTERNAL: Change = Change {
         internal: true,
         external: false,
+        multicluster: false,
+    };
+    const MULTICLUSTER: Change = Change {
+        internal: false,
+        external: false,
+        multicluster: true,
     };
 }
 
@@ -149,7 +192,11 @@ impl Modified for Service {
         let external = old.external_ips != new.external_ips;
         let internal = old.external_name != new.external_name;
         if internal && external {
-            return Change { internal, external };
+            return Change {
+                internal,
+                external,
+                multicluster: false,
+            };
         }
         let ports_changed = old.ports.len() != new.ports.len()
             || old
@@ -161,14 +208,19 @@ impl Modified for Service {
             return Change {
                 internal: true,
                 external: true,
+                multicluster: false,
             };
         }
-        Change { internal, external }
+        Change {
+            internal,
+            external,
+            multicluster: false,
+        }
     }
 }
 
-impl Modified for Endpoints {
-    fn modified(old: &Self, new: &Self) -> Change {
+fn endpoints_equivalent(old: &Endpoints, new: &Endpoints) -> bool {
+    {
         let same_subset = |a: &crate::object::EndpointSubset, b: &crate::object::EndpointSubset| {
             a.addresses.len() == b.addresses.len()
                 && a.ports.len() == b.ports.len()
@@ -181,10 +233,42 @@ impl Modified for Endpoints {
                     .zip(&b.ports)
                     .all(|(x, y)| x.name == y.name && x.port == y.port && x.protocol == y.protocol)
         };
-        let equivalent = old.subsets.len() == new.subsets.len()
+        old.subsets.len() == new.subsets.len()
             && old.zones == new.zones
-            && old.subsets.iter().zip(&new.subsets).all(|(a, b)| same_subset(a, b));
-        if equivalent { Change::NONE } else { Change::INTERNAL }
+            && old.subsets.iter().zip(&new.subsets).all(|(a, b)| same_subset(a, b))
+    }
+}
+
+impl Modified for Endpoints {
+    fn modified(old: &Self, new: &Self) -> Change {
+        if endpoints_equivalent(old, new) {
+            Change::NONE
+        } else {
+            Change::INTERNAL
+        }
+    }
+}
+
+impl Modified for MultiClusterEndpoints {
+    fn modified(old: &Self, new: &Self) -> Change {
+        if endpoints_equivalent(&old.endpoints, &new.endpoints) && old.cluster_id == new.cluster_id {
+            Change::NONE
+        } else {
+            Change::MULTICLUSTER
+        }
+    }
+}
+
+impl Modified for ServiceImport {
+    fn modified(old: &Self, new: &Self) -> Change {
+        let same = old.type_ == new.type_
+            && old.ports.len() == new.ports.len()
+            && old
+                .ports
+                .iter()
+                .zip(&new.ports)
+                .all(|(a, b)| a.name == b.name && a.port == b.port && a.protocol == b.protocol);
+        if same { Change::NONE } else { Change::MULTICLUSTER }
     }
 }
 
@@ -201,8 +285,8 @@ impl Modified for Pod {
 impl<T: Indexed + PartialEq + Modified> Index<T> {
     /// Insert or replace; returns what changed for the serials (an add
     /// changes the internal one).
-    fn put(&mut self, key: String, obj: T) -> Change {
-        let mut change = Change::INTERNAL;
+    fn put(&mut self, key: String, obj: T, add: Change) -> Change {
+        let mut change = add;
         if let Some(old) = self.objs.get(key.as_str()) {
             if **old == obj {
                 return Change::NONE;
@@ -251,6 +335,8 @@ struct State {
     eps: Index<Endpoints>,
     pods: Index<Pod>,
     namespaces: HashSet<String>,
+    imports: Index<ServiceImport>,
+    mc_eps: Index<MultiClusterEndpoints>,
 }
 
 /// Which resources to watch and how (`dnsControlOpts`).
@@ -262,14 +348,21 @@ pub struct Options {
     pub label_selector: Option<String>,
     /// `namespace_labels`: only these namespaces are exposed.
     pub namespace_label_selector: Option<String>,
+    /// `zonal`: keep the endpoints' topology zones.
+    pub zonal: bool,
+    /// `multicluster`: watch ServiceImports and multicluster EndpointSlices.
+    pub multicluster: bool,
+    /// The API client's rate and in-flight limits.
+    pub limits: crate::client::Limits,
 }
 
 /// The kube-rs implementation of [`DnsController`].
 pub struct KubeController {
     state: RwLock<State>,
-    synced: [AtomicBool; 4],
+    synced: [AtomicBool; 6],
     modified: AtomicI64,
     ext_modified: AtomicI64,
+    mc_modified: AtomicI64,
     opts: Options,
 }
 
@@ -277,6 +370,11 @@ const SVC: usize = 0;
 const EP: usize = 1;
 const POD: usize = 2;
 const NS: usize = 3;
+const IMPORT: usize = 4;
+const MC_EP: usize = 5;
+
+/// Pods that have finished or are unknown are never answered for.
+const POD_FIELD_SELECTOR: &str = "status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown";
 
 fn now() -> i64 {
     std::time::SystemTime::now()
@@ -300,6 +398,7 @@ impl KubeController {
             synced: Default::default(),
             modified: AtomicI64::new(0),
             ext_modified: AtomicI64::new(0),
+            mc_modified: AtomicI64::new(0),
             opts,
         });
         if !c.opts.watch_endpoints {
@@ -307,6 +406,10 @@ impl KubeController {
         }
         if !c.opts.watch_pods {
             c.synced[POD].store(true, Ordering::Relaxed);
+        }
+        if !c.opts.multicluster {
+            c.synced[IMPORT].store(true, Ordering::Relaxed);
+            c.synced[MC_EP].store(true, Ordering::Relaxed);
         }
         c
     }
@@ -321,6 +424,35 @@ impl KubeController {
         }
         if c.external {
             self.ext_modified.store(now(), Ordering::Relaxed);
+        }
+        if c.multicluster {
+            self.mc_modified.store(now(), Ordering::Relaxed);
+        }
+    }
+
+    /// `EndpointLatencyRecorder`: the DNS programming latency of an
+    /// EndpointSlice change, if the slice has a trigger time and exactly
+    /// one service.
+    fn record_latency(&self, o: &discovery::EndpointSlice) {
+        let Some(tt) = o
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get(crate::metrics::LAST_CHANGE_TRIGGER_TIME))
+        else {
+            return;
+        };
+        let svc = o
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|l| l.get(convert::SERVICE_NAME_LABEL))
+            .map(String::as_str)
+            .unwrap_or("");
+        let ns = o.metadata.namespace.as_deref().unwrap_or("");
+        let svcs = self.svc_index(&Service::key(svc, ns));
+        if let [s] = svcs.as_slice() {
+            crate::metrics::record_programming_latency(tt, s.headless(), std::time::SystemTime::now());
         }
     }
 
@@ -345,9 +477,13 @@ impl KubeController {
                 api,
                 c,
                 SVC,
-                |st: &mut State, o: &core::Service| st.svcs.put(obj_key(&o.metadata), convert::service(o)),
+                Change::INTERNAL,
+                |st: &mut State, o: &core::Service| {
+                    st.svcs.put(obj_key(&o.metadata), convert::service(o), Change::INTERNAL)
+                },
                 |st, k| st.svcs.remove(k),
                 |live, new| std::mem::swap(&mut live.svcs, &mut new.svcs),
+                |_, _| {},
             )
             .await
         }));
@@ -356,16 +492,23 @@ impl KubeController {
             let me = self.clone();
             let api: Api<discovery::EndpointSlice> = Api::all(client.clone());
             let c = cfg(&self.opts.label_selector);
+            let zonal = self.opts.zonal;
             tasks.push(tokio::spawn(async move {
                 me.watch(
                     api,
                     c,
                     EP,
-                    |st: &mut State, o: &discovery::EndpointSlice| {
-                        st.eps.put(obj_key(&o.metadata), convert::endpoint_slice(o, false))
+                    Change::INTERNAL,
+                    move |st: &mut State, o: &discovery::EndpointSlice| {
+                        st.eps.put(
+                            obj_key(&o.metadata),
+                            convert::endpoint_slice(o, zonal),
+                            Change::INTERNAL,
+                        )
                     },
                     |st, k| st.eps.remove(k),
                     |live, new| std::mem::swap(&mut live.eps, &mut new.eps),
+                    |me, o| me.record_latency(o),
                 )
                 .await
             }));
@@ -374,20 +517,73 @@ impl KubeController {
         if self.opts.watch_pods {
             let me = self.clone();
             let api: Api<core::Pod> = Api::all(client.clone());
-            let c = cfg(&self.opts.label_selector);
+            let c = cfg(&self.opts.label_selector).fields(POD_FIELD_SELECTOR);
             tasks.push(tokio::spawn(async move {
                 me.watch(
                     api,
                     c,
                     POD,
+                    Change::INTERNAL,
                     |st: &mut State, o: &core::Pod| match convert::pod(o) {
-                        Some(p) => st.pods.put(obj_key(&o.metadata), p),
+                        Some(p) => st.pods.put(obj_key(&o.metadata), p, Change::INTERNAL),
                         // like CoreDNS, a terminating pod is skipped: it
                         // stays until it is deleted
                         None => Change::NONE,
                     },
                     |st, k| st.pods.remove(k),
                     |live, new| std::mem::swap(&mut live.pods, &mut new.pods),
+                    |_, _| {},
+                )
+                .await
+            }));
+        }
+
+        if self.opts.multicluster {
+            // like CoreDNS, ServiceImports are selected by the namespace
+            // label selector
+            let me = self.clone();
+            let api: Api<crate::mcs::ServiceImport> = Api::all(client.clone());
+            let c = cfg(&self.opts.namespace_label_selector);
+            tasks.push(tokio::spawn(async move {
+                me.watch(
+                    api,
+                    c,
+                    IMPORT,
+                    Change::MULTICLUSTER,
+                    |st: &mut State, o: &crate::mcs::ServiceImport| {
+                        st.imports
+                            .put(obj_key(&o.metadata), convert::service_import(o), Change::MULTICLUSTER)
+                    },
+                    |st, k| st.imports.remove(k),
+                    |live, new| std::mem::swap(&mut live.imports, &mut new.imports),
+                    |_, _| {},
+                )
+                .await
+            }));
+
+            let me = self.clone();
+            let api: Api<discovery::EndpointSlice> = Api::all(client.clone());
+            let sel = match &self.opts.label_selector {
+                Some(s) => format!("{s},{}", convert::MCS_SERVICE_NAME_LABEL),
+                None => convert::MCS_SERVICE_NAME_LABEL.to_string(),
+            };
+            let c = cfg(&Some(sel));
+            tasks.push(tokio::spawn(async move {
+                me.watch(
+                    api,
+                    c,
+                    MC_EP,
+                    Change::MULTICLUSTER,
+                    |st: &mut State, o: &discovery::EndpointSlice| {
+                        st.mc_eps.put(
+                            obj_key(&o.metadata),
+                            convert::multicluster_endpoint_slice(o),
+                            Change::MULTICLUSTER,
+                        )
+                    },
+                    |st, k| st.mc_eps.remove(k),
+                    |live, new| std::mem::swap(&mut live.mc_eps, &mut new.mc_eps),
+                    |me, o| me.record_latency(o),
                 )
                 .await
             }));
@@ -401,6 +597,7 @@ impl KubeController {
                 api,
                 c,
                 NS,
+                Change::INTERNAL,
                 |st: &mut State, o: &core::Namespace| {
                     // namespaces don't count for the serials
                     st.namespaces.insert(o.metadata.name.clone().unwrap_or_default());
@@ -408,6 +605,7 @@ impl KubeController {
                 },
                 |st, k| st.namespaces.remove(k.trim_start_matches('/')),
                 |live, new| std::mem::swap(&mut live.namespaces, &mut new.namespaces),
+                |_, _| {},
             )
             .await
         }));
@@ -417,15 +615,19 @@ impl KubeController {
     /// Consume one watcher, applying events to the state. A re-list
     /// (`Init` .. `InitDone`) builds a fresh index from the converted
     /// objects (full API objects are never kept) and then replaces the
-    /// live one with `swap`.
+    /// live one with `swap`. A sync or delete counts as the `change`
+    /// given; `after` runs for every object seen, outside the lock.
+    #[allow(clippy::too_many_arguments)]
     async fn watch<K>(
         self: Arc<Self>,
         api: Api<K>,
         cfg: watcher::Config,
         slot: usize,
+        change: Change,
         apply: impl Fn(&mut State, &K) -> Change + Send,
         delete: impl Fn(&mut State, &str) -> bool + Send,
         swap: impl Fn(&mut State, &mut State) + Send,
+        after: impl Fn(&Self, &K) + Send,
     ) where
         K: kube::Resource<DynamicType = ()> + Clone + serde::de::DeserializeOwned + std::fmt::Debug + Send + 'static,
     {
@@ -443,26 +645,29 @@ impl KubeController {
                 Event::Init => staging = Some(State::default()),
                 Event::InitApply(o) => {
                     apply(staging.get_or_insert_with(State::default), &o);
+                    after(&self, &o);
                 }
                 Event::InitDone => {
                     let mut st = staging.take().unwrap_or_default();
                     swap(&mut self.state.write().unwrap(), &mut st);
                     drop(st);
-                    self.touch();
+                    self.record(change);
                     self.synced[slot].store(true, Ordering::Relaxed);
                     // a (re-)list parsed every object of this kind; give the
                     // transient memory back instead of holding it at its peak
                     release_free_memory();
                 }
                 Event::Apply(o) => {
-                    let change = apply(&mut self.state.write().unwrap(), &o);
-                    self.record(change);
+                    let c = apply(&mut self.state.write().unwrap(), &o);
+                    self.record(c);
+                    after(&self, &o);
                 }
                 Event::Delete(o) => {
                     let key = obj_key(o.meta());
                     if delete(&mut self.state.write().unwrap(), &key) {
-                        self.touch();
+                        self.record(change);
                     }
+                    after(&self, &o);
                 }
             }
         }
@@ -520,6 +725,20 @@ impl DnsController for KubeController {
     fn modified_external(&self) -> i64 {
         self.ext_modified.load(Ordering::Relaxed)
     }
+    fn modified_multicluster(&self) -> i64 {
+        self.mc_modified.load(Ordering::Relaxed)
+    }
+    fn svc_import_index(&self, idx: &str) -> Vec<Arc<ServiceImport>> {
+        let st = self.state.read().unwrap();
+        st.imports.lookup(&st.imports.by, idx)
+    }
+    fn service_import_list(&self) -> Vec<Arc<ServiceImport>> {
+        self.state.read().unwrap().imports.objs.values().cloned().collect()
+    }
+    fn mc_ep_index(&self, idx: &str) -> Vec<Arc<MultiClusterEndpoints>> {
+        let st = self.state.read().unwrap();
+        st.mc_eps.lookup(&st.mc_eps.by, idx)
+    }
     fn service_list(&self) -> Vec<Arc<Service>> {
         self.state.read().unwrap().svcs.objs.values().cloned().collect()
     }
@@ -542,10 +761,18 @@ mod tests {
             cluster_ips: vec![ip.into()],
             ..Default::default()
         };
-        assert_eq!(idx.put("ns/a".into(), s("10.0.0.1")), Change::INTERNAL, "an add");
-        assert_eq!(idx.put("ns/a".into(), s("10.0.0.1")), Change::NONE, "no change");
+        assert_eq!(
+            idx.put("ns/a".into(), s("10.0.0.1"), Change::INTERNAL),
+            Change::INTERNAL,
+            "an add"
+        );
+        assert_eq!(
+            idx.put("ns/a".into(), s("10.0.0.1"), Change::INTERNAL),
+            Change::NONE,
+            "no change"
+        );
         // like CoreDNS, a new cluster IP doesn't change the serial
-        assert_eq!(idx.put("ns/a".into(), s("10.0.0.2")), Change::NONE);
+        assert_eq!(idx.put("ns/a".into(), s("10.0.0.2"), Change::INTERNAL), Change::NONE);
         assert!(idx.lookup(&idx.by_ip, "10.0.0.1").is_empty());
         assert_eq!(idx.lookup(&idx.by_ip, "10.0.0.2").len(), 1);
         assert_eq!(idx.lookup(&idx.by, "a.ns").len(), 1);

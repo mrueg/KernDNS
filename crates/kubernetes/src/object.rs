@@ -116,6 +116,43 @@ pub struct Pod {
     pub pod_ips: Vec<String>,
     pub name: String,
     pub namespace: String,
+    /// For the `kubernetes/client-label/*` metadata.
+    #[serde(default, deserialize_with = "null_map")]
+    pub labels: HashMap<String, String>,
+}
+
+/// A multicluster ServiceImport (MCS API, `multicluster.x-k8s.io/v1alpha1`).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ServiceImport {
+    pub name: String,
+    pub namespace: String,
+    #[serde(default)]
+    pub index: String,
+    #[serde(rename = "ClusterIPs", default, deserialize_with = "null_vec")]
+    pub cluster_ips: Vec<String>,
+    /// `ClusterSetIP` or `Headless`.
+    #[serde(rename = "Type", default)]
+    pub type_: String,
+    #[serde(default, deserialize_with = "null_vec")]
+    pub ports: Vec<ServicePort>,
+}
+
+impl ServiceImport {
+    pub fn headless(&self) -> bool {
+        self.type_ == "Headless"
+    }
+}
+
+/// An EndpointSlice of a multicluster service, keyed to its ServiceImport
+/// by `index`, from the cluster `cluster_id`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MultiClusterEndpoints {
+    #[serde(flatten)]
+    pub endpoints: Endpoints,
+    #[serde(default)]
+    pub cluster_id: String,
 }
 
 /// Convert API objects (k8s-openapi) to the minimal objects.
@@ -248,6 +285,45 @@ pub mod convert {
                 .unwrap_or_default(),
             name: p.metadata.name.clone().unwrap_or_default(),
             namespace: p.metadata.namespace.clone().unwrap_or_default(),
+            labels: p.metadata.labels.clone().unwrap_or_default().into_iter().collect(),
         })
+    }
+
+    pub const MCS_SERVICE_NAME_LABEL: &str = "multicluster.kubernetes.io/service-name";
+    pub const MCS_SOURCE_CLUSTER_LABEL: &str = "multicluster.kubernetes.io/source-cluster";
+
+    /// `EndpointSliceToMultiClusterEndpoints`.
+    pub fn multicluster_endpoint_slice(e: &discovery::EndpointSlice) -> MultiClusterEndpoints {
+        let labels = e.metadata.labels.as_ref();
+        let label = |k: &str| labels.and_then(|l| l.get(k)).cloned().unwrap_or_default();
+        let mut endpoints = endpoint_slice(e, false);
+        endpoints.index = Service::key(&label(MCS_SERVICE_NAME_LABEL), &endpoints.namespace);
+        MultiClusterEndpoints {
+            endpoints,
+            cluster_id: label(MCS_SOURCE_CLUSTER_LABEL),
+        }
+    }
+
+    /// `ToServiceImport`.
+    pub fn service_import(s: &crate::mcs::ServiceImport) -> ServiceImport {
+        let name = s.metadata.name.clone().unwrap_or_default();
+        let namespace = s.metadata.namespace.clone().unwrap_or_default();
+        let spec = s.spec.clone().unwrap_or_default();
+        ServiceImport {
+            index: Service::key(&name, &namespace),
+            name,
+            namespace,
+            cluster_ips: spec.ips,
+            type_: spec.type_,
+            ports: spec
+                .ports
+                .into_iter()
+                .map(|p| ServicePort {
+                    name: p.name.unwrap_or_default(),
+                    protocol: p.protocol.unwrap_or_default(),
+                    port: p.port,
+                })
+                .collect(),
+        }
     }
 }
