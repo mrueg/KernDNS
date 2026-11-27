@@ -75,6 +75,15 @@ enum Stream {
     Tls(Box<TlsStream<TcpStream>>),
 }
 
+impl Stream {
+    fn local_addr(&self) -> Option<SocketAddr> {
+        match self {
+            Stream::Tcp(t) => t.local_addr().ok(),
+            Stream::Tls(t) => t.get_ref().0.local_addr().ok(),
+        }
+    }
+}
+
 struct Pooled<T> {
     conn: T,
     created: Instant,
@@ -303,8 +312,15 @@ impl Proxy {
 
     /// Send `req` (whose id is replaced for the upstream and restored in
     /// the answer) over `proto`, reusing pooled connections, like
-    /// `Proxy.Connect` + `lookupDNS`. Returns the answer and the protocol used.
-    pub async fn connect(&self, req: &Message, proto: Proto) -> Result<(Message, Proto), ExchangeError> {
+    /// `Proxy.Connect` + `lookupDNS`. Returns the answer and the protocol
+    /// used; `local` gets our address on the upstream socket (for dnstap)
+    /// once there is one.
+    pub async fn connect(
+        &self,
+        req: &Message,
+        proto: Proto,
+        local: &mut Option<SocketAddr>,
+    ) -> Result<(Message, Proto), ExchangeError> {
         let start = Instant::now();
         let origin_id = req.metadata.id;
         let id = rand_id();
@@ -321,6 +337,7 @@ impl Proxy {
                     None => (self.dial_udp().await?, false),
                 };
                 let _ = cached;
+                *local = sock.local_addr().ok();
                 let created = Instant::now();
                 // like `pc.c.UDPSize = max(state.Size(), 512)`: the upstream
                 // answers within the client's EDNS size
@@ -342,6 +359,7 @@ impl Proxy {
                     Some((s, created)) => (s, created, true),
                     None => (self.dial_stream().await?, Instant::now(), false),
                 };
+                *local = s.local_addr();
                 match stream_exchange(&mut s, &wire, id, self.read_timeout).await {
                     Ok(r) => {
                         self.pool.lock().unwrap().stream.push(Pooled {

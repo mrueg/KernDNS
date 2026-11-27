@@ -37,6 +37,8 @@ use crate::dispatch::Dispatcher;
 use crate::doh::connection_limit;
 use crate::unpack::unpack_request;
 
+pub use kerndns_core::protobuf::{decode_packet, encode_packet};
+
 pub const SERVICE: &str = "coredns.dns.DnsService";
 pub const QUERY_PATH: &str = "/coredns.dns.DnsService/Query";
 
@@ -153,74 +155,6 @@ fn ok(payload: &[u8]) -> Response<GrpcBody> {
     r.headers_mut()
         .insert("content-type", HeaderValue::from_static("application/grpc"));
     r
-}
-
-fn put_varint(out: &mut Vec<u8>, mut v: u64) {
-    while v >= 0x80 {
-        out.push((v as u8) | 0x80);
-        v >>= 7;
-    }
-    out.push(v as u8);
-}
-
-fn get_varint(b: &mut &[u8]) -> Option<u64> {
-    let mut v = 0u64;
-    for shift in (0..64).step_by(7) {
-        let (&byte, rest) = b.split_first()?;
-        *b = rest;
-        v |= u64::from(byte & 0x7f) << shift;
-        if byte & 0x80 == 0 {
-            return Some(v);
-        }
-    }
-    None
-}
-
-/// `DnsPacket{msg}` in protobuf (proto3 leaves out an empty field).
-pub fn encode_packet(msg: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(msg.len() + 4);
-    if !msg.is_empty() {
-        out.push(0x0a);
-        put_varint(&mut out, msg.len() as u64);
-        out.extend_from_slice(msg);
-    }
-    out
-}
-
-/// The `msg` field of a `DnsPacket`; unknown fields are skipped.
-pub fn decode_packet(mut b: &[u8]) -> Option<Vec<u8>> {
-    let mut msg = Vec::new();
-    while !b.is_empty() {
-        let key = get_varint(&mut b)?;
-        let (field, wire) = (key >> 3, key & 7);
-        if field == 0 {
-            return None;
-        }
-        match wire {
-            0 => {
-                get_varint(&mut b)?;
-            }
-            1 | 5 => {
-                let n = if wire == 1 { 8 } else { 4 };
-                if b.len() < n {
-                    return None;
-                }
-                b = &b[n..];
-            }
-            2 => {
-                let n = usize::try_from(get_varint(&mut b)?).ok()?;
-                if b.len() < n {
-                    return None;
-                }
-                if field == 1 {
-                    msg = b[..n].to_vec();
-                }
-                b = &b[n..];
-            }
-            _ => return None,
-        }
-    }
-    Some(msg)
 }
 
 /// Read the one request message of a unary call.
@@ -422,19 +356,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn protobuf() {
-        let msg = vec![7u8; 300];
-        let pb = encode_packet(&msg);
-        assert_eq!(&pb[..3], &[0x0a, 0xac, 0x02]);
-        assert_eq!(decode_packet(&pb), Some(msg));
-        assert_eq!(encode_packet(&[]), Vec::<u8>::new());
-        assert_eq!(decode_packet(&[]), Some(vec![]));
-        // unknown varint field 2, then msg
-        assert_eq!(decode_packet(&[0x10, 0x05, 0x0a, 0x01, 0x09]), Some(vec![9]));
-        assert_eq!(decode_packet(&[0x0a, 0x05, 0x01]), None);
-    }
 
     #[test]
     fn grpc_message() {

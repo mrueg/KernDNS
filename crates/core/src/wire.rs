@@ -21,6 +21,57 @@ pub fn to_wire(m: &Message) -> Result<Vec<u8>, ProtoError> {
     }
 }
 
+/// The encoded size of `m` (`usize::MAX` if it can't be encoded).
+pub fn wire_len(m: &Message) -> usize {
+    to_wire(m).map(|v| v.len()).unwrap_or(usize::MAX)
+}
+
+/// Like miekg/dns `Msg.Truncate`: keep as many answer, authority and
+/// additional records (in that order) as fit in `size`, and set TC if any
+/// record was dropped.
+pub fn truncate(m: &mut Message, size: usize) {
+    let size = size.max(512);
+    if wire_len(m) <= size {
+        return;
+    }
+    truncate_oversized(m, size);
+}
+
+/// [`truncate`] for a message already known not to fit.
+pub fn truncate_oversized(m: &mut Message, size: usize) {
+    let answers = std::mem::take(&mut m.answers);
+    let authorities = std::mem::take(&mut m.authorities);
+    let additionals = std::mem::take(&mut m.additionals);
+    let (na, nn, nx) = (answers.len(), authorities.len(), additionals.len());
+
+    let mut dropped = false;
+    for (section, records) in [(0, answers), (1, authorities), (2, additionals)] {
+        for r in records {
+            if dropped {
+                break;
+            }
+            let target = match section {
+                0 => &mut m.answers,
+                1 => &mut m.authorities,
+                _ => &mut m.additionals,
+            };
+            target.push(r);
+            if wire_len(m) > size {
+                match section {
+                    0 => m.answers.pop(),
+                    1 => m.authorities.pop(),
+                    _ => m.additionals.pop(),
+                };
+                dropped = true;
+            }
+        }
+    }
+    let kept = m.answers.len() + m.authorities.len() + m.additionals.len();
+    if kept < na + nn + nx {
+        m.metadata.truncation = true;
+    }
+}
+
 /// Names already written, as (hash of the label sequence, offset).
 struct Encoder {
     buf: Vec<u8>,

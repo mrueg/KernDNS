@@ -19,9 +19,11 @@
 //!
 //! Placeholders: `{PORT}` (the server's port), `{DIR}` (the case's
 //! directory), `{BENCH}` (`bench/`), `{FIX}` (generated fixtures: zones of
-//! 100, 10k and 100k names, a hosts file and query files), `{BACKEND}` and
-//! `{BACKEND_DOT}` (a shared upstream, CoreDNS serving the 10k zone over
-//! UDP/TCP and DoT, with transfers allowed) and `{KUBECONFIG}` (the fake API
+//! 100, 10k and 100k names, a hosts file and query files), `{BACKEND}`,
+//! `{BACKEND_DOT}` and `{BACKEND_GRPC}` (a shared upstream, CoreDNS serving
+//! the 10k zone over UDP/TCP, DoT and gRPC, with transfers allowed),
+//! `{DNSTAP}` (a unix socket where the harness accepts dnstap Frame
+//! Streams and counts the messages) and `{KUBECONFIG}` (the fake API
 //! server, 1000 Services). `bench/plugins/EXEMPT` lists plugins without a
 //! scenario and why; `--check` fails for any other plugin in KernDNS's
 //! registry that has none.
@@ -97,7 +99,17 @@ struct Case {
     corefile: String,
 }
 
-const PLACEHOLDERS: &[&str] = &["PORT", "DIR", "BENCH", "FIX", "BACKEND", "BACKEND_DOT", "KUBECONFIG"];
+const PLACEHOLDERS: &[&str] = &[
+    "PORT",
+    "DIR",
+    "BENCH",
+    "FIX",
+    "BACKEND",
+    "BACKEND_DOT",
+    "BACKEND_GRPC",
+    "DNSTAP",
+    "KUBECONFIG",
+];
 
 fn parse_case(level: u8, group: &str, dir: &Path, path: &Path) -> Result<Case> {
     let text = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
@@ -772,12 +784,13 @@ pub fn run(args: &[String]) -> Result<()> {
     // the shared upstream for forward and secondary: CoreDNS serving the zone
     let backend_port = free_port()?;
     let backend_dot = free_port()?;
+    let backend_grpc = free_port()?;
     let tls = bench.join("shared/tls");
     let backend_cf = work.join("backend.conf");
     fs::write(
         &backend_cf,
         format!(
-            "example.org:{backend_port} {{\n    file {fix}/db.example.org\n    transfer {{\n        to *\n    }}\n}}\ntls://example.org:{backend_dot} {{\n    tls {tls}/cert.pem {tls}/key.pem\n    file {fix}/db.example.org\n}}\n",
+            "example.org:{backend_port} {{\n    file {fix}/db.example.org\n    transfer {{\n        to *\n    }}\n}}\ntls://example.org:{backend_dot} {{\n    tls {tls}/cert.pem {tls}/key.pem\n    file {fix}/db.example.org\n}}\ngrpc://example.org:{backend_grpc} {{\n    file {fix}/db.example.org\n}}\n",
             fix = fix.display(),
             tls = tls.display()
         ),
@@ -799,11 +812,34 @@ pub fn run(args: &[String]) -> Result<()> {
         None
     };
 
+    // the dnstap sink: accepts Frame Streams on a unix socket and counts
+    // the messages
+    let dnstap_sock = work.join("dnstap.sock");
+    let dnstap_frames = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let _sink = if cases.iter().any(|c| c.corefile.contains("{DNSTAP}")) {
+        let _ = fs::remove_file(&dnstap_sock);
+        let _guard = rt.enter();
+        let l = tokio::net::UnixListener::bind(&dnstap_sock).context("binding the dnstap sink")?;
+        let frames = dnstap_frames.clone();
+        Some(rt.spawn(async move {
+            while let Ok((s, _)) = l.accept().await {
+                let frames = frames.clone();
+                tokio::spawn(kerndns_plugins::dnstap::framestream::read_stream(s, move |_| {
+                    frames.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }));
+            }
+        }))
+    } else {
+        None
+    };
+
     let mut vars: BTreeMap<&str, String> = BTreeMap::new();
     vars.insert("BENCH", bench.display().to_string());
     vars.insert("FIX", fix.display().to_string());
     vars.insert("BACKEND", backend_port.to_string());
     vars.insert("BACKEND_DOT", backend_dot.to_string());
+    vars.insert("BACKEND_GRPC", backend_grpc.to_string());
+    vars.insert("DNSTAP", dnstap_sock.display().to_string());
     vars.insert("KUBECONFIG", kubeconfig.display().to_string());
 
     let servers = [("CoreDNS", &coredns), ("KernDNS", &kerndns)];
@@ -825,6 +861,7 @@ pub fn run(args: &[String]) -> Result<()> {
             // with --runs N, the run with the median CPU time per query
             let mut runs_done = Vec::new();
             let mut err = None;
+            let frames0 = dnstap_frames.load(std::sync::atomic::Ordering::Relaxed);
             for _ in 0..runs {
                 match measure(&cpus, bin, &cf, port, case, &q, secs, rate) {
                     Ok((r, used)) => {
@@ -861,6 +898,12 @@ pub fn run(args: &[String]) -> Result<()> {
                     "   warning: {label} lost {:.1}% of queries at max load",
                     r.max.lost / r.max.sent * 100.0
                 );
+            }
+            if case.corefile.contains("{DNSTAP}") {
+                // give the last buffered messages a moment to arrive
+                std::thread::sleep(Duration::from_millis(1500));
+                let n = dnstap_frames.load(std::sync::atomic::Ordering::Relaxed) - frames0;
+                eprintln!("   {label:8} dnstap sink received {n} messages");
             }
             res[i] = Some(r);
         }

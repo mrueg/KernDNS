@@ -117,3 +117,54 @@ pub fn server_config(
         .map_err(|e| format!("could not load TLS cert: {e}"))?;
     Ok(Arc::new(cfg))
 }
+
+/// A client config that accepts any server certificate (`skipverify`,
+/// Go's `InsecureSkipVerify`).
+pub fn insecure_client_config() -> Arc<ClientConfig> {
+    use rustls::DigitallySignedStruct;
+    use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+    use rustls_pki_types::{ServerName, UnixTime};
+
+    #[derive(Debug)]
+    struct NoVerify(Arc<rustls::crypto::CryptoProvider>);
+
+    impl ServerCertVerifier for NoVerify {
+        fn verify_server_cert(
+            &self,
+            _: &CertificateDer<'_>,
+            _: &[CertificateDer<'_>],
+            _: &ServerName<'_>,
+            _: &[u8],
+            _: UnixTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
+            Ok(ServerCertVerified::assertion())
+        }
+        fn verify_tls12_signature(
+            &self,
+            message: &[u8],
+            cert: &CertificateDer<'_>,
+            dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            rustls::crypto::verify_tls12_signature(message, cert, dss, &self.0.signature_verification_algorithms)
+        }
+        fn verify_tls13_signature(
+            &self,
+            message: &[u8],
+            cert: &CertificateDer<'_>,
+            dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            rustls::crypto::verify_tls13_signature(message, cert, dss, &self.0.signature_verification_algorithms)
+        }
+        fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+            self.0.signature_verification_algorithms.supported_schemes()
+        }
+    }
+
+    install_provider();
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let cfg = ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(NoVerify(provider)))
+        .with_no_client_auth();
+    Arc::new(cfg)
+}

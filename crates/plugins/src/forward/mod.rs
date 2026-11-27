@@ -24,28 +24,36 @@
 //! }
 //! ```
 //!
-//! Not ported yet: `https://` and `quic://` upstreams (`doh_method`),
-//! upstreams given as hostnames (`resolver`), and dnstap integration.
+//! Queries and answers are logged to the block's `dnstap` plugins as
+//! FORWARDER_QUERY / FORWARDER_RESPONSE, like CoreDNS's `dnstap.go`.
+//!
+//! Not ported yet: `https://` and `quic://` upstreams (`doh_method`) and
+//! upstreams given as hostnames (`resolver`).
 //! These are rejected with an error rather than ignored.
 
+pub mod policy;
 pub mod proxy;
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI64, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, Instant};
 
 use kerndns_core::duration::parse_duration;
 use kerndns_core::proto::op::ResponseCode;
 use kerndns_core::proto::rr::Name;
-use kerndns_core::zones::{is_subdomain, normalize_exact};
+use kerndns_core::zones::normalize_exact;
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
     async_trait, next_or_failure,
 };
 use rustls_pki_types::ServerName;
 
+use policy::Picker;
+pub use policy::Policy;
 use proxy::{ExchangeError, Options, Proto, Proxy, TlsSettings, rand_below};
+
+use crate::dnstap::Taps;
 
 /// Overall time budget for one query (CoreDNS `defaultTimeout`).
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -53,20 +61,12 @@ const DEFAULT_CONNECT_ATTEMPTS_PER_UPSTREAM: u64 = 2;
 /// Maximum number of upstreams per stanza.
 const MAX_UPSTREAMS: usize = 15;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Policy {
-    Random,
-    RoundRobin,
-    Sequential,
-}
-
 /// One `forward` stanza: its upstreams and settings.
 pub struct ForwardCore {
     pub from: String,
     pub ignored: Vec<String>,
     pub proxies: Vec<Arc<Proxy>>,
-    pub policy: Policy,
-    robin: AtomicU32,
+    pub picker: Picker,
     pub max_fails: u32,
     pub max_connect_attempts: Option<u64>,
     pub hc_interval: Duration,
@@ -82,34 +82,11 @@ pub struct ForwardCore {
 impl ForwardCore {
     /// Upstreams in the order the policy wants them tried.
     fn list(&self) -> Vec<Arc<Proxy>> {
-        let p = &self.proxies;
-        match self.policy {
-            Policy::Sequential => p.clone(),
-            Policy::RoundRobin => {
-                let i = (self.robin.fetch_add(1, Ordering::Relaxed).wrapping_add(1) as usize) % p.len();
-                let mut v = vec![p[i].clone()];
-                v.extend(p[..i].iter().cloned());
-                v.extend(p[i + 1..].iter().cloned());
-                v
-            }
-            Policy::Random => {
-                let mut v = p.clone();
-                for i in (1..v.len()).rev() {
-                    v.swap(i, rand_below(i + 1));
-                }
-                v
-            }
-        }
+        self.picker.list(&self.proxies)
     }
 
     fn matches(&self, name: &str) -> bool {
-        if !is_subdomain(&self.from, name) {
-            return false;
-        }
-        if name == self.from {
-            return true;
-        }
-        !self.ignored.iter().any(|i| is_subdomain(i, name))
+        policy::matches(&self.from, &self.ignored, name)
     }
 }
 
@@ -225,10 +202,12 @@ impl PluginFactory for Setup {
                 }
             });
             let core = core.clone();
+            let taps = Taps::of(c.config);
             c.add_plugin(move |next| {
                 Arc::new(Forward {
                     core: core.clone(),
                     next,
+                    taps: taps.clone(),
                 })
             });
         }
@@ -385,20 +364,7 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
                     return Err(err(format!("max_idle_conns can't be negative: {n}")));
                 }
             }
-            "policy" => {
-                if !c.next_arg() {
-                    return Err(c.arg_err());
-                }
-                policy = match c.val() {
-                    "random" => Policy::Random,
-                    "round_robin" => Policy::RoundRobin,
-                    "sequential" => Policy::Sequential,
-                    x => {
-                        let msg = format!("unknown policy '{x}'");
-                        return Err(c.errf(msg));
-                    }
-                };
-            }
+            "policy" => policy = Policy::parse(c)?,
             "max_concurrent" => {
                 if !c.next_arg() {
                     return Err(c.arg_err());
@@ -510,8 +476,7 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
         from,
         ignored,
         proxies,
-        policy,
-        robin: AtomicU32::new(0),
+        picker: Picker::new(policy),
         max_fails,
         max_connect_attempts,
         hc_interval,
@@ -530,6 +495,8 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
 pub struct Forward {
     core: Arc<ForwardCore>,
     next: Next,
+    /// The block's `dnstap` plugins (`SetTapPlugin`).
+    taps: Taps,
 }
 
 impl Forward {
@@ -574,6 +541,7 @@ impl Handler for Forward {
         };
 
         let list = f.list();
+        let start = std::time::SystemTime::now();
         let deadline = Instant::now() + DEFAULT_TIMEOUT;
         let max_attempts = f
             .max_connect_attempts
@@ -606,6 +574,8 @@ impl Handler for Forward {
             ctx.metadata.insert("forward/upstream".into(), proxy.display_addr());
 
             let mut force_tcp = f.opts.force_tcp;
+            let mut local = None;
+            let mut used;
             let result = loop {
                 // force_tcp wins over prefer_udp; otherwise use the client's protocol
                 let proto = if force_tcp {
@@ -622,7 +592,8 @@ impl Handler for Forward {
                 {
                     e.set_max_payload(512);
                 }
-                match proxy.connect(&msg, proto).await {
+                used = if proxy.is_tls() { Proto::Tcp } else { proto };
+                match proxy.connect(&msg, proto, &mut local).await {
                     Err(ExchangeError::CachedClosed) => continue,
                     Ok((ret, _)) if ret.metadata.truncation && !force_tcp && f.opts.prefer_udp => {
                         force_tcp = true;
@@ -631,6 +602,12 @@ impl Handler for Forward {
                     r => break r,
                 }
             };
+            if let Some(taps) = self.taps.get()
+                && !taps.is_empty()
+            {
+                let reply = result.as_ref().ok().map(|(m, _)| m);
+                to_dnstap(ctx, taps, proxy.addr, local, used, req, reply, start);
+            }
 
             let ret = match result {
                 Ok((ret, _)) => ret,
@@ -687,6 +664,56 @@ impl Handler for Forward {
             "forward",
             upstream_err.unwrap_or_else(|| "no healthy proxies".into()),
         ))
+    }
+}
+
+/// `toDnstap`: FORWARDER_QUERY and, if there is an answer,
+/// FORWARDER_RESPONSE, seen from KernDNS (`local`) towards the upstream.
+#[allow(clippy::too_many_arguments)]
+fn to_dnstap(
+    ctx: &Context,
+    taps: &[Arc<crate::dnstap::Tap>],
+    upstream: SocketAddr,
+    local: Option<SocketAddr>,
+    proto: Proto,
+    req: &Request,
+    reply: Option<&kerndns_core::proto::op::Message>,
+    start: std::time::SystemTime,
+) {
+    use crate::dnstap::msg::{Message as TapMsg, MessageType};
+    let proto = proto.as_str();
+    let raw_query = taps
+        .iter()
+        .any(|t| t.include_raw)
+        .then(|| kerndns_core::wire::to_wire(&req.msg).ok())
+        .flatten();
+    let raw_reply = reply
+        .filter(|_| taps.iter().any(|t| t.include_raw))
+        .and_then(|m| kerndns_core::wire::to_wire(m).ok());
+    for t in taps {
+        let mut q = TapMsg::new(MessageType::ForwarderQuery);
+        q.set_query_time(start);
+        if let Some(l) = local {
+            q.set_query_address(l, proto);
+        }
+        q.set_response_address(upstream, proto);
+        if t.include_raw {
+            q.query_message = raw_query.clone();
+        }
+        t.tap_message_with_metadata(ctx, req, &q);
+        if reply.is_some() {
+            let mut r = TapMsg::new(MessageType::ForwarderResponse);
+            if t.include_raw {
+                r.response_message = raw_reply.clone();
+            }
+            r.set_query_time(start);
+            if let Some(l) = local {
+                r.set_query_address(l, proto);
+            }
+            r.set_response_address(upstream, proto);
+            r.set_response_time(std::time::SystemTime::now());
+            t.tap_message_with_metadata(ctx, req, &r);
+        }
     }
 }
 
@@ -765,8 +792,7 @@ mod tests {
             from: from.into(),
             ignored: ignored.iter().map(|s| s.to_string()).collect(),
             proxies: vec![],
-            policy: Policy::Random,
-            robin: AtomicU32::new(0),
+            picker: Picker::new(Policy::Random),
             max_fails: 2,
             max_connect_attempts: None,
             hc_interval: Duration::from_millis(500),

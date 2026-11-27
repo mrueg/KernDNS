@@ -132,10 +132,36 @@ pub fn split_host_port(s: &str) -> Result<(Vec<String>, Option<String>), String>
             return Ok((reverse_zones(ip, len).map_err(|e| format!("{e}: {host}"))?, port));
         }
     }
-    if host.contains("..") || (host != "." && host.starts_with('.')) {
+    if host.contains("..") || (host != "." && host.starts_with('.')) || !labels_fit(host) {
         return Err(format!("zone is not a valid domain name: {host}"));
     }
     Ok((vec![normalize_zone(host)], port))
+}
+
+/// Every label is at most 63 octets (`\X` and `\DDD` escapes count as
+/// one), as `dns.IsDomainName` requires.
+fn labels_fit(name: &str) -> bool {
+    let b = name.as_bytes();
+    let (mut i, mut label) = (0, 0);
+    while i < b.len() {
+        match b[i] {
+            b'.' => label = 0,
+            b'\\' => {
+                i += if b.get(i + 1).is_some_and(u8::is_ascii_digit) {
+                    3
+                } else {
+                    1
+                };
+                label += 1;
+            }
+            _ => label += 1,
+        }
+        if label > 63 {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 /// Reverse zones for a network. A prefix that is not on a label boundary

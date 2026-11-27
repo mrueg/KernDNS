@@ -1,0 +1,6 @@
+# about: dnstap (full) of every client query and response to a unix socket sink + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    dnstap {DNSTAP} full
+    whoami
+}

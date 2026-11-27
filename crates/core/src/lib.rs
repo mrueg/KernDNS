@@ -23,6 +23,7 @@ pub mod log;
 pub mod metrics;
 pub mod order;
 pub mod plugin;
+pub mod protobuf;
 pub mod readiness;
 pub mod reload;
 pub mod request;

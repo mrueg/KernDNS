@@ -12,7 +12,8 @@ tokio.workspace = true
 thiserror.workspace = true
 data-encoding.workspace = true
 regex.workspace = true
-hyper.workspace = true
+hyper = { workspace = true, features = ["client", "http2"] }
+http.workspace = true
 hyper-util.workspace = true
 http-body-util.workspace = true
 bytes.workspace = true

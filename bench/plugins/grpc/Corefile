@@ -1,0 +1,5 @@
+# about: grpc to a shared upstream (CoreDNS serving the zone over gRPC, h2c)
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    grpc . 127.0.0.1:{BACKEND_GRPC}
+}
