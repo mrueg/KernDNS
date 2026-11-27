@@ -11,7 +11,7 @@ pass  TestAXFR
 pass  TestAXFRPods
 pass  TestDNSProgrammingLatencyEndpoints
 pass  TestKubernetesA
-xfail TestKubernetesAutopath              environment: fails on CoreDNS too (kind job, coredns target); a search domain from the GitHub runner's resolv.conf reaches forward, which has no next plugin (SERVFAIL)
+skip  TestKubernetesAutopath              environment: depends on the GitHub runner's resolv.conf; with a search domain there, it reaches forward, which has no next plugin (SERVFAIL), for CoreDNS (coredns target) too; without one it passes
 pass  TestKubernetesEndpointPodNames
 pass  TestKubernetesFallthrough
 pass  TestKubernetesFallthroughFiltered
