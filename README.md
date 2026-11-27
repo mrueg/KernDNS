@@ -13,6 +13,12 @@ KernDNS aims to:
 3. **Prove it**: CoreDNS's own integration tests run against KernDNS, and
    benchmarks compare the two plugin by plugin.
 
+> [!WARNING]
+> **KernDNS is a prototype. Do not use it in production.** It is an
+> experiment in how far a Rust port of CoreDNS can go. It has not been
+> audited or run under real traffic, and its interfaces, flags and image
+> can change without notice.
+
 > KernDNS is an independent project. It is not affiliated with or endorsed by
 > the CoreDNS project or the CNCF.
 
@@ -249,10 +255,17 @@ The [`Dockerfile`](Dockerfile) builds an image that replaces CoreDNS's
 kubeadm's `coredns` Deployment:
 
 ```sh
-docker build -t kerndns .                  # CI builds it on every PR (no push)
+kubectl -n kube-system set image deployment/coredns coredns=ghcr.io/mrueg/kerndns:main
+# or build it yourself:
+docker build -t kerndns .
 kind load docker-image --name CLUSTER kerndns
 kubectl -n kube-system set image deployment/coredns coredns=kerndns
 ```
+
+CI builds the image on every PR and pushes it to
+`ghcr.io/mrueg/kerndns` on every push to `main` (tags `main`, `latest` and
+`sha-<commit>`) and for `v*` tags (the version). Remember that KernDNS is
+a prototype: don't put this image in a production cluster.
 
 Like CoreDNS's image, the entrypoint is `/coredns` (an alias of
 `/kerndns`), it runs as uid/gid 65532 with `cap_net_bind_service` on the
@@ -270,6 +283,12 @@ seconds, probes and `/metrics` answer, the ConfigMap edit is picked up by
 names; over UDP and TCP) get the same answers as the cluster's CoreDNS, except
 `cluster.local NS`, which names the DNS Service in the server's own
 namespace in both.
+
+CI also runs CoreDNS's end-to-end Kubernetes tests
+([coredns/ci](https://github.com/coredns/ci), `test/kubernetes`) with this
+image as the cluster DNS of a kind cluster, set up the way coredns/ci sets
+it up for CoreDNS (one replica, its Deployment and ClusterRole patches, its
+test namespaces and workloads).
 
 ## Layout
 
