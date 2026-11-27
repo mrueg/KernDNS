@@ -29,7 +29,7 @@ sha2 = "0.10"
 # DNSSEC signing; the same ring that hickory-proto (dnssec-ring) and rustls use
 ring = "0.17"
 hmac = "0.12"
-sha1 = "0.10"
+sha1 = "0.11"
 md-5 = "0.10"
 prometheus = { version = "0.14", default-features = false, features = ["process", "protobuf"] }
 data-encoding = "2"
