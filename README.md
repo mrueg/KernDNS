@@ -161,6 +161,16 @@ Services with 3 endpoints each; both servers watch it via kubeconfig):
 | 10,000 | 5.6 s → 0.64 s | 121 → 77 MiB | 148 → 77 MiB | 33k → 108k |
 | 50,000 | 7.8 s → 1.9 s | 352 → 178 MiB | 495 → 254 MiB | 66k → 125k |
 
+Level 3, kubeadm cluster DNS (`bench/setups/kubeadm`: kubeadm's default
+Corefile, the queries pods send through the `ndots:5` search path, SRV,
+PTR, pod names and external names), one 5 s run on a heavily loaded
+machine:
+
+| API server | Max QPS CoreDNS → KernDNS | CPU µs/query | Peak RSS |
+|---|---|---|---|
+| fake, 1,000 Services | 12.6k → 16.3k | 84.8 → 73.6 | 76 → 25 MiB |
+| kind cluster (`--kubeconfig`) | 8.0k → 18.8k | 147.2 → 74.6 | 73 → 23 MiB |
+
 Single laptop runs: treat them as indicative; the plan calls for a
 dedicated benchmark machine.
 
@@ -202,6 +212,35 @@ Plugins that cooperate through Go types (`transfer` and its zone sources,
 `kubernetes` and `k8s_external`, `alternate` and `forward`, `autopath`
 and the plugin it gets the search path from) must all run on
 the same side; KernDNS checks that when it loads the Corefile.
+
+### Container image
+
+The [`Dockerfile`](Dockerfile) builds an image that replaces CoreDNS's
+(`registry.k8s.io/coredns/coredns`) by changing only the `image` field of
+kubeadm's `coredns` Deployment:
+
+```sh
+docker build -t kerndns .                  # CI builds it on every PR (no push)
+kind load docker-image --name CLUSTER kerndns
+kubectl -n kube-system set image deployment/coredns coredns=kerndns
+```
+
+Like CoreDNS's image, the entrypoint is `/coredns` (an alias of
+`/kerndns`), it runs as uid/gid 65532 with `cap_net_bind_service` on the
+binary, and the Deployment's `-conf /etc/coredns/Corefile`, probes
+(`health` on :8080, `ready` on :8181), metrics on :9153, read-only root
+filesystem and dropped capabilities all work unchanged. The base is
+distroless `cc` (glibc) instead of `static`, so `-bridge` can load a Go
+plugin library; the image is 57 MB (CoreDNS 1.14.6: 77 MB).
+
+Checked on a kind cluster with a copy of kubeadm's Deployment, Service,
+ConfigMap (the default Corefile) and RBAC in a test namespace: ready in
+seconds, probes and `/metrics` answer, the ConfigMap edit is picked up by
+`reload`, a deleted pod goes through `lameduck` and exits, and 47 queries
+(services, headless, ExternalName, SRV, pods, PTR, NXDOMAIN, external
+names; over UDP and TCP) get the same answers as the cluster's CoreDNS, except
+`cluster.local NS`, which names the DNS Service in the server's own
+namespace in both.
 
 ## Layout
 
@@ -255,6 +294,7 @@ cargo xtask k8s-bench                   # kubernetes plugin at 1k/10k/50k servic
 # live-cluster comparison (workloads in namespaces testns/other):
 kubectl --context CTX apply -f bench/k8s/workloads.yaml
 cargo xtask k8s-difftest --context CTX
+cargo xtask bench --scenario kubeadm --kubeconfig KUBECONFIG  # kubeadm setup against the live cluster
 kubectl --context CTX delete ns testns other
 ```
 

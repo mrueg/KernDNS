@@ -15,6 +15,7 @@
 //! # queries: {FIX}/q-file.txt       (dnsperf input; default {DIR}/queries.txt)
 //! # dnsperf: -m dot                 (extra dnsperf arguments)
 //! # needs: kubernetes               (start the fake Kubernetes API server)
+//! # live-queries: {DIR}/q-live.txt  (dnsperf input with --kubeconfig)
 //! ```
 //!
 //! Placeholders: `{PORT}` (the server's port), `{DIR}` (the case's
@@ -24,7 +25,8 @@
 //! the 10k zone over UDP/TCP, DoT and gRPC, with transfers allowed),
 //! `{DNSTAP}` (a unix socket where the harness accepts dnstap Frame
 //! Streams and counts the messages) and `{KUBECONFIG}` (the fake API
-//! server, 1000 Services). `bench/plugins/EXEMPT` lists plugins without a
+//! server, 1000 Services; with `--kubeconfig PATH`, that file instead, for
+//! a live cluster). `bench/plugins/EXEMPT` lists plugins without a
 //! scenario and why; `--check` fails for any other plugin in KernDNS's
 //! registry that has none.
 //!
@@ -94,6 +96,8 @@ struct Case {
     path: PathBuf,
     about: String,
     queries: String,
+    /// `# live-queries:`, used instead of `queries` with `--kubeconfig`.
+    live_queries: Option<String>,
     dnsperf: Vec<String>,
     needs_k8s: bool,
     corefile: String,
@@ -126,6 +130,7 @@ fn parse_case(level: u8, group: &str, dir: &Path, path: &Path) -> Result<Case> {
         path: path.to_path_buf(),
         about: String::new(),
         queries: "{DIR}/queries.txt".into(),
+        live_queries: None,
         dnsperf: Vec::new(),
         needs_k8s: false,
         corefile: text.clone(),
@@ -139,6 +144,7 @@ fn parse_case(level: u8, group: &str, dir: &Path, path: &Path) -> Result<Case> {
         match key.trim() {
             "about" => case.about = value.to_string(),
             "queries" => case.queries = value.to_string(),
+            "live-queries" => case.live_queries = Some(value.to_string()),
             "dnsperf" => case.dnsperf = value.split_whitespace().map(String::from).collect(),
             "needs" => match value {
                 "kubernetes" => case.needs_k8s = true,
@@ -283,15 +289,19 @@ fn check(bench: &Path) -> Result<()> {
     vars.insert("BENCH", bench.display().to_string());
     for c in &cases {
         let rel = c.path.strip_prefix(bench).unwrap_or(&c.path).display().to_string();
-        for ph in placeholders(&c.corefile).into_iter().chain(placeholders(&c.queries)) {
+        let queries = std::iter::once(&c.queries).chain(&c.live_queries);
+        for ph in placeholders(&c.corefile)
+            .into_iter()
+            .chain(queries.clone().flat_map(|q| placeholders(q)))
+        {
             if !PLACEHOLDERS.contains(&ph.as_str()) {
                 problems.push(format!("{rel}: unknown placeholder {{{ph}}}"));
             }
         }
-        if !c.queries.starts_with("{FIX}") {
+        for q in queries.filter(|q| !q.starts_with("{FIX}")) {
             let mut v = vars.clone();
             v.insert("DIR", c.dir.display().to_string());
-            let q = render(&c.queries, &v);
+            let q = render(q, &v);
             if !Path::new(&q).is_file() {
                 problems.push(format!("{rel}: query file {q} does not exist"));
             }
@@ -708,6 +718,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let mut secs = 10u32;
     let mut runs = 1usize;
     let mut coredns_bin = None;
+    let mut live_kubeconfig: Option<PathBuf> = None;
     let mut do_check = false;
     let mut list = false;
     let mut it = args.iter();
@@ -729,6 +740,10 @@ pub fn run(args: &[String]) -> Result<()> {
             "--duration" => secs = it.next().context("--duration needs seconds")?.parse()?,
             "--runs" => runs = it.next().context("--runs needs a count")?.parse::<usize>()?.max(1),
             "--coredns" => coredns_bin = Some(PathBuf::from(it.next().context("--coredns needs a path")?)),
+            "--kubeconfig" => {
+                let p = PathBuf::from(it.next().context("--kubeconfig needs a path")?);
+                live_kubeconfig = Some(fs::canonicalize(&p).with_context(|| format!("{}", p.display()))?);
+            }
             other => bail!("unknown argument {other}"),
         }
     }
@@ -802,8 +817,9 @@ pub fn run(args: &[String]) -> Result<()> {
         .worker_threads(1)
         .enable_all()
         .build()?;
-    let kubeconfig = work.join("kubeconfig");
-    let _api = if cases.iter().any(|c| c.needs_k8s) {
+    // a live cluster (--kubeconfig) replaces the fake API server
+    let kubeconfig = live_kubeconfig.clone().unwrap_or_else(|| work.join("kubeconfig"));
+    let _api = if live_kubeconfig.is_none() && cases.iter().any(|c| c.needs_k8s) {
         let objs = crate::fakeapi::generate_with(K8S_SERVICES, K8S_NAMESPACES, true);
         let (addr, task) = rt.block_on(crate::fakeapi::serve(objs))?;
         fs::write(&kubeconfig, kubeconfig_for(&addr.to_string()))?;
@@ -849,7 +865,11 @@ pub fn run(args: &[String]) -> Result<()> {
         eprintln!("== level {} {}: {}", case.level, case.name, case.about);
         let mut v = vars.clone();
         v.insert("DIR", case.dir.display().to_string());
-        let q = PathBuf::from(render(&case.queries, &v));
+        let queries = match (&live_kubeconfig, &case.live_queries) {
+            (Some(_), Some(live)) => live,
+            _ => &case.queries,
+        };
+        let q = PathBuf::from(render(queries, &v));
         let mut rate = None;
         let mut res: [Option<Result1>; 2] = [None, None];
         for (i, (label, bin)) in servers.iter().enumerate() {
