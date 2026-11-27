@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: third_party/coredns/go.mod
+          cache-dependency-path: third_party/coredns/go.sum
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: CoreDNS integration tests
+        run: cargo xtask compat-test
+      - name: Differential test against CoreDNS
+        run: cargo xtask difftest

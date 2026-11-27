@@ -1,0 +1,126 @@
+# Expected results of CoreDNS's integration tests (third_party/coredns/test) against KernDNS.
+# Maintained by `cargo xtask compat-test --update`; edit reasons by hand.
+#
+#   pass   must pass
+#   xfail  fails today; the run fails if it starts passing, so it gets promoted
+#   skip   not run: tests Go internals, or never starts a server through the helpers
+#
+# <status> <test> <reason>
+xfail TestACLAuthorizesAutopathExpandedName           Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'acl' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestACMEDNS01CertificateManagement              starting CoreDNS: plugin/tls: ACME certificates are not supported by KernDNS yet
+xfail TestAuto                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestAutoAXFR                                    Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestAutoNonExistentZone                         Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestAutoPathErraticNotLoaded                    Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'autopath' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestBind_FilterAll
+xfail TestCacheACLAuthorization                       start no-cache control server: stdin:3 - Error during parsing: Directive 'acl' is not available in KernDNS yet (no Rust port of this plugin)
+skip  TestChaos                                       expects the version string CoreDNS-1.15.0; KernDNS reports KernDNS-<version>
+pass  TestClasslessReverse
+xfail TestCompressScrub                               Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestCorefileParsing
+xfail TestDNS64FallbackError                          stdin:3 - Error during parsing: Directive 'dns64' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestDynUpdateAXFRIncludesUpdatedRecord
+pass  TestDynUpdateCoalescesNotify
+skip  TestDynUpdateCorefileReload                     calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestDynUpdateFailedStartupDoesNotCreateDatabase
+pass  TestDynUpdateIsNotServedFromCache
+skip  TestDynUpdateKeaLifecycle                       does not start a server through the test helpers
+pass  TestDynUpdateNsupdate
+pass  TestDynUpdatePersistentWire
+pass  TestDynUpdateRejectsDuplicateDirective
+pass  TestDynUpdateRejectsOtherZones
+pass  TestDynUpdateRejectsUnsignedRequest
+pass  TestDynUpdateUDPAndTCP
+pass  TestEDNS0
+pass  TestEmptySecondaryZone
+pass  TestFileCnameOrigin
+pass  TestFileLoop
+skip  TestFileNameHyphen                              does not start a server through the test helpers
+pass  TestFileUpstream
+pass  TestFileUpstreamAdditional
+xfail TestFileUpstreamError                           Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'template' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestGRPCConnectionLimit                         Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestGRPCTLSWithLimits                           Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestGRPCWithLimits                              Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestGrpc                                        Could not get CoreDNS serving instance: grpc://:0: the grpc:// transport is not supported by KernDNS yet
+pass  TestHTTPS
+xfail TestHTTPS3                                      Could not get CoreDNS serving instance: https3://:0: the https3:// transport is not supported by KernDNS yet
+xfail TestHTTPS3WithLimits                            Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'https3' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestHTTPSConnectionLimit                        Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'https' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestHTTPSMaxStreamsKeyOrder                     Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'https' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestHTTPSWithLimits                             Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'https' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestHostsInlineLookup
+skip  TestImportOrdering                              does not start a server through the test helpers
+skip  TestImportTesting                               does not start a server through the test helpers
+xfail TestIssue7630                                   Could not start test CoreDNS: stdin:2 - Error during parsing: Directive 'metadata' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestIxfrResponse
+skip  TestJSONLoggingProcess                          does not start a server through the test helpers
+skip  TestJSONLoggingProcessHelper                    does not start a server through the test helpers
+xfail TestKubernetesAutopathCacheRefresh              isolated test failed: exit status 1
+pass  TestLargeAXFR
+xfail TestLookupAutoPathErratic                       Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestLookupBalanceRewriteCacheDnssec             Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'rewrite' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestLookupCache
+pass  TestLookupCacheWithoutEdns
+pass  TestLookupDS
+pass  TestLookupProxy
+pass  TestLookupWildcard
+skip  TestLowercaseLog                                does not start a server through the test helpers
+skip  TestMetricNaming                                does not start a server through the test helpers
+xfail TestMetricsAuto                                 Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestMetricsAvailable
+skip  TestMetricsAvailableAfterReload                 calls caddy.Restart, which starts an in-process CoreDNS
+skip  TestMetricsAvailableAfterReloadAndFailedReload  calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestMetricsPluginEnabled
+pass  TestMetricsRefused
+xfail TestMetricsRewriteRequestSize                   Available metrics without rewrite:
+pass  TestMetricsServer
+pass  TestMetricsSeveralBlocs
+skip  TestMultiZoneBlockConfigs                       reads dnsserver.Config through reflection on the caddy instance
+xfail TestMultisocket                                 Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'multisocket' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestMultisocket_Restart                         Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'multisocket' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestMultisocket_WhoAmI                          Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'multisocket' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestNoPlugins
+xfail TestProxyThreeWay                               Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestProxyToChaosServer
+xfail TestQUIC                                        Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
+xfail TestQUICProtocolError                           Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
+xfail TestQUICReloadDoesNotPanic                      Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
+xfail TestQUICStreamLimits                            Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'quic' is not available in KernDNS yet (no Rust port of this plugin)
+skip  TestReadme                                      does not start a server through the test helpers
+skip  TestReload                                      second half calls caddy.Restart, which starts an in-process CoreDNS
+skip  TestReloadConcurrentRestartAndStop              calls caddy.Restart, which starts an in-process CoreDNS
+skip  TestReloadHealth                                calls caddy.Restart, which starts an in-process CoreDNS
+skip  TestReloadMetricsHealth                         calls caddy.Restart, which starts an in-process CoreDNS
+skip  TestReloadSeveralTimeMetrics                    calls caddy.Restart, which starts an in-process CoreDNS
+skip  TestReloadTwoServerBlocksUnreadyPlugin          uses test-only Go plugins registered inside the test binary
+skip  TestReloadUnreadyPlugin                         uses test-only Go plugins registered inside the test binary
+pass  TestRetryInitialTransfer
+pass  TestReverse
+pass  TestReverseCorefile
+pass  TestReverseExpansion
+pass  TestReverseInAddr
+xfail TestRewrite                                     Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'rewrite' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestRewriteFailure                              Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'rewrite' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestSIITAfterForward                            could not start CoreDNS test server: stdin:2 - Error during parsing: Directive 'siit' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestSecondaryFallthrough
+pass  TestSecondaryZoneNotify
+pass  TestSecondaryZoneTransfer
+xfail TestShed                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'shed' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestTLS
+skip  TestTempFile                                    does not start a server through the test helpers
+xfail TestTemplateUpstream                            Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'template' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestTsig
+pass  TestTsigBadKey
+pass  TestTsigBadSig
+pass  TestTsigBadTime
+pass  TestUppercaseServerBlockZone
+xfail TestView                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestViewServerBlockOrdering                     Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestZoneDanglingCNAMENegativeAuthority
+pass  TestZoneEDNS0Lookup
+pass  TestZoneExternalCNAMELookupWithProxy
+pass  TestZoneExternalCNAMELookupWithoutProxy
+pass  TestZoneNoNS
+pass  TestZoneReload
+pass  TestZoneSRVAdditional
