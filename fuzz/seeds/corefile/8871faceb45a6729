@@ -1,0 +1,10 @@
+. {
+  view example {
+    expr name() matches '^abc\\..*\\.example\\.com\\.$'
+  }
+  forward . 10.0.0.2
+}
+
+. {
+  forward . 10.0.0.1
+}

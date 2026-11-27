@@ -1,0 +1,57 @@
+example.org {
+    acl {
+        block type HINFO
+    }
+    header {
+        response set ra
+    }
+    rewrite stop {
+        name regex (.*)\.rw\.example\.org {1}.example.org
+        answer name (.*)\.example\.org {1}.rw.example.org
+    }
+    rewrite name exact short.example.org www.example.org
+    rewrite edns0 local set 0xffee abcd
+    cache 30 {
+        prefetch 2
+        serve_stale
+    }
+    loadbalance
+    template IN A ip.example.org {
+        match "^(?P<a>[0-9]+)\.ip\.example\.org\.$"
+        answer "{{ .Name }} 60 IN A 10.0.0.{{ .Group.a }}"
+        fallthrough
+    }
+    template IN TXT tmpl.example.org {
+        answer "{{ .Name }} 60 IN TXT \"{{ .Type }} {{ .Class }} {{ .Zone }}\""
+    }
+    file {FIX}/db.example.org {
+        reload 0
+    }
+}
+
+example.net {
+    tsig {
+        secret tsig.example.net. MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
+    }
+    minimal
+    bufsize 1232
+    nsid kerndns
+    any
+    hosts {FIX}/hosts {
+        reload 0
+        fallthrough
+    }
+    dns64 {
+        prefix 64:ff9b::/96
+        translate_all
+    }
+    template ANY ANY {
+        rcode NXDOMAIN
+    }
+}
+
+. {
+    chaos KernDNS dev@example.org
+    local
+    whoami
+}

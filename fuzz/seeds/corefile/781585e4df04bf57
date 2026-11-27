@@ -1,0 +1,6 @@
+.:0 {
+		etcd skydns.test {
+			path /skydns
+		}
+		cache skydns.test
+	}

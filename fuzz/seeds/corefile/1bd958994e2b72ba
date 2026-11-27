@@ -1,0 +1,14 @@
+.:0 {
+		# CNAME
+		template IN ANY cname.example.net. {
+			match ".*"
+			answer "cname.example.net. 60 IN CNAME target.example.net."
+			upstream
+		}
+
+		# Target
+		template IN A target.example.net. {
+			match ".*"
+			answer "target.example.net. 60 IN A 1.2.3.4"
+		}
+	}

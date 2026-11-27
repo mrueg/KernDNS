@@ -1,0 +1,10 @@
+. {
+  view example {
+    expr type() in ['A', 'AAAA']
+  }
+  forward . 10.0.0.6
+}
+
+. {
+  forward . 10.0.0.1
+}

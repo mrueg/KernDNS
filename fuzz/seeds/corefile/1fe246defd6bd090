@@ -1,0 +1,14 @@
+.:0 {
+    kubernetes cluster.local {
+        pods verified
+        kubeconfig %q
+    }
+    autopath @kubernetes
+    cache {
+        success 1024 3600 0
+        denial 1024 1800 0
+        %s
+    }
+    forward . %s
+    loadbalance
+}

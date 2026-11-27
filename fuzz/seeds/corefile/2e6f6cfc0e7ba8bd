@@ -1,0 +1,13 @@
+%s:0 {
+	bind 127.0.0.1
+	cache
+	tsig {
+		secret %s %s
+		require_opcode UPDATE
+	}
+	dynupdate {
+		file %q
+		database %q
+		allow %s * %s
+	}
+}

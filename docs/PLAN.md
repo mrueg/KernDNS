@@ -446,7 +446,10 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
    fixtures against CoreDNS and KernDNS, a query corpus including fuzzed
    queries, diffs normalised for TTL and RRset order. A plugin becomes the
    default Rust implementation only after it passes.
-5. **Fuzzing:** the Corefile parser and the bridge's message handling.
+5. **Fuzzing** (`fuzz/`, cargo-fuzz, done): the Corefile parser, dispenser
+   and every plugin's setup; the wire request path with a representative
+   chain; the Rust side of the bridge's message handling (callbacks from Go,
+   the plugin list, directive rendering). CI runs each target for 60 s.
 
 ## Benchmarks: CoreDNS vs KernDNS
 

@@ -1,0 +1,6 @@
+example.org:53555 {
+        bind 127.0.0.1
+		secondary {
+			transfer from 127.0.0.1:53554
+		}
+	}

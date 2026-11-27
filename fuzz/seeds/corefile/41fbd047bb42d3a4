@@ -1,0 +1,7 @@
+https3://.:443 {
+    tls cert.pem key.pem
+    https3 {
+        max_streams 0
+    }
+    whoami
+}

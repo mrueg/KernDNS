@@ -1,0 +1,5 @@
+example.org:0 {
+		secondary {
+			transfer from 127.0.0.1:5399
+		}
+	}

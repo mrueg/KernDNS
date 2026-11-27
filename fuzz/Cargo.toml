@@ -1,0 +1,49 @@
+[package]
+name = "kerndns-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+# Not part of the main workspace: it needs nightly and libFuzzer.
+[workspace]
+members = ["."]
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+tokio = { version = "1", features = ["full"] }
+kerndns-core = { path = "../crates/core" }
+kerndns-corefile = { path = "../crates/corefile" }
+kerndns-server = { path = "../crates/server" }
+kerndns-plugins = { path = "../crates/plugins" }
+kerndns-kubernetes = { path = "../crates/kubernetes" }
+kerndns-go-bridge = { path = "../crates/go-bridge" }
+
+[profile.release]
+debug = 1
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "corefile"
+path = "fuzz_targets/corefile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wire"
+path = "fuzz_targets/wire.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bridge"
+path = "fuzz_targets/bridge.rs"
+test = false
+doc = false
+bench = false

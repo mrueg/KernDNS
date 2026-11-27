@@ -1,0 +1,4 @@
+grpc_server {
+    max_streams NON_NEGATIVE_INTEGER
+    max_connections NON_NEGATIVE_INTEGER
+}

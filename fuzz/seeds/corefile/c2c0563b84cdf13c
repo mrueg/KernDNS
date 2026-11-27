@@ -1,0 +1,10 @@
+.:0 {
+		etcd skydns.local {
+			stubzones
+			path /skydns
+			endpoint http://localhost:2379
+			upstream
+			fallthrough
+		}
+		forward . 8.8.8.8:53
+	}

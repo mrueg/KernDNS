@@ -1,0 +1,7 @@
+.:0 {
+		rewrite type MX a
+		rewrite edns0 local set 0xffee hello-world
+		erratic . {
+			drop 0
+		}
+	}

@@ -1,0 +1,5 @@
+quic {
+    max_streams POSITIVE_INTEGER
+    max_connections NON_NEGATIVE_INTEGER
+    worker_pool_size POSITIVE_INTEGER
+}

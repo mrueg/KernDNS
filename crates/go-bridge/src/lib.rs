@@ -142,11 +142,17 @@ extern "C" fn on_next(token: u64, next_token: u64, msg: *const u8, len: usize) {
 
 extern "C" fn on_done(token: u64, rcode: c_int, err: *const c_char) {
     let e = if err.is_null() {
-        String::new()
+        None
     } else {
-        unsafe { CStr::from_ptr(err) }.to_string_lossy().into_owned()
+        Some(unsafe { CStr::from_ptr(err) })
     };
-    send(token, Event::Done(rcode as u16, e));
+    send(token, done_event(rcode, e));
+}
+
+/// The event for `on_done`.
+fn done_event(rcode: c_int, err: Option<&CStr>) -> Event {
+    let e = err.map(|e| e.to_string_lossy().into_owned()).unwrap_or_default();
+    Event::Done(rcode as u16, e)
 }
 
 fn cstring(s: &str) -> CString {
@@ -448,7 +454,7 @@ impl SyncCall<'_> {
                 // SAFETY: serve_dns holds the &mut Context and doesn't touch
                 // it while the synchronous call runs.
                 let ctx = unsafe { &mut *self.ctx };
-                let fut = self.plugin.run_next(ctx, self.req, &b);
+                let fut = run_next(self.plugin.name, &self.plugin.next, ctx, self.req, &b);
                 let (code, out, err) = tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(fut));
                 let err = cstring(&err);
                 // SAFETY: as in serve_dns; the Go side doesn't keep the buffer.
@@ -502,19 +508,10 @@ impl Handler for GoPlugin {
         if self.sync && multi {
             let (writes, done) = self.call_sync(ctx, req, &wire, [&remote, &local, &proto, &server, &meta]);
             for b in writes {
-                match Message::from_vec(&b) {
-                    Ok(m) => w
-                        .write_msg(m)
-                        .await
-                        .map_err(|e| PluginError::servfail(self.name, e.to_string()))?,
-                    Err(e) => kerndns_core::error!(plugin = self.name, "unparsable response from Go: {e}"),
-                }
+                write_from_go(self.name, w, &b).await?;
             }
             let (code, err) = done.unwrap_or((2, "Go plugin returned no result".into()));
-            if err.is_empty() {
-                return Ok(rcode(code));
-            }
-            return Err(PluginError::new(self.name, rcode(code), err));
+            return done_result(self.name, code, err);
         }
         let token = TOKENS.fetch_add(1, Ordering::Relaxed);
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -534,34 +531,60 @@ impl Handler for GoPlugin {
                 meta.as_ptr(),
             )
         };
-        while let Some(ev) = rx.recv().await {
-            match ev {
-                Event::Write(b) => match Message::from_vec(&b) {
-                    Ok(m) => w
-                        .write_msg(m)
-                        .await
-                        .map_err(|e| PluginError::servfail(self.name, e.to_string()))?,
-                    Err(e) => kerndns_core::error!(plugin = self.name, "unparsable response from Go: {e}"),
-                },
-                Event::Next(nt, b) => {
-                    let (code, out, err) = self.run_next(ctx, req, &b).await;
-                    let err = cstring(&err);
-                    // SAFETY: as above.
-                    unsafe {
-                        (self.bridge.api.next_done)(nt, c_int::from(code), out.as_ptr(), out.len(), err.as_ptr())
-                    };
-                }
-                Event::Done(code, err) => {
-                    let rc = rcode(code);
-                    if err.is_empty() {
-                        return Ok(rc);
-                    }
-                    return Err(PluginError::new(self.name, rc, err));
-                }
-            }
-        }
-        Err(PluginError::servfail(self.name, "Go bridge closed the request"))
+        let next_done = |nt: u64, code: u16, out: &[u8], err: &CStr| {
+            // SAFETY: as above.
+            unsafe { (self.bridge.api.next_done)(nt, c_int::from(code), out.as_ptr(), out.len(), err.as_ptr()) };
+        };
+        drive(self.name, &self.next, ctx, w, req, &mut rx, next_done).await
     }
+}
+
+/// A response the Go plugin wrote: pass it on to `w`. An unparsable one is
+/// logged and dropped.
+async fn write_from_go(name: &'static str, w: &mut dyn ResponseWriter, b: &[u8]) -> Result<(), PluginError> {
+    match Message::from_vec(b) {
+        Ok(m) => w
+            .write_msg(m)
+            .await
+            .map_err(|e| PluginError::servfail(name, e.to_string())),
+        Err(e) => {
+            kerndns_core::error!(plugin = name, "unparsable response from Go: {e}");
+            Ok(())
+        }
+    }
+}
+
+/// The Go plugin's result: its rcode and error text.
+fn done_result(name: &'static str, code: u16, err: String) -> HandlerResult {
+    let rc = rcode(code);
+    if err.is_empty() {
+        return Ok(rc);
+    }
+    Err(PluginError::new(name, rc, err))
+}
+
+/// Handle the events of one asynchronous request until the Go plugin is
+/// done; `next_done` answers its calls to next.
+async fn drive(
+    name: &'static str,
+    next: &Next,
+    ctx: &mut Context,
+    w: &mut dyn ResponseWriter,
+    req: &Request,
+    rx: &mut mpsc::UnboundedReceiver<Event>,
+    next_done: impl Fn(u64, u16, &[u8], &CStr),
+) -> HandlerResult {
+    while let Some(ev) = rx.recv().await {
+        match ev {
+            Event::Write(b) => write_from_go(name, w, &b).await?,
+            Event::Next(nt, b) => {
+                let (code, out, err) = run_next(name, next, ctx, req, &b).await;
+                next_done(nt, code, &out, &cstring(&err));
+            }
+            Event::Done(code, err) => return done_result(name, code, err),
+        }
+    }
+    Err(PluginError::servfail(name, "Go bridge closed the request"))
 }
 
 impl GoPlugin {
@@ -598,30 +621,85 @@ impl GoPlugin {
         };
         (call.writes, call.done)
     }
+}
 
-    /// The rest of the chain for the Go plugin's `Next`: (rcode, written
-    /// messages each prefixed with a 2-byte length, error text).
-    async fn run_next(&self, ctx: &mut Context, req: &Request, wire: &[u8]) -> (u16, Vec<u8>, String) {
-        let mut r = req.clone();
-        match Message::from_vec(wire) {
-            Ok(m) => r.msg = m,
-            Err(e) => return (2, Vec::new(), e.to_string()),
+/// The rest of the chain for the Go plugin's `Next`: (rcode, written
+/// messages each prefixed with a 2-byte length, error text).
+async fn run_next(
+    name: &'static str,
+    next: &Next,
+    ctx: &mut Context,
+    req: &Request,
+    wire: &[u8],
+) -> (u16, Vec<u8>, String) {
+    let mut r = req.clone();
+    match Message::from_vec(wire) {
+        Ok(m) => r.msg = m,
+        Err(e) => return (2, Vec::new(), e.to_string()),
+    }
+    r.wire = Some(Arc::from(wire));
+    let mut cw = CaptureWriter::new();
+    let res = next_or_failure(name, next, ctx, &mut cw, &r).await;
+    let code = u16::from(result_rcode(&res));
+    let err = res.err().map(|e| e.msg).unwrap_or_default();
+    let mut out = Vec::new();
+    for m in &cw.msgs {
+        if let Ok(b) = to_wire(m)
+            && let Ok(n) = u16::try_from(b.len())
+        {
+            out.extend_from_slice(&n.to_be_bytes());
+            out.extend_from_slice(&b);
         }
-        r.wire = Some(Arc::from(wire));
-        let mut cw = CaptureWriter::new();
-        let res = next_or_failure(self.name, &self.next, ctx, &mut cw, &r).await;
-        let code = u16::from(result_rcode(&res));
-        let err = res.err().map(|e| e.msg).unwrap_or_default();
-        let mut out = Vec::new();
-        for m in &cw.msgs {
-            if let Ok(b) = to_wire(m)
-                && let Ok(n) = u16::try_from(b.len())
-            {
-                out.extend_from_slice(&n.to_be_bytes());
-                out.extend_from_slice(&b);
-            }
+    }
+    (code, out, err)
+}
+
+/// Entry points for the fuzz targets in `fuzz/`: what the Rust side does
+/// with data coming back from Go, without loading the library.
+#[doc(hidden)]
+pub mod fuzz {
+    use super::*;
+
+    /// One callback from the Go side.
+    pub enum Callback<'a> {
+        /// `on_write`: a response the Go plugin wrote.
+        Write(&'a [u8]),
+        /// `on_next`: the Go plugin calls its next plugin with this message.
+        Next(u64, &'a [u8]),
+        /// `on_done`: its rcode and error text (NUL-terminated, or none).
+        Done(c_int, Option<&'a CStr>),
+    }
+
+    /// Feed `callbacks` to one request as the async path would receive
+    /// them; returns the plugin's result and what each `next_done` got.
+    pub async fn replay(
+        next: &Next,
+        ctx: &mut Context,
+        w: &mut dyn ResponseWriter,
+        req: &Request,
+        callbacks: &[Callback<'_>],
+    ) -> (HandlerResult, Vec<(u64, u16, Vec<u8>)>) {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        for c in callbacks {
+            let ev = match c {
+                Callback::Write(b) => Event::Write(b.to_vec()),
+                Callback::Next(t, b) => Event::Next(*t, b.to_vec()),
+                Callback::Done(code, err) => done_event(*code, *err),
+            };
+            let _ = tx.send(ev);
         }
-        (code, out, err)
+        drop(tx);
+        let done = std::cell::RefCell::new(Vec::new());
+        let res = drive("fuzz", next, ctx, w, req, &mut rx, |t, code, out, _err| {
+            done.borrow_mut().push((t, code, out.to_vec()))
+        })
+        .await;
+        (res, done.into_inner())
+    }
+
+    /// The bridge's plugin list as `Bridge::load` parses it.
+    pub fn plugin_list(s: &str) -> Vec<String> {
+        parse_string_list(s)
     }
 }
 

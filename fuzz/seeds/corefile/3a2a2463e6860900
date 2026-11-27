@@ -1,0 +1,11 @@
+.:0 {
+	bind 127.0.0.1
+	acl protected.example. {
+		allow net %s/32
+		block
+	}%s
+	template IN A protected.example. {
+		match ^secret[.]protected[.]example[.]$
+		answer "{{ .Name }} 30 IN A 192.0.2.124"
+	}
+}

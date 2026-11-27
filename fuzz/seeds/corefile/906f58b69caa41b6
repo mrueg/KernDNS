@@ -1,0 +1,8 @@
+grpc://.:8053 {
+    tls cert.pem key.pem
+    grpc_server {
+        max_streams 0
+        max_connections 0
+    }
+    whoami
+}

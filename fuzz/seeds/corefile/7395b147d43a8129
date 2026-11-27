@@ -1,0 +1,5 @@
+. {
+    bufsize 1100
+    forward . 172.31.0.10
+    log
+}

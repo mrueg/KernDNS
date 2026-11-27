@@ -1,0 +1,4 @@
+.:0 {
+		prometheus localhost:0
+		forward . 8.8.8.8
+	}

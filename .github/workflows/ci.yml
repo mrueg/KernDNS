@@ -67,3 +67,25 @@ jobs:
           curl -sf localhost:8080/health
           dig @127.0.0.1 -p 1053 whoami.example.org | grep -q 'status: NOERROR'
           docker logs kerndns
+
+  fuzz:
+    # builds the cargo-fuzz targets (fuzz/, nightly) and runs each for a
+    # minute from the committed seeds; longer runs are local (see README)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - name: Run each fuzz target for 60 s
+        working-directory: fuzz
+        run: |
+          for t in $(cargo +nightly fuzz list); do
+            mkdir -p corpus/$t
+            cargo +nightly fuzz run $t corpus/$t seeds/$t -- \
+              -max_total_time=60 -timeout=10 -rss_limit_mb=4096 -close_fd_mask=1
+          done
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts

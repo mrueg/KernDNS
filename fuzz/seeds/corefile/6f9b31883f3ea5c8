@@ -1,0 +1,5 @@
+quic://.:8853 {
+    tls cert.pem key.pem
+    quic
+    whoami
+}

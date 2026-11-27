@@ -1,0 +1,5 @@
+.:0 {
+		reload 2s 1s
+		whoami
+		# change to trigger different config
+	}

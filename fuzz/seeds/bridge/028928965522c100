@@ -1,0 +1,5 @@
+ (.*) {1}
+			reload 0.01s
+		}
+		errors stdout
+	}

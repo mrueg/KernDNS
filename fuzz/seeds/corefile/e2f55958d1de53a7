@@ -1,0 +1,5 @@
+.:0 {
+		prometheus localhost:0
+		rewrite edns0 local set 0x13 test123456 revert
+		forward . 8.8.8.8
+	}
