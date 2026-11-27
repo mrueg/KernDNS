@@ -1287,7 +1287,9 @@ fn compare(a: f64, b: f64, decimals: usize, unit: &str) -> String {
     } else {
         String::new()
     };
-    format!("{a:.decimals$} → {b:.decimals$}{unit}{pct}")
+    // a suffix like `k` goes on both numbers, a separate unit (` MiB`) once
+    let a_unit = if unit.starts_with(' ') { "" } else { unit };
+    format!("{a:.decimals$}{a_unit} → {b:.decimals$}{unit}{pct}")
 }
 
 /// RSS (current, peak) in MiB.
@@ -1468,7 +1470,7 @@ mod tests {
 
     #[test]
     fn compare_shows_change() {
-        assert_eq!(compare(40.0, 83.0, 0, "k"), "40 → 83k (+108%)");
+        assert_eq!(compare(40.0, 83.0, 0, "k"), "40k → 83k (+108%)");
         assert_eq!(compare(49.8, 31.2, 1, ""), "49.8 → 31.2 (-37%)");
         assert_eq!(compare(0.0, 5.0, 0, " MiB"), "0 → 5 MiB");
     }
