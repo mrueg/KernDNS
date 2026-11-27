@@ -176,9 +176,9 @@ impl Kubernetes {
             .collect()
     }
 
-    /// `ExternalSerial`.
+    /// `ExternalSerial`: when services' external IPs or ports last changed.
     fn external_serial(&self) -> u32 {
-        self.api().map(|a| a.modified() as u32).unwrap_or(0)
+        self.api().map(|a| a.modified_external() as u32).unwrap_or(0)
     }
 }
 

@@ -33,6 +33,11 @@ pub trait DnsController: Send + Sync {
     fn has_synced(&self) -> bool;
     /// Unix time of the last DNS-relevant change (the SOA serial).
     fn modified(&self) -> i64;
+    /// Unix time of the last change to services' external IPs or ports
+    /// (`ModifiedExternal`, the `k8s_external` SOA serial).
+    fn modified_external(&self) -> i64 {
+        self.modified()
+    }
     fn service_list(&self) -> Vec<Arc<Service>>;
     fn endpoints_list(&self) -> Vec<Arc<Endpoints>>;
 }
@@ -115,13 +120,94 @@ impl Indexed for Pod {
     }
 }
 
-impl<T: Indexed + PartialEq> Index<T> {
-    /// Insert or replace; returns true if anything DNS-visible changed.
-    fn put(&mut self, key: String, obj: T) -> bool {
+/// What an event changed, for the SOA serials (`detectChanges`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Change {
+    pub internal: bool,
+    pub external: bool,
+}
+
+impl Change {
+    const NONE: Change = Change {
+        internal: false,
+        external: false,
+    };
+    const INTERNAL: Change = Change {
+        internal: true,
+        external: false,
+    };
+}
+
+/// How an update counts for the serials: CoreDNS's `serviceModified`,
+/// `endpointsEquivalent` and `podModified`.
+pub trait Modified {
+    fn modified(old: &Self, new: &Self) -> Change;
+}
+
+impl Modified for Service {
+    fn modified(old: &Self, new: &Self) -> Change {
+        let external = old.external_ips != new.external_ips;
+        let internal = old.external_name != new.external_name;
+        if internal && external {
+            return Change { internal, external };
+        }
+        let ports_changed = old.ports.len() != new.ports.len()
+            || old
+                .ports
+                .iter()
+                .zip(&new.ports)
+                .any(|(a, b)| a.name != b.name || a.port != b.port || a.protocol != b.protocol);
+        if ports_changed {
+            return Change {
+                internal: true,
+                external: true,
+            };
+        }
+        Change { internal, external }
+    }
+}
+
+impl Modified for Endpoints {
+    fn modified(old: &Self, new: &Self) -> Change {
+        let same_subset = |a: &crate::object::EndpointSubset, b: &crate::object::EndpointSubset| {
+            a.addresses.len() == b.addresses.len()
+                && a.ports.len() == b.ports.len()
+                && a.addresses
+                    .iter()
+                    .zip(&b.addresses)
+                    .all(|(x, y)| x.ip == y.ip && x.hostname == y.hostname)
+                && a.ports
+                    .iter()
+                    .zip(&b.ports)
+                    .all(|(x, y)| x.name == y.name && x.port == y.port && x.protocol == y.protocol)
+        };
+        let equivalent = old.subsets.len() == new.subsets.len()
+            && old.zones == new.zones
+            && old.subsets.iter().zip(&new.subsets).all(|(a, b)| same_subset(a, b));
+        if equivalent { Change::NONE } else { Change::INTERNAL }
+    }
+}
+
+impl Modified for Pod {
+    fn modified(old: &Self, new: &Self) -> Change {
+        if old.pod_ips == new.pod_ips {
+            Change::NONE
+        } else {
+            Change::INTERNAL
+        }
+    }
+}
+
+impl<T: Indexed + PartialEq + Modified> Index<T> {
+    /// Insert or replace; returns what changed for the serials (an add
+    /// changes the internal one).
+    fn put(&mut self, key: String, obj: T) -> Change {
+        let mut change = Change::INTERNAL;
         if let Some(old) = self.objs.get(key.as_str()) {
             if **old == obj {
-                return false;
+                return Change::NONE;
             }
+            change = T::modified(old, &obj);
             self.remove(&key);
         }
         let key: Arc<str> = Arc::from(key);
@@ -135,7 +221,7 @@ impl<T: Indexed + PartialEq> Index<T> {
             add_key(&mut self.by_ip2, &ip, &key);
         }
         self.objs.insert(key, Arc::new(obj));
-        true
+        change
     }
 
     fn remove(&mut self, key: &str) -> bool {
@@ -183,6 +269,7 @@ pub struct KubeController {
     state: RwLock<State>,
     synced: [AtomicBool; 4],
     modified: AtomicI64,
+    ext_modified: AtomicI64,
     opts: Options,
 }
 
@@ -212,6 +299,7 @@ impl KubeController {
             state: RwLock::new(State::default()),
             synced: Default::default(),
             modified: AtomicI64::new(0),
+            ext_modified: AtomicI64::new(0),
             opts,
         });
         if !c.opts.watch_endpoints {
@@ -225,6 +313,15 @@ impl KubeController {
 
     fn touch(&self) {
         self.modified.store(now(), Ordering::Relaxed);
+    }
+
+    fn record(&self, c: Change) {
+        if c.internal {
+            self.touch();
+        }
+        if c.external {
+            self.ext_modified.store(now(), Ordering::Relaxed);
+        }
     }
 
     /// Start the watchers; they run until the returned handles are aborted.
@@ -285,7 +382,9 @@ impl KubeController {
                     POD,
                     |st: &mut State, o: &core::Pod| match convert::pod(o) {
                         Some(p) => st.pods.put(obj_key(&o.metadata), p),
-                        None => st.pods.remove(&obj_key(&o.metadata)),
+                        // like CoreDNS, a terminating pod is skipped: it
+                        // stays until it is deleted
+                        None => Change::NONE,
                     },
                     |st, k| st.pods.remove(k),
                     |live, new| std::mem::swap(&mut live.pods, &mut new.pods),
@@ -302,7 +401,11 @@ impl KubeController {
                 api,
                 c,
                 NS,
-                |st: &mut State, o: &core::Namespace| st.namespaces.insert(o.metadata.name.clone().unwrap_or_default()),
+                |st: &mut State, o: &core::Namespace| {
+                    // namespaces don't count for the serials
+                    st.namespaces.insert(o.metadata.name.clone().unwrap_or_default());
+                    Change::NONE
+                },
                 |st, k| st.namespaces.remove(k.trim_start_matches('/')),
                 |live, new| std::mem::swap(&mut live.namespaces, &mut new.namespaces),
             )
@@ -320,7 +423,7 @@ impl KubeController {
         api: Api<K>,
         cfg: watcher::Config,
         slot: usize,
-        apply: impl Fn(&mut State, &K) -> bool + Send,
+        apply: impl Fn(&mut State, &K) -> Change + Send,
         delete: impl Fn(&mut State, &str) -> bool + Send,
         swap: impl Fn(&mut State, &mut State) + Send,
     ) where
@@ -352,10 +455,8 @@ impl KubeController {
                     release_free_memory();
                 }
                 Event::Apply(o) => {
-                    let changed = apply(&mut self.state.write().unwrap(), &o);
-                    if changed {
-                        self.touch();
-                    }
+                    let change = apply(&mut self.state.write().unwrap(), &o);
+                    self.record(change);
                 }
                 Event::Delete(o) => {
                     let key = obj_key(o.meta());
@@ -416,6 +517,9 @@ impl DnsController for KubeController {
     fn modified(&self) -> i64 {
         self.modified.load(Ordering::Relaxed)
     }
+    fn modified_external(&self) -> i64 {
+        self.ext_modified.load(Ordering::Relaxed)
+    }
     fn service_list(&self) -> Vec<Arc<Service>> {
         self.state.read().unwrap().svcs.objs.values().cloned().collect()
     }
@@ -438,9 +542,10 @@ mod tests {
             cluster_ips: vec![ip.into()],
             ..Default::default()
         };
-        assert!(idx.put("ns/a".into(), s("10.0.0.1")));
-        assert!(!idx.put("ns/a".into(), s("10.0.0.1")), "no change");
-        assert!(idx.put("ns/a".into(), s("10.0.0.2")));
+        assert_eq!(idx.put("ns/a".into(), s("10.0.0.1")), Change::INTERNAL, "an add");
+        assert_eq!(idx.put("ns/a".into(), s("10.0.0.1")), Change::NONE, "no change");
+        // like CoreDNS, a new cluster IP doesn't change the serial
+        assert_eq!(idx.put("ns/a".into(), s("10.0.0.2")), Change::NONE);
         assert!(idx.lookup(&idx.by_ip, "10.0.0.1").is_empty());
         assert_eq!(idx.lookup(&idx.by_ip, "10.0.0.2").len(), 1);
         assert_eq!(idx.lookup(&idx.by, "a.ns").len(), 1);
