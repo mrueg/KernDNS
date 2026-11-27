@@ -49,6 +49,21 @@ pub fn parse_zone(text: &str, origin: &Name, file: &Path) -> Result<Vec<Record>,
     Ok(st.records)
 }
 
+/// Parse the first record in `text` like miekg/dns's `NewRR`: names are
+/// relative to the root and the default TTL is 3600. `Ok(None)` if `text`
+/// holds no record.
+pub fn new_rr(text: &str) -> Result<Option<Record>, ZoneFileError> {
+    let mut st = State {
+        origin: Name::root(),
+        def_ttl: Some(3600),
+        ttl_by_directive: false,
+        last_owner: None,
+        records: Vec::new(),
+    };
+    st.read(text, Path::new(""), 0)?;
+    Ok(st.records.into_iter().next())
+}
+
 #[derive(Debug, Clone)]
 struct Tok {
     text: String,
