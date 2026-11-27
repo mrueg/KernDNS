@@ -6,14 +6,14 @@
 #   skip   not run: tests Go internals, or never starts a server through the helpers
 #
 # <status> <test> <reason>
-xfail TestACLAuthorizesAutopathExpandedName           Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'acl' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestACLAuthorizesAutopathExpandedName           Could not get CoreDNS serving instance: stdin:5 - Error during parsing: Directive 'autopath' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestACMEDNS01CertificateManagement              starting CoreDNS: plugin/tls: ACME certificates are not supported by KernDNS yet
 xfail TestAuto                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestAutoAXFR                                    Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestAutoNonExistentZone                         Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestAutoPathErraticNotLoaded                    Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'autopath' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestBind_FilterAll
-xfail TestCacheACLAuthorization                       start no-cache control server: stdin:3 - Error during parsing: Directive 'acl' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestCacheACLAuthorization                       start no-cache control server: stdin:7 - Error during parsing: Directive 'template' is not available in KernDNS yet (no Rust port of this plugin)
 skip  TestChaos                                       expects the version string CoreDNS-1.15.0; KernDNS reports KernDNS-<version>
 pass  TestClasslessReverse
 xfail TestCompressScrub                               Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
@@ -52,7 +52,7 @@ xfail TestHTTPSWithLimits                             Could not get CoreDNS serv
 pass  TestHostsInlineLookup
 skip  TestImportOrdering                              does not start a server through the test helpers
 skip  TestImportTesting                               does not start a server through the test helpers
-xfail TestIssue7630                                   Could not start test CoreDNS: stdin:2 - Error during parsing: Directive 'metadata' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestIssue7630
 pass  TestIxfrResponse
 skip  TestJSONLoggingProcess                          does not start a server through the test helpers
 skip  TestJSONLoggingProcessHelper                    does not start a server through the test helpers

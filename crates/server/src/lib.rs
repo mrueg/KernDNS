@@ -218,14 +218,14 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
     let tasks = match l.transport {
         Transport::Dns => {
             let u = udp::serve(udp, dispatcher.clone(), udp_local);
-            let t = tcp::serve(tcp, dispatcher, tcp_local, None);
+            let t = tcp::serve(tcp, dispatcher, tcp_local, None, tcp::Limits::from(&l.conn));
             merge(u, t)
         }
         Transport::Tls => {
             let mut cfg = (**l.tls.as_ref().expect("checked")).clone();
             cfg.alpn_protocols = vec![b"dot".to_vec()];
             let acc = tokio_rustls::TlsAcceptor::from(std::sync::Arc::new(cfg));
-            tcp::serve(tcp, dispatcher, tcp_local, Some(acc))
+            tcp::serve(tcp, dispatcher, tcp_local, Some(acc), tcp::Limits::from(&l.conn))
         }
         Transport::Https => {
             let mut cfg = (**l.tls.as_ref().expect("checked")).clone();

@@ -1,6 +1,9 @@
 //! TCP (and DoT) listeners: two-byte length-framed messages, served in
-//! order per connection, closed after 10s without a query (CoreDNS's idle
-//! timeout). Responses are encoded and signed by [`crate::dispatch::encode`].
+//! order per connection. Like miekg/dns, the first query must arrive within
+//! the read timeout (3s), later ones within the idle timeout (10s), writes
+//! must finish within the write timeout (5s), and a connection may be
+//! limited to a number of queries; `timeouts` changes these. Responses are
+//! encoded and signed by [`crate::dispatch::encode`].
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -14,8 +17,40 @@ use tokio_rustls::TlsAcceptor;
 use crate::dispatch::Dispatcher;
 use crate::udp::handle;
 
-pub const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Per-connection timeouts and query limit.
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    pub read: Duration,
+    pub write: Duration,
+    pub idle: Duration,
+    /// `None` is unlimited.
+    pub max_queries: Option<u64>,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            read: Duration::from_secs(3),
+            write: Duration::from_secs(5),
+            idle: Duration::from_secs(10),
+            max_queries: None,
+        }
+    }
+}
+
+impl From<&kerndns_core::plugin::ConnLimits> for Limits {
+    fn from(c: &kerndns_core::plugin::ConnLimits) -> Self {
+        let d = Limits::default();
+        Limits {
+            read: c.read.unwrap_or(d.read),
+            write: c.write.unwrap_or(d.write),
+            idle: c.idle.unwrap_or(d.idle),
+            max_queries: c.max_tcp_queries.and_then(|n| u64::try_from(n).ok()),
+        }
+    }
+}
 
 /// Serve DNS over TCP, or over TLS if `tls` is given.
 pub fn serve(
@@ -23,6 +58,7 @@ pub fn serve(
     dispatcher: Dispatcher,
     local: SocketAddr,
     tls: Option<TlsAcceptor>,
+    limits: Limits,
 ) -> JoinSet<()> {
     let mut set = JoinSet::new();
     set.spawn(async move {
@@ -35,10 +71,10 @@ pub fn serve(
             let tls = tls.clone();
             tokio::spawn(async move {
                 match tls {
-                    None => connection(stream, &d, src, local, Protocol::Tcp).await,
+                    None => connection(stream, &d, src, local, Protocol::Tcp, limits).await,
                     Some(acc) => {
                         if let Ok(Ok(s)) = tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, acc.accept(stream)).await {
-                            connection(s, &d, src, local, Protocol::Tls).await;
+                            connection(s, &d, src, local, Protocol::Tls, limits).await;
                         }
                     }
                 }
@@ -54,15 +90,21 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
     src: SocketAddr,
     local: SocketAddr,
     protocol: Protocol,
+    limits: Limits,
 ) {
+    let mut served: u64 = 0;
     loop {
+        if limits.max_queries.is_some_and(|m| served >= m) {
+            return;
+        }
+        let wait = if served == 0 { limits.read } else { limits.idle };
         let mut len = [0u8; 2];
-        match tokio::time::timeout(IDLE_TIMEOUT, s.read_exact(&mut len)).await {
+        match tokio::time::timeout(wait, s.read_exact(&mut len)).await {
             Ok(Ok(_)) => {}
             _ => return,
         }
         let mut buf = vec![0u8; u16::from_be_bytes(len) as usize];
-        match tokio::time::timeout(IDLE_TIMEOUT, s.read_exact(&mut buf)).await {
+        match tokio::time::timeout(limits.read, s.read_exact(&mut buf)).await {
             Ok(Ok(_)) => {}
             _ => return,
         }
@@ -74,12 +116,13 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
             let mut out = Vec::with_capacity(wire.len() + 2);
             out.extend_from_slice(&n.to_be_bytes());
             out.extend_from_slice(&wire);
-            if s.write_all(&out).await.is_err() {
+            if !matches!(tokio::time::timeout(limits.write, s.write_all(&out)).await, Ok(Ok(()))) {
                 return;
             }
         }
-        if s.flush().await.is_err() {
+        if !matches!(tokio::time::timeout(limits.write, s.flush()).await, Ok(Ok(()))) {
             return;
         }
+        served += 1;
     }
 }
