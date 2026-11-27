@@ -4,6 +4,11 @@
 //! it with `file` from both CoreDNS (built from third_party/coredns) and
 //! kerndns, then let `go/difftest` send generated queries to both and
 //! report differences.
+//!
+//! With `--dnssec` both servers also sign every zone on the fly (`dnssec`
+//! with one ECDSA key): RRSIGs are compared without their signature and
+//! validity times, which differ by design, and every RRSIG from either
+//! server must verify with the key.
 
 use std::fs;
 use std::net::UdpSocket;
@@ -108,12 +113,14 @@ pub fn run(args: &[String]) -> Result<()> {
     let mut release = false;
     let mut only: Option<String> = None;
     let mut show = "10".to_string();
+    let mut dnssec = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--release" => release = true,
             "--zone" => only = Some(it.next().context("--zone needs a value")?.clone()),
             "--show" => show = it.next().context("--show needs a value")?.clone(),
+            "--dnssec" => dnssec = true,
             other => bail!("unknown argument {other}"),
         }
     }
@@ -181,6 +188,22 @@ pub fn run(args: &[String]) -> Result<()> {
         bail!("no zone fixtures found");
     }
 
+    // A key whose owner is the root can sign every zone (dnssec renames it
+    // to the zone in DNSKEY answers).
+    let key_base = work.join("Kdifftest");
+    let mut dnssec_block = String::new();
+    if dnssec {
+        fs::write(
+            key_base.with_extension("key"),
+            ". IN DNSKEY 257 3 13 0J8u0XJ9GNGFEBXuAmLu04taHG4BXPP3gwhetiOUMnGA+x09nqzgF5IY OyjWB7N3rXqQbnOSILhH1hnuyh7mmA==\n",
+        )?;
+        fs::write(
+            key_base.with_extension("private"),
+            "Private-key-format: v1.3\nAlgorithm: 13 (ECDSAP256SHA256)\nPrivateKey: /4BZk8AFvyW5hL3cOLSVxIp1RTqHSAEloWUxj86p3gs=\n",
+        )?;
+        dnssec_block = format!("    dnssec {{\n        key file {}\n    }}\n", key_base.display());
+    }
+
     let mut total_diffs = 0;
     let mut summary = Vec::new();
     for (name, path) in &zones {
@@ -196,7 +219,7 @@ pub fn run(args: &[String]) -> Result<()> {
         let (pa, pb) = two_ports()?;
         let cf = |port: u16| {
             format!(
-                "{origin}:{port} {{\n    bind 127.0.0.1\n    file {}\n}}\n",
+                "{origin}:{port} {{\n    bind 127.0.0.1\n{dnssec_block}    file {}\n}}\n",
                 path.display()
             )
         };
@@ -232,7 +255,11 @@ pub fn run(args: &[String]) -> Result<()> {
             }
             _ => {}
         }
-        let out = Command::new(&tool)
+        let mut cmd = Command::new(&tool);
+        if dnssec {
+            cmd.arg("-dnssec-key").arg(key_base.with_extension("key"));
+        }
+        let out = cmd
             .args([
                 "-a",
                 &format!("127.0.0.1:{pa}"),

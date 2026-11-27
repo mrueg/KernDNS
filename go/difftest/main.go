@@ -32,8 +32,24 @@ func main() {
 	printOrigin := flag.Bool("print-origin", false, "print the zone's SOA owner name and exit")
 	queryFile := flag.String("queries", "", "file with 'name type' lines to send instead of zone-derived queries")
 	ignoreSerial := flag.Bool("ignore-soa-serial", false, "compare SOA records without their serial")
+	dnssecKey := flag.String("dnssec-key", "", "DNSKEY file: compare RRSIGs without signature and times, and verify every RRSIG of both servers with this key")
 	flag.Parse()
 	normalizeSerial = *ignoreSerial
+	if *dnssecKey != "" {
+		f, err := os.Open(*dnssecKey)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		rr, err := dns.ReadRR(f, *dnssecKey)
+		f.Close()
+		k, ok := rr.(*dns.DNSKEY)
+		if err != nil || !ok {
+			fmt.Fprintln(os.Stderr, "no DNSKEY in", *dnssecKey, err)
+			os.Exit(2)
+		}
+		verifyKey = k
+	}
 
 	if *queryFile != "" {
 		os.Exit(runQueries(*a, *b, *queryFile, *maxDiffs))
@@ -120,6 +136,45 @@ func main() {
 
 var normalizeSerial bool
 
+// verifyKey, if set, signs both servers' answers: RRSIGs are compared
+// without their signature and validity times (randomized ECDSA and
+// signing time differ by design) and each one must verify with it.
+var verifyKey *dns.DNSKEY
+
+// sigProblems verifies every RRSIG in m made by verifyKey against the
+// RRset it covers in the same section.
+func sigProblems(m *dns.Msg) []string {
+	var out []string
+	now := time.Now()
+	for _, sec := range [][]dns.RR{m.Answer, m.Ns, m.Extra} {
+		for _, rr := range sec {
+			sig, ok := rr.(*dns.RRSIG)
+			if !ok {
+				continue
+			}
+			k := *verifyKey
+			k.Hdr.Name = sig.SignerName
+			if sig.KeyTag != k.KeyTag() {
+				continue // signed by a key we don't know (e.g. RRSIGs from the zone file)
+			}
+			var set []dns.RR
+			for _, x := range sec {
+				if x.Header().Rrtype == sig.TypeCovered && strings.EqualFold(x.Header().Name, sig.Header().Name) {
+					set = append(set, x)
+				}
+			}
+			if len(set) == 0 {
+				out = append(out, "RRSIG covers nothing: "+sig.String())
+			} else if err := sig.Verify(&k, set); err != nil {
+				out = append(out, fmt.Sprintf("RRSIG does not verify (%v): %s", err, sig.String()))
+			} else if !sig.ValidityPeriod(now) {
+				out = append(out, "RRSIG not valid now: "+sig.String())
+			}
+		}
+	}
+	return out
+}
+
 func section(rrs []dns.RR) []string {
 	var out []string
 	for _, rr := range rrs {
@@ -129,6 +184,11 @@ func section(rrs []dns.RR) []string {
 		if soa, ok := rr.(*dns.SOA); ok && normalizeSerial {
 			c := dns.Copy(soa).(*dns.SOA)
 			c.Serial = 0
+			rr = c
+		}
+		if sig, ok := rr.(*dns.RRSIG); ok && verifyKey != nil {
+			c := dns.Copy(sig).(*dns.RRSIG)
+			c.Inception, c.Expiration, c.Signature = 0, 0, "-"
 			rr = c
 		}
 		out = append(out, strings.ToLower(rr.String()))
@@ -155,8 +215,11 @@ func compare(a *dns.Msg, errA error, b *dns.Msg, errB error) string {
 		return ""
 	}
 	sa, sb := summary(a), summary(b)
+	if verifyKey != nil {
+		sa["sigs"], sb["sigs"] = sigProblems(a), sigProblems(b)
+	}
 	var out []string
-	for _, k := range []string{"rcode", "flags", "ans", "ns", "extra"} {
+	for _, k := range []string{"rcode", "flags", "ans", "ns", "extra", "sigs"} {
 		x, y := strings.Join(sa[k], "\n      "), strings.Join(sb[k], "\n      ")
 		if x != y {
 			out = append(out, fmt.Sprintf("  %s:\n    A:  %s\n    B:  %s", k, x, y))
