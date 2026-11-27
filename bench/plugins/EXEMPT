@@ -10,3 +10,4 @@ reload: polls the Corefile in the background; no per-query work
 https3: sets DoH3 listener limits; no per-query work, and dnsperf has no HTTP/3 mode
 quic: sets DoQ listener limits; no per-query work, and dnsperf has no DoQ mode
 grpc_server: sets gRPC listener limits; no per-query work, and dnsperf has no gRPC mode
+sign: signs zone files in the background (at startup and every 5 hours); no per-query work
