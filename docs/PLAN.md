@@ -315,12 +315,29 @@ Each scenario runs N times and reports the median and spread.
 - **Level 1, micro** (criterion vs `go test -bench`): message parse/pack,
   Corefile parse, chain dispatch, each plugin's hot path, and the bridge
   round trip.
-- **Level 2, per plugin:** `bench/plugins/<name>/` with Corefile, fixtures and
-  queries. The result is the added cost over a `whoami` baseline, with cases
-  specific to each plugin (cache hit ratios and sizes, forward
-  protocols and failures, zone sizes, regex rewrites, DNSSEC cold/warm). A
-  plugin isn't finished without a scenario; `xtask bench --check` enforces this.
-- **Level 3, common setups:** kubeadm cluster DNS, caching forwarder,
+- **Level 2, per plugin (done for every plugin ported so far):**
+  `bench/plugins/<name>/` with Corefile templates, fixtures and queries:
+  `Corefile` plus optional `<case>.Corefile` cases (cache hits and misses,
+  forward over UDP/TCP/DoT, zones of 100/10k/100k names, exact/suffix/regex
+  rewrites, AXFR, TSIG-signed queries and UPDATEs, kubernetes and
+  `k8s_external` against the fake API server, ...). Leading `# about:`,
+  `# queries:`, `# dnsperf:` and `# needs:` comments describe each case
+  (see `xtask/src/bench.rs`). The result is the CPU time per query added
+  over the `whoami` baseline, next to max QPS, latency at a fixed rate and
+  peak RSS, with a warning when CoreDNS and KernDNS answer with different
+  response codes. `cargo xtask bench --level 2 --plugin cache` runs a
+  subset. A plugin isn't finished without a scenario: `cargo xtask bench
+  --check` (in CI, no dnsperf needed) fails for any plugin in KernDNS's
+  registry without a `bench/plugins/<name>/` directory or an entry in
+  `bench/plugins/EXEMPT` (only plugins with no per-query work: `bind`,
+  `root`, `debug`, `health`, `ready`, `reload`), and checks that every case
+  parses and uses its plugin. Still missing: DNSSEC cold/warm and forward
+  failures. Follow-ups from the first full run (README): the cache miss
+  path (small cache, constant evictions) is slower than CoreDNS's, AXFR
+  costs more CPU, and a 100k-name `file` zone uses more memory (247 vs
+  189 MiB).
+- **Level 3, common setups:** `bench/setups/<name>/`, same format (today
+  only the caching resolver). Planned: kubeadm cluster DNS, caching forwarder,
   authoritative server, split horizon, DoT/DoH frontend, and a mixed bridge
   chain vs all-Go CoreDNS.
 - **Kubernetes at scale:** kind + kwok with 1k/10k/50k Services and up to
@@ -329,8 +346,9 @@ Each scenario runs N times and reports the median and spread.
   ready, change propagation, API server load, and behaviour when the API
   server restarts.
 
-**CI:** level 1 and a level 2 subset on every PR, failing on regressions
-above a threshold, with history tracked. Everything else nightly on a
+**CI:** `bench --check` and a one-second level 2 smoke run of a few
+plugins on every PR (done). Planned: level 1 and a level 2 subset failing
+on regressions above a threshold, with history tracked. Everything else nightly on a
 dedicated machine, with a published report.
 
 ## Milestones
@@ -341,7 +359,7 @@ dedicated machine, with a published report.
 | **M1** (done) | Wave 1 plugins, `reload`, `/metrics` | All relevant `test/` tests pass or are classified with a plugin reason; difftest in CI; bench harness with level 1/2 for wave 1 |
 | **M2** (done) | `kubernetes` + `k8s_external` | Ported unit tables, `coredns/ci` kind tests and Go difftest all pass; scale benchmarks published, with memory at or below CoreDNS |
 | **M3** (done) | Go bridge MVP | Go `etcd` inside a Rust chain; bridge micro-benchmarks; affinity groups enforced |
-| **M4** | Waves 3–4, DoT/DoH/DoQ/gRPC | Compat pass rate goes up; every plugin has a level 2 scenario |
+| **M4** | Waves 3–4, DoT/DoH/DoQ/gRPC | Compat pass rate goes up; every plugin has a level 2 scenario (enforced by `bench --check` since the level 2 harness landed) |
 | **M5** | Wave 5, optional out-of-process bridge, packaging | Nightly level 3 report; drop-in image replacing CoreDNS in kubeadm |
 
 ## Risks

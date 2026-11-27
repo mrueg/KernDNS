@@ -46,5 +46,5 @@ jobs:
         with:
           go-version-file: third_party/coredns/go.mod
           cache-dependency-path: third_party/coredns/go.sum
-      - run: sudo apt-get install -y dnsperf
+      - run: sudo apt-get update && sudo apt-get install -y dnsperf
       - run: cargo xtask bench --level 2 --plugin cache,file,rewrite,tsig --duration 1

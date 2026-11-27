@@ -41,28 +41,90 @@ Milestones **M0**, **M1** and **M2** are done.
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
 | CoreDNS integration tests against KernDNS | 89 pass, 5 expected failures (plugins not ported yet), 24 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
-| Benchmarks against CoreDNS (`cargo xtask bench`) | see below |
+| Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin, see below |
 | `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
 | Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `etcd`) | done (M3) |
 
 ### Benchmarks
 
-`cargo xtask bench` on a 4-core laptop (i7-1065G7), servers pinned to 2 cores
-(4 threads), dnsperf on others; same Corefile and fixtures for both:
+Every plugin has a level 2 scenario: a directory in
+[`bench/plugins/`](bench/plugins/) with a Corefile template, fixtures and
+queries, often with several cases (cache hits and misses, forward over
+UDP/TCP/DoT, zone sizes, regex rewrites, AXFR, TSIG, ...). `cargo xtask
+bench` runs each case against CoreDNS 1.15.0 and KernDNS with the same
+Corefile and fixtures, servers pinned to 2 cores (4 threads) of a 4-core
+laptop (i7-1065G7) and dnsperf on others, and reports the CPU time per query
+each case adds over a `whoami`-only server, next to max QPS and peak RSS.
+Plugins without per-query work are listed in
+[`bench/plugins/EXEMPT`](bench/plugins/EXEMPT); `cargo xtask bench --check`
+(in CI) fails for any other plugin without a scenario.
 
-| Scenario | CoreDNS 1.15.0 QPS | KernDNS QPS | Peak RSS CoreDNS → KernDNS |
-|---|---:|---:|---|
-| whoami | 116k | 153k | 62 → 7 MiB |
-| log + whoami | 45k | 145k | 67 → 8 MiB |
-| prometheus + whoami | 55k | 174k | 65 → 8 MiB |
-| hosts (10k entries) | 77k | 183k | 73 → 17 MiB |
-| file (10k-name zone) | 66k | 153k | 75 → 29 MiB |
-| forward | 24k | 38k | 66 → 52 MiB |
-| cache + forward | 75k | 133k | 71 → 44 MiB |
-| resolver (errors, health, ready, prometheus, cache, forward, loop, reload) | 84k | 107k | 73 → 46 MiB |
+**These numbers are indicative only.** They come from one `cargo xtask bench
+--level 2 --duration 3 --runs 3` (median of 3 runs per case) on a laptop
+where other builds were running at the same time, so differences of a few
+µs, and all negative values, are noise. `whoami` itself costs 29.0 µs
+(CoreDNS) and 23.9 µs (KernDNS) of CPU per query at max load.
 
-Latency at a fixed rate (half of CoreDNS's max) is equal or lower in every
-scenario, with much smaller worst cases.
+| case | CoreDNS +µs/q | KernDNS +µs/q | max QPS CoreDNS → KernDNS | peak RSS CoreDNS → KernDNS |
+|---|---:|---:|---|---|
+| whoami | 29.0 (base) | 23.9 (base) | 90k → 141k | 59 → 9 MiB |
+| acl | +15.0 | -6.1 | 76k → 195k | 60 → 9 MiB |
+| acl/block | -6.8 | -0.8 | 112k → 145k | 60 → 10 MiB |
+| any | -8.9 | -5.7 | 121k → 178k | 58 → 10 MiB |
+| bufsize | +4.2 | +3.3 | 82k → 125k | 59 → 10 MiB |
+| cache¹ | -9.2 | -5.8 | 121k → 195k | 69 → 16 MiB |
+| cache/miss¹ | +55.5 | +66.4 | 35k → 20k | 65 → 15 MiB |
+| cancel | +17.9 | -4.0 | 39k → 161k | 62 → 10 MiB |
+| chaos | +32.2 | +1.6 | 42k → 114k | 59 → 10 MiB |
+| dynupdate | +24.4 | +14.0 | 66k → 101k | 61 → 11 MiB |
+| dynupdate/update | +1361.1 | +494.3 | 1k → 2k | 66 → 33 MiB |
+| erratic | +3.2 | -7.4 | 75k → 196k | 60 → 9 MiB |
+| errors | +5.1 | +1.8 | 78k → 128k | 61 → 9 MiB |
+| file | +12.6 | +8.3 | 96k → 124k | 71 → 31 MiB |
+| file/100k | +22.9 | +0.1 | 77k → 166k | 189 → 247 MiB |
+| file/8a | +3.6 | -2.2 | 106k → 183k | 62 → 11 MiB |
+| file/small | +10.3 | +6.3 | 87k → 131k | 62 → 10 MiB |
+| forward¹ | +31.8 | +23.5 | 27k → 30k | 64 → 14 MiB |
+| forward/dot¹ | +40.4 | +60.6 | 41k → 32k | 78 → 20 MiB |
+| forward/tcp¹ | +25.0 | +28.1 | 53k → 50k | 64 → 14 MiB |
+| header | -6.4 | -6.1 | 116k → 196k | 60 → 9 MiB |
+| hosts | -5.6 | -5.3 | 118k → 191k | 69 → 20 MiB |
+| hosts/miss | +15.0 | +2.3 | 76k → 134k | 71 → 20 MiB |
+| k8s_external | +1.5 | -1.9 | 108k → 181k | 77 → 21 MiB |
+| kubernetes | +20.4 | +2.9 | 71k → 149k | 77 → 22 MiB |
+| loadbalance | +10.1 | -0.6 | 96k → 171k | 63 → 12 MiB |
+| local | -2.3 | -5.2 | 111k → 182k | 62 → 10 MiB |
+| log | +8.6 | +0.1 | 69k → 165k | 65 → 10 MiB |
+| log/class-denial | +2.5 | +7.3 | 100k → 127k | 62 → 10 MiB |
+| loop | -6.6 | -6.3 | 117k → 193k | 59 → 10 MiB |
+| metadata | +1.5 | +1.2 | 87k → 138k | 60 → 9 MiB |
+| minimal | +14.4 | -0.6 | 92k → 171k | 71 → 32 MiB |
+| nsid | +4.8 | +1.2 | 102k → 150k | 62 → 10 MiB |
+| prometheus | +15.3 | -5.0 | 66k → 193k | 64 → 10 MiB |
+| rewrite | +3.9 | +2.5 | 102k → 140k | 62 → 10 MiB |
+| rewrite/chain | +12.5 | -1.9 | 86k → 181k | 62 → 11 MiB |
+| rewrite/regex | +7.3 | +7.7 | 98k → 126k | 63 → 12 MiB |
+| rewrite/suffix | +10.8 | -2.6 | 85k → 184k | 64 → 9 MiB |
+| secondary | +15.2 | +3.8 | 90k → 144k | 72 → 32 MiB |
+| template | +15.4 | +5.5 | 88k → 135k | 61 → 12 MiB |
+| template/rcode | +23.9 | +1.4 | 74k → 158k | 61 → 12 MiB |
+| timeouts | -7.3 | -6.8 | 119k → 197k | 62 → 9 MiB |
+| tls | +2.2 | -2.4 | 124k → 138k | 59 → 10 MiB |
+| transfer | +13.7 | -0.8 | 93k → 173k | 71 → 32 MiB |
+| transfer/axfr | +195.3 | +321.2 | 18k → 11k | 61 → 10 MiB |
+| tsig | +31.5 | +4.2 | 65k → 115k | 62 → 9 MiB |
+| view | +28.7 | -5.0 | 68k → 193k | 62 → 10 MiB |
+
+¹ From a second run of only the cache and forward cases (with its own
+`whoami` baseline): in the full run, a burst of load from other processes cut
+KernDNS's cache throughput in half.
+
+What stands out: KernDNS is behind CoreDNS when the cache mostly misses (a
+small cache with constant evictions: lower QPS in every run so far), on
+AXFR (more CPU per transfer) and in memory for a 100k-name zone (247 vs
+189 MiB). Forward over DoT went either way between runs. Signed dynamic
+updates (`dynupdate`) cost KernDNS about a third of CoreDNS's CPU. Latency at a fixed rate (half of CoreDNS's
+max) is in the detailed report (`target/bench/report.md`).
 
 Kubernetes at scale (`cargo xtask k8s-bench`, a fake API server serving N
 Services with 3 endpoints each; both servers watch it via kubeconfig):
@@ -71,8 +133,10 @@ Services with 3 endpoints each; both servers watch it via kubeconfig):
 |---:|---|---|---|---|
 | 1,000 | 0.69 s → 0.23 s | 66 → 19 MiB | 78 → 21 MiB | 18k → 30k |
 | 10,000 | 5.6 s → 0.64 s | 121 → 77 MiB | 148 → 77 MiB | 33k → 108k |
-| 50,000 | 7.8 s → 1.9 s | 352 → 178 MiB | 495 → 254 MiB | 66k → 125k | Single laptop runs: treat them as
-indicative; the plan calls for a dedicated benchmark machine.
+| 50,000 | 7.8 s → 1.9 s | 352 → 178 MiB | 495 → 254 MiB | 66k → 125k |
+
+Single laptop runs: treat them as indicative; the plan calls for a
+dedicated benchmark machine.
 
 ## Quick start
 
@@ -156,7 +220,10 @@ cargo xtask compat-test --run TestEDNS0 # a subset
 cargo xtask compat-test --update        # accept the current results
 cargo xtask compat-test --target coredns  # same tests against real CoreDNS (checks the harness)
 cargo xtask difftest                    # same zones in CoreDNS and kerndns, diff the answers
-cargo xtask bench                       # CoreDNS vs kerndns with dnsperf
+cargo xtask bench                       # CoreDNS vs kerndns with dnsperf, every scenario
+cargo xtask bench --plugin cache,forward  # level 2 cases of some plugins (+ whoami baseline)
+cargo xtask bench --level 3             # common setups only
+cargo xtask bench --check               # every plugin has a scenario (no dnsperf needed)
 cargo xtask k8s-cases                   # regenerate the upstream kubernetes test cases (Go)
 cargo xtask k8s-bench                   # kubernetes plugin at 1k/10k/50k services
 # live-cluster comparison (workloads in namespaces testns/other):
