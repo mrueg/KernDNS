@@ -7,11 +7,18 @@
 #   skip   result ignored: the test doesn't exercise the cluster DNS
 #
 # <status> <test> <reason>
-xfail TestAXFR                          kubernetes: zone transfers (Transferer) are not ported yet; KernDNS answers AXFR with REFUSED
-xfail TestAXFRPods                      kubernetes: zone transfers (Transferer) are not ported yet; KernDNS answers AXFR with REFUSED
+xfail TestAXFR                            kubernetes: zone transfers (Transferer) are not ported yet; KernDNS answers AXFR with REFUSED
+xfail TestAXFRPods                        kubernetes: zone transfers (Transferer) are not ported yet; KernDNS answers AXFR with REFUSED
+xfail TestDNSProgrammingLatencyEndpoints  kubernetes: the coredns_kubernetes_dns_programming_duration_seconds metric is not ported yet
 pass  TestKubernetesA
-xfail TestKubernetesAutopath            fqdn and external names: a search domain from the runner's resolv.conf reaches forward, which has no next plugin (SERVFAIL); compare with the coredns target
+xfail TestKubernetesAutopath              environment: fails on CoreDNS too (kind job, coredns target); a search domain from the GitHub runner's resolv.conf reaches forward, which has no next plugin (SERVFAIL)
 pass  TestKubernetesEndpointPodNames
 pass  TestKubernetesFallthrough
 pass  TestKubernetesFallthroughFiltered
-skip  TestKubernetesSecureAPI           starts an in-process Go CoreDNS (ctest.CoreDNSServer) against the API server, not the cluster DNS
+pass  TestKubernetesNSExposed
+pass  TestKubernetesPTR
+pass  TestKubernetesPodsInsecure
+pass  TestKubernetesPodsVerified
+pass  TestKubernetesSRV
+skip  TestKubernetesSecureAPI             starts an in-process Go CoreDNS (ctest.CoreDNSServer) against the API server, not the cluster DNS
+pass  TestReload
