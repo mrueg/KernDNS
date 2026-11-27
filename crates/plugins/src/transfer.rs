@@ -15,8 +15,8 @@ use std::time::Duration;
 
 use kerndns_core::proto::op::{Message, MessageType, OpCode, Query, ResponseCode};
 use kerndns_core::proto::rr::{Name, RData, Record, RecordType};
-use kerndns_core::proto::serialize::binary::{BinEncodable, BinEncoder};
 use kerndns_core::transfer::{Notifier, TransferError, TransferRegistry};
+use kerndns_core::wire::{self, RecordSizer};
 use kerndns_core::zones;
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
@@ -29,6 +29,8 @@ use crate::forward::proxy::rand_id;
 const BATCH_BYTES: usize = 63000;
 /// Encoded messages must stay below the TCP limit with room for a TSIG.
 const MAX_ENCODED: usize = 64000;
+/// The DNS message header.
+const HEADER: usize = 12;
 
 #[derive(Debug, Clone)]
 struct Xfr {
@@ -210,13 +212,6 @@ async fn send_notify(zone: &str, to: &str, source: Option<IpAddr>) -> Result<(),
     Err(format!("notify for zone {zone:?} was not accepted by {to:?}: {last}"))
 }
 
-fn record_len(r: &Record) -> usize {
-    let mut buf = Vec::with_capacity(64);
-    let mut enc = BinEncoder::new(&mut buf);
-    let _ = r.emit(&mut enc);
-    buf.len()
-}
-
 pub struct Transfer {
     core: Arc<Core>,
     next: Next,
@@ -275,10 +270,13 @@ impl Handler for Transfer {
         };
 
         let mut soa: Option<Record> = None;
-        let mut out: Vec<Vec<Record>> = Vec::new();
+        // each message's records and the most they can take on the wire
+        let mut out: Vec<(Vec<Record>, usize)> = Vec::new();
         let mut cur: Vec<Record> = Vec::new();
         let mut size = 0usize;
+        let mut bound = 0usize;
         let mut total = 0usize;
+        let mut sizer = RecordSizer::new();
         for records in batches {
             if records.is_empty() {
                 continue;
@@ -287,14 +285,16 @@ impl Handler for Transfer {
                 soa = Some(records[0].clone());
             }
             for rr in records {
-                let len = record_len(&rr);
+                let (len, max) = sizer.measure(&rr);
                 if !cur.is_empty() && size + len > BATCH_BYTES {
                     total += cur.len();
-                    out.push(std::mem::take(&mut cur));
+                    out.push((std::mem::take(&mut cur), bound));
                     size = 0;
+                    bound = 0;
                 }
                 cur.push(rr);
                 size += len;
+                bound += max;
             }
         }
         let serial_of = |r: &Option<Record>| match r.as_ref().map(|r| &r.data) {
@@ -319,20 +319,29 @@ impl Handler for Transfer {
         }
         if !cur.is_empty() {
             total += cur.len();
-            out.push(cur);
+            out.push((cur, bound));
         }
         // the size estimate is per record; split any message whose actual
-        // encoding is too big for TCP (64K, minus room for a TSIG)
-        let mut queue: std::collections::VecDeque<Vec<Record>> = out.into();
-        while let Some(batch) = queue.pop_front() {
+        // encoding is too big for TCP (64K, minus room for a TSIG). Only
+        // messages that might be too big are encoded here: the header, the
+        // question and the uncompressed records bound the encoded size.
+        let question = req.msg.queries.first().map_or(0, |q| wire::name_len(q.name()) + 4);
+        let mut queue: std::collections::VecDeque<(Vec<Record>, Option<usize>)> =
+            out.into_iter().map(|(b, max)| (b, Some(max))).collect();
+        while let Some((batch, max)) = queue.pop_front() {
             let mut m = req.reply();
             m.metadata.authoritative = true;
             m.answers = batch;
-            let len = kerndns_core::wire::to_wire(&m).map(|v| v.len()).unwrap_or(usize::MAX);
+            let fits = max.is_some_and(|max| HEADER + question + max <= MAX_ENCODED);
+            let len = if fits {
+                0
+            } else {
+                wire::to_wire(&m).map(|v| v.len()).unwrap_or(usize::MAX)
+            };
             if len > MAX_ENCODED && m.answers.len() > 1 {
                 let second = m.answers.split_off(m.answers.len() / 2);
-                queue.push_front(second);
-                queue.push_front(std::mem::take(&mut m.answers));
+                queue.push_front((second, None));
+                queue.push_front((std::mem::take(&mut m.answers), None));
                 continue;
             }
             w.write_msg(m)
