@@ -146,7 +146,7 @@ provides the plugin, else an error saying how to build the bridge with it.
 | M0 | `whoami`, `log`, `errors`, `debug`, `bind`, `root` (done) |
 | 1: minimal server | `file`, `health`, `ready`, `prometheus`, `forward`, `cache`, `hosts`, `reload`, `loop`, `chaos` (done) |
 | 2: Kubernetes | `kubernetes`, `k8s_external` (done) |
-| 3: authoritative | `file`, `auto`, `secondary`, `transfer`, `any`, `minimal`, `loadbalance`, `local`, `tsig` |
+| 3: authoritative | `file`, `auto`, `secondary`, `transfer`, `any`, `minimal`, `loadbalance`, `local`, `tsig` (done) |
 | 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `nsid`, `tls` |
 | 5: DNSSEC and the rest | `dnssec`, `sign`, `alternate`, and the remaining in-tree plugins as needed |
 
@@ -156,9 +156,14 @@ Through the Go bridge until someone needs a port: `etcd`, `route53`,
 `tls`, `tsig`, `header` and `transfer` are ported (with DoT and DoH
 listeners), and so are `secondary` (with RFC 9432 catalog zones) and `dynupdate`
 (its database is KernDNS's own file format, replaced atomically per commit,
-instead of bbolt). The upstream tests still failing are mostly blocked by the
-`https`/`https3`/`quic`/`grpc_server` listener plugins (12), `erratic` (5)
-and ACME (1).
+instead of bbolt). `auto` loads zones from a directory and rescans it with
+the `file` zone code, and `multisocket` sets the number of `SO_REUSEPORT`
+servers (UDP socket and TCP listener each) per address. The upstream tests
+still failing are mostly blocked by the `https`/`https3`/`quic`/`grpc_server`
+listener plugins and transports (13), `autopath` (4), `dns64`, `dnssec`,
+`siit` and `shed` (4) and ACME (1); `view`'s two tests bind a port another
+running instance holds, which CoreDNS allows because all its listeners use
+`SO_REUSEPORT` and KernDNS refuses on purpose (2).
 
 Performance follow-ups from the first benchmarks, done:
 

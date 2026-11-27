@@ -63,6 +63,9 @@ pub struct ListenerPlan {
     pub tls: Option<Arc<rustls::ServerConfig>>,
     /// TCP/DoT timeouts merged from the listener's blocks (`timeouts`).
     pub conn: kerndns_core::plugin::ConnLimits,
+    /// `multisocket` of the first block on this address: that many UDP
+    /// sockets and TCP listeners, each a server of its own. 0 if not set.
+    pub num_sockets: usize,
 }
 
 impl ListenerPlan {
@@ -234,6 +237,7 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
                             class_chaos: false,
                             tls: None,
                             conn: Default::default(),
+                            num_sockets: cfg.num_sockets,
                         });
                         listeners.last_mut().unwrap()
                     }

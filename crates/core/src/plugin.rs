@@ -126,6 +126,9 @@ pub struct BlockConfig {
     pub view_name: Option<String>,
     /// Connection timeouts and limits for TCP/DoT (`timeouts`).
     pub conn: ConnLimits,
+    /// `multisocket`: servers (UDP socket + TCP listener, `SO_REUSEPORT`)
+    /// per listen address; 0 if not set.
+    pub num_sockets: usize,
     /// Handlers registered by setup, with their directive names, in the
     /// order setup ran (which is the execution order).
     pub plugins: Vec<(&'static str, PluginFn)>,
@@ -149,6 +152,7 @@ impl BlockConfig {
             filters: Vec::new(),
             view_name: None,
             conn: ConnLimits::default(),
+            num_sockets: 0,
             plugins: Vec::new(),
             extensions: Extensions::default(),
         }

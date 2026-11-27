@@ -19,6 +19,48 @@ use crate::udp::handle;
 
 const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Bind `n` TCP listeners to `addr` (`multisocket`). One listener is a
+/// plain bind; more share the port with `SO_REUSEPORT`, after a probe bind
+/// without it, so a port someone else holds still fails with "address in
+/// use" (see [`crate::udp::bind_reuseport`]). With port 0 the first
+/// listener picks the port and the others join it.
+pub async fn bind_reuseport(addr: SocketAddr, n: usize) -> std::io::Result<Vec<TcpListener>> {
+    if n <= 1 {
+        return Ok(vec![TcpListener::bind(addr).await?]);
+    }
+    use socket2::{Domain, Protocol as SockProto, Socket, Type};
+    let domain = if addr.is_ipv4() { Domain::IPV4 } else { Domain::IPV6 };
+    let mut addr = addr;
+    {
+        let probe = Socket::new(domain, Type::STREAM, Some(SockProto::TCP))?;
+        if addr.is_ipv6() {
+            let _ = probe.set_only_v6(false);
+        }
+        // like TcpListener::bind: TIME_WAIT leftovers don't block the port,
+        // a listener does
+        probe.set_reuse_address(true)?;
+        probe.bind(&addr.into())?;
+        if addr.port() == 0 {
+            addr.set_port(probe.local_addr()?.as_socket().expect("inet socket").port());
+        }
+    }
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        let s = Socket::new(domain, Type::STREAM, Some(SockProto::TCP))?;
+        if addr.is_ipv6() {
+            // dual stack, like Go's ":53"
+            let _ = s.set_only_v6(false);
+        }
+        s.set_reuse_address(true)?;
+        s.set_reuse_port(true)?;
+        s.set_nonblocking(true)?;
+        s.bind(&addr.into())?;
+        s.listen(1024)?;
+        out.push(TcpListener::from_std(s.into())?);
+    }
+    Ok(out)
+}
+
 /// Per-connection timeouts and query limit.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
