@@ -26,6 +26,8 @@ pub struct Answer {
     pub on_sent: Vec<kerndns_core::handler::SentHook>,
     /// A smaller EDNS UDP size a plugin applied to the request (`bufsize`).
     pub bufsize: Option<u16>,
+    /// The request's OPT record as a plugin rewrote it (`rewrite edns0`).
+    pub edns: Option<Box<Edns>>,
 }
 
 impl From<Vec<Message>> for Answer {
@@ -35,22 +37,29 @@ impl From<Vec<Message>> for Answer {
             signer: None,
             on_sent: Vec::new(),
             bufsize: None,
+            edns: None,
         }
     }
 }
 
-/// `req` as the plugins left it: with the EDNS size `bufsize` applied.
-pub fn effective_request(req: &Request, bufsize: Option<u16>) -> std::borrow::Cow<'_, Request> {
-    match bufsize {
-        Some(b) if req.edns().is_some_and(|e| e.max_payload() > b) => {
-            let mut r = req.clone();
-            if let Some(e) = r.msg.edns.as_mut() {
-                e.set_max_payload(b);
-            }
-            std::borrow::Cow::Owned(r)
-        }
-        _ => std::borrow::Cow::Borrowed(req),
+/// `req` as the plugins left it: with a rewritten OPT record (`edns`) and
+/// the EDNS size `bufsize` applied.
+pub fn effective_request<'a>(
+    req: &'a Request,
+    edns: Option<&Edns>,
+    bufsize: Option<u16>,
+) -> std::borrow::Cow<'a, Request> {
+    let mut r = std::borrow::Cow::Borrowed(req);
+    if let Some(e) = edns {
+        r.to_mut().msg.edns = Some(e.clone());
     }
+    if let Some(b) = bufsize
+        && r.edns().is_some_and(|e| e.max_payload() > b)
+        && let Some(e) = r.to_mut().msg.edns.as_mut()
+    {
+        e.set_max_payload(b);
+    }
+    r
 }
 
 impl Answer {
@@ -58,7 +67,7 @@ impl Answer {
     /// size they would have on the wire.
     fn into_msgs(self, req: &Request) -> Vec<Message> {
         let mut msgs = self.msgs;
-        scrub_truncate(&effective_request(req, self.bufsize), &mut msgs);
+        scrub_truncate(&effective_request(req, self.edns.as_deref(), self.bufsize), &mut msgs);
         if !self.on_sent.is_empty() {
             let n = msgs.iter().map(|m| to_wire(m).map_or(0, |v| v.len())).sum();
             for h in &self.on_sent {
@@ -351,7 +360,7 @@ impl Inner {
                 }
             }
         }
-        let sreq = effective_request(req, ctx.bufsize);
+        let sreq = effective_request(req, ctx.edns.as_deref(), ctx.bufsize);
         for m in &mut msgs {
             scrub(&sreq, m);
         }
@@ -360,6 +369,7 @@ impl Inner {
             signer: ctx.signer,
             on_sent: ctx.on_sent,
             bufsize: ctx.bufsize,
+            edns: ctx.edns,
         }
     }
 

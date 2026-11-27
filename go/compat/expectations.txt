@@ -100,7 +100,7 @@ pass  TestReverse
 pass  TestReverseCorefile
 pass  TestReverseExpansion
 pass  TestReverseInAddr
-xfail TestRewrite                                     Expected EDNS0 options but got none
+pass  TestRewrite
 pass  TestRewriteFailure
 xfail TestSIITAfterForward                            could not start CoreDNS test server: stdin:2 - Error during parsing: Directive 'siit' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestSecondaryFallthrough

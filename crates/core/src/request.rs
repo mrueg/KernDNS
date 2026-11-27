@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use hickory_proto::op::{Edns, Message, MessageType, OpCode, Query, ResponseCode};
 use hickory_proto::rr::{DNSClass, Name, RecordType};
@@ -10,6 +11,21 @@ use hickory_proto::rr::{DNSClass, Name, RecordType};
 pub const MIN_MSG_SIZE: u16 = 512;
 /// Largest DNS message.
 pub const MAX_MSG_SIZE: u16 = 65535;
+
+/// EDNS option codes a plugin handles, which the server may copy from a
+/// request to a response without an OPT record (`edns.SetSupportedOption`).
+static SUPPORTED_OPTIONS: [AtomicU64; 1024] = [const { AtomicU64::new(0) }; 1024];
+
+/// Let the server copy EDNS option `code` from requests to responses that
+/// have no OPT record of their own, like `edns.SetSupportedOption`.
+pub fn set_supported_option(code: u16) {
+    SUPPORTED_OPTIONS[usize::from(code / 64)].fetch_or(1 << (code % 64), Ordering::Relaxed);
+}
+
+/// Was `code` registered with [`set_supported_option`]?
+pub fn supported_option(code: u16) -> bool {
+    SUPPORTED_OPTIONS[usize::from(code / 64)].load(Ordering::Relaxed) & (1 << (code % 64)) != 0
+}
 
 /// The protocol a request arrived on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -191,12 +207,22 @@ impl Request {
     /// Make the reply's EDNS match the request, like `SizeAndDo`: if the
     /// request had an OPT record, the reply gets one with version 0, the
     /// request's buffer size and the request's DO bit. Options already on
-    /// the reply are kept; the request's options are not echoed.
+    /// the reply are kept. A reply without an OPT record gets the request's
+    /// options that a plugin registered with [`set_supported_option`].
     pub fn size_and_do(&self, reply: &mut Message) -> bool {
         let Some(req) = self.edns() else {
             return false;
         };
-        let opt = reply.edns.get_or_insert_with(Edns::new);
+        let opt = reply.edns.get_or_insert_with(|| {
+            let mut e = Edns::new();
+            let opts = &mut e.options_mut().options;
+            for (code, o) in &req.options().options {
+                if supported_option(u16::from(*code)) {
+                    opts.push((*code, o.clone()));
+                }
+            }
+            e
+        });
         opt.set_version(0);
         opt.set_max_payload(req.max_payload());
         opt.set_rcode_high(0);
@@ -274,5 +300,30 @@ mod tests {
         let opt = reply.edns.unwrap();
         assert_eq!(opt.max_payload(), 1232);
         assert!(opt.flags().dnssec_ok);
+    }
+
+    /// Only registered options are copied, and only into a reply without
+    /// an OPT record of its own.
+    #[test]
+    fn size_and_do_copies_supported_options() {
+        use hickory_proto::rr::rdata::opt::{EdnsCode, EdnsOption};
+        let mut r = req("a.", Protocol::Udp);
+        let mut e = Edns::new();
+        e.options_mut().insert(EdnsOption::Unknown(0xfde9, b"x".to_vec()));
+        e.options_mut().insert(EdnsOption::Unknown(0xfdea, b"y".to_vec()));
+        r.msg.edns = Some(e);
+        set_supported_option(0xfde9);
+        assert!(supported_option(0xfde9) && !supported_option(0xfdea));
+
+        let mut reply = r.reply();
+        r.size_and_do(&mut reply);
+        let opt = reply.edns.unwrap();
+        assert!(opt.option(EdnsCode::from(0xfde9)).is_some());
+        assert!(opt.option(EdnsCode::from(0xfdea)).is_none());
+
+        let mut reply = r.reply();
+        reply.edns = Some(Edns::new());
+        r.size_and_do(&mut reply);
+        assert!(reply.edns.unwrap().option(EdnsCode::from(0xfde9)).is_none());
     }
 }

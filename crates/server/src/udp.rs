@@ -91,7 +91,7 @@ pub async fn handle(
     let mut req = Request::new(msg, local, src, protocol);
     req.wire = Some(Arc::from(packet));
     let answer = d.answer(&req).await;
-    let size = crate::dispatch::effective_request(&req, answer.bufsize).size() as usize;
+    let size = crate::dispatch::effective_request(&req, answer.edns.as_deref(), answer.bufsize).size() as usize;
     encode(answer, size)
 }
 

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use hickory_proto::op::ResponseCode;
+use hickory_proto::op::{Edns, ResponseCode};
 
 use crate::request::Request;
 use crate::response::ResponseWriter;
@@ -85,6 +85,11 @@ pub struct Context {
     /// `bufsize`); the server echoes it and truncates UDP answers to it,
     /// as CoreDNS does after `bufsize` rewrites the request.
     pub bufsize: Option<u16>,
+    /// The request's OPT record as a plugin rewrote it (`rewrite edns0`).
+    /// CoreDNS plugins change the request in place, so the server answers
+    /// as if the client had sent this one: it echoes it and truncates UDP
+    /// answers to its size.
+    pub edns: Option<Box<Edns>>,
 }
 
 /// See [`Context::on_sent`].
@@ -111,6 +116,7 @@ impl Context {
             tsig_key: None,
             on_sent: Vec::new(),
             bufsize: None,
+            edns: None,
         }
     }
 }
