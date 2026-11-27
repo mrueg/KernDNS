@@ -1,0 +1,8 @@
+	example.org:0 {
+		chaos CoreDNS-001 miek@miek.nl
+		prometheus localhost:0
+	}
+	example.com:0 {
+		log
+		prometheus localhost:0
+	}

@@ -1,0 +1,16 @@
+dns://.:%d {
+	bind 127.0.0.1
+	whoami
+}
+
+tls://.:%d {
+	bind 127.0.0.1
+	tls {
+		acme %s
+		ca %s%s
+		ca_root %s
+		storage %s
+		resolver 127.0.0.1:%d
+	}
+	whoami
+}

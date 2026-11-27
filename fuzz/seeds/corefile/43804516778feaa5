@@ -1,0 +1,15 @@
+.:0 {
+				bind 127.0.0.1
+				dns64 {
+					allow_ipv4
+				}
+				template IN AAAA example.org {
+					rcode NOERROR
+				}
+				template IN A example.org {
+					rcode %s
+				}
+				template IN TXT example.org {
+					answer "{{ .Name }} 60 IN TXT \"connection reused\""
+				}
+			}

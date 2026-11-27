@@ -1,0 +1,8 @@
+.:0 {
+        bind 127.0.0.1 {
+            except 127.0.0.1
+        }
+        trace
+        loop
+        whoami
+    }

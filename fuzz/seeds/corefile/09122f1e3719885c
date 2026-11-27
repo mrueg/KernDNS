@@ -1,0 +1,54 @@
+job "dns" {
+  type = "service"
+
+  group "dns" {
+    network {
+      port "dns" {
+        static = 1053
+      }
+    }
+    task "dns" {
+      driver = "docker"
+
+      config {
+        image = "coredns/coredns:latest"
+        ports = ["dns"]
+        args = ["-conf", "/secrets/coredns/Corefile", "-dns.port", "1053"]
+      }
+
+      service {
+        name         = "hostmaster"
+        provider     = "nomad"
+        port         = "dns"
+        address_mode = "driver"
+      }
+
+      identity {
+        env = true
+      }
+
+      template {
+        data          = <<EOF
+. {
+  forward . 1.1.1.1
+}
+
+service.nomad. {
+  errors
+  debug
+  health
+  log
+  nomad service.nomad {
+    address unix:///secrets/api.sock
+    ttl 10
+  }
+  cache 30
+}
+EOF
+        destination   = "secrets/coredns/Corefile"
+        change_mode   = "signal"
+        change_signal = "SIGHUP"
+      }
+    }
+  }
+}

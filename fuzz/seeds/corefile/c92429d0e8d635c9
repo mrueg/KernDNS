@@ -1,0 +1,5 @@
+example.org:0 {
+		siit {
+			ipv6_prefix 64:ff9b::/96
+		}
+		forward . 

@@ -282,6 +282,7 @@ crates/
   plugins/    Rust ports of CoreDNS plugins (and the shared service-backend lookup)
   kubernetes/ kubernetes and k8s_external
   kerndns/    the binary
+fuzz/         cargo-fuzz targets: Corefile setup, the request path, the Go bridge
 go/compat/    overlay that runs CoreDNS's integration tests against kerndns
 go/bridge/    the Go bridge library: CoreDNS plugins behind a C interface
 third_party/coredns   CoreDNS v1.15.0 (git submodule): tests and reference behaviour
@@ -340,6 +341,27 @@ runs in its own process, and the results are compared with
 
 A test only counts as passing if it actually started `kerndns`. Tests that
 pass without ever starting the server are classified as `skip`.
+
+### Fuzzing
+
+[`fuzz/`](fuzz/) has [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz)
+(libFuzzer) targets; they need a nightly toolchain:
+
+| target | what it feeds |
+|---|---|
+| `corefile` | arbitrary Corefiles through the lexer, the dispenser, the parser and every plugin's setup (`config::load`, no sockets, no startup hooks) |
+| `wire` | arbitrary packets through the server's request path (`udp::handle` over UDP/TCP, or `unpack_request` + `answer` as DoH, DoH3, DoQ and gRPC do) with a chain of acl, header, rewrite, cache, loadbalance, template, file, tsig, minimal, hosts, dns64, chaos, ... ([`fuzz/fixtures/Corefile.wire`](fuzz/fixtures/Corefile.wire)) |
+| `bridge` | the Rust side of the Go bridge without the Go library: arbitrary callback sequences (responses, calls to next, results), the plugin list, and directive rendering (rendered tokens must lex back to the same tokens) |
+
+```sh
+cargo install cargo-fuzz
+cd fuzz
+cargo +nightly fuzz run wire corpus/wire seeds/wire -- -max_total_time=600 -close_fd_mask=1 -jobs=2
+```
+
+Seeds in `fuzz/seeds/` come from CoreDNS's READMEs and integration test
+Corefiles and from hand-built queries; `corpus/` and `artifacts/` are not
+committed. CI builds the targets and runs each for 60 seconds.
 
 ## License
 

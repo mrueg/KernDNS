@@ -1,0 +1,5 @@
+ db\.(.*) {1}
+			reload 0.1s
+		}
+		prometheus localhost:0
+	}

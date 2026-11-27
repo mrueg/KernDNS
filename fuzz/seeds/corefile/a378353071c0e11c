@@ -1,0 +1,5 @@
+rewrite [continue|stop] {
+    name regex STRING STRING
+    answer name STRING STRING
+    [answer value STRING STRING]
+}

@@ -1,0 +1,7 @@
+https://.:0 {
+	tls ../plugin/tls/test_cert.pem ../plugin/tls/test_key.pem ../plugin/tls/test_ca.pem
+	https {
+		max_connections 2
+	}
+	whoami
+}

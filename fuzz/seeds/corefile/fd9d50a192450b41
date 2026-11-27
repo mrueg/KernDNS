@@ -1,0 +1,4 @@
+example.org:0 {
+		whoami
+		prometheus localhost:0
+	}

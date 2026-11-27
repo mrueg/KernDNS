@@ -1,0 +1,6 @@
+grpc://.:0 {
+	grpc_server {
+		max_streams 2
+	}
+	whoami
+}

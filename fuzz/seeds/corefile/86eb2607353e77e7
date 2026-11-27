@@ -1,0 +1,34 @@
+, dynUpdateKey, dynUpdateSecret, zoneFile, dynUpdateKey)
+	server, udp, _, err := CoreDNSServerAndPorts(corefile)
+	if err != nil {
+		t.Fatalf("starting CoreDNS: %v", err)
+	}
+	defer server.Stop()
+
+	msg := new(dns.Msg).SetUpdate("example.org.")
+	rr, err := dns.NewRR("unsigned.example.org. 60 IN TXT \"denied\"")
+	if err != nil {
+		t.Fatalf("creating update RR: %v", err)
+	}
+	msg.Insert([]dns.RR{rr})
+	resp, err := dns.Exchange(msg, udp)
+	if err != nil {
+		t.Fatalf("sending unsigned UPDATE: %v", err)
+	}
+	if resp.Rcode != dns.RcodeRefused {
+		t.Fatalf("unsigned UPDATE rcode = %s, want REFUSED", dns.RcodeToString[resp.Rcode])
+	}
+}
+
+func TestDynUpdateRejectsOtherZones(t *testing.T) {
+	seed, removeSeed, err := plugintest.TempFile(".", dynUpdateZone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeSeed()
+	other, removeOther, err := plugintest.TempFile(".", strings.ReplaceAll(dynUpdateZone, "example.org.", "other.example."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeOther()
+	corefile := fmt.Sprintf(

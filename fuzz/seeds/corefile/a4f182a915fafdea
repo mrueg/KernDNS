@@ -1,0 +1,4 @@
+.:0 {
+        rewrite name regex (.*)\.test\.$ {1}. answer auto
+        # no next plugin to induce SERVFAIL
+    }

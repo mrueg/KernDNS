@@ -1,0 +1,5 @@
+quic://.:0 {
+		tls ../plugin/tls/test_cert.pem ../plugin/tls/test_key.pem ../plugin/tls/test_ca.pem
+		whoami
+		quic
+	}

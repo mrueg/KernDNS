@@ -1,0 +1,7 @@
+example.org:0 {
+		erratic {
+			drop 0
+			delay 0
+			large
+		}
+	}

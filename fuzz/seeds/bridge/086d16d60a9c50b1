@@ -1,0 +1,3 @@
+acl [ZONES...] {
+    ACTION [type QTYPE...] [net SOURCE...]
+}

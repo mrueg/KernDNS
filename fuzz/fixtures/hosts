@@ -1,0 +1,3 @@
+192.0.2.80 hosts.example.net h1.example.net
+2001:db8::80 hosts.example.net
+10.0.0.1 ten.example.net

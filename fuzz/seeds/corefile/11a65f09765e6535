@@ -1,0 +1,32 @@
+. {
+  view example1 {
+    expr incidr(client_ip(), '127.0.0.0/24')
+  }
+  hosts {
+    1.1.1.1 test
+  }
+}
+
+. {
+  view example2 {
+    expr incidr(client_ip(), '192.168.0.0/16')
+  }
+  hosts {
+    2.2.2.2 test
+  }
+}
+
+. {
+  view v6_example1 {
+    expr incidr(client_ip(), '2001:0DB8::/32')
+  }
+  hosts {
+    2001:0DB8::1 test
+  }
+}
+
+. {
+  hosts {
+    3.3.3.3 test
+  }
+}

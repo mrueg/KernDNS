@@ -1,0 +1,5 @@
+.:0 {
+		acl protected.example. {
+			block
+		}
+		autopath 

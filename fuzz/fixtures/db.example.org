@@ -1,0 +1,28 @@
+$ORIGIN example.org.
+$TTL 3600
+@       IN SOA  ns1.example.org. hostmaster.example.org. 2026112701 7200 3600 1209600 3600
+        IN NS   ns1.example.org.
+        IN NS   ns2.example.org.
+        IN MX   10 mail.example.org.
+        IN TXT  "v=spf1 -all"
+        IN A    192.0.2.1
+        IN AAAA 2001:db8::1
+ns1     IN A    192.0.2.53
+ns2     IN AAAA 2001:db8::53
+www     IN A    192.0.2.10
+www     IN A    192.0.2.11
+www     IN AAAA 2001:db8::10
+mail    IN A    192.0.2.25
+alias   IN CNAME www
+dangling IN CNAME nowhere.example.net.
+loop1   IN CNAME loop2
+loop2   IN CNAME loop1
+*.wild  IN A    192.0.2.99
+*.wild  IN TXT  "wildcard"
+_sip._udp IN SRV 10 60 5060 sip.example.org.
+sip     IN A    192.0.2.60
+sub     IN NS   ns.sub.example.org.
+ns.sub  IN A    192.0.2.70
+dn      IN DNAME example.net.
+caa     IN CAA  0 issue "ca.example.net"
+ptr     IN PTR  www.example.org.

@@ -1,0 +1,19 @@
+kubernetes [ZONES...] {
+    endpoint URL
+    tls CERT KEY CACERT
+    kubeconfig KUBECONFIG [CONTEXT]
+    apiserver_qps QPS
+    apiserver_burst BURST
+    apiserver_max_inflight MAX
+    namespaces NAMESPACE...
+    labels EXPRESSION
+    pods POD-MODE
+    endpoint_pod_names
+    ttl TTL
+    noendpoints
+    fallthrough [ZONES...]
+    ignore empty_service
+    multicluster [ZONES...]
+    zonal
+    startup_timeout DURATION
+}
