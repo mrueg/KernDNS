@@ -192,6 +192,11 @@ impl Dispatcher {
         self.0.serve(req, 0).await
     }
 
+    /// The listener's label, e.g. `dns://:53` (the `server` metrics label).
+    pub fn label(&self) -> &str {
+        &self.0.label
+    }
+
     /// A handle that can swap in a new routing table later (reload).
     pub fn handle(&self) -> DispatcherHandle {
         DispatcherHandle(self.0.clone())
@@ -431,7 +436,7 @@ pub fn scrub(req: &Request, m: &mut Message) {
 
 /// `scrub` plus the truncation, for answers that are not encoded here.
 fn scrub_truncate(req: &Request, msgs: &mut [Message]) {
-    if req.protocol == Protocol::Udp {
+    if req.proto() == "udp" {
         for m in msgs {
             truncate(m, req.size() as usize);
         }

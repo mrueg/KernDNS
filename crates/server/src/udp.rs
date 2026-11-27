@@ -88,6 +88,19 @@ pub async fn handle(
     if msg.metadata.message_type == MessageType::Response {
         return Vec::new();
     }
+    answer(d, msg, packet, src, local, protocol).await
+}
+
+/// Serve a parsed request `msg` (received as `packet`); returns the wire
+/// responses, truncated to what the client accepts and signed.
+pub async fn answer(
+    d: &Dispatcher,
+    msg: Message,
+    packet: &[u8],
+    src: SocketAddr,
+    local: SocketAddr,
+    protocol: Protocol,
+) -> Vec<Vec<u8>> {
     let mut req = Request::new(msg, local, src, protocol);
     req.wire = Some(Arc::from(packet));
     let answer = d.answer(&req).await;

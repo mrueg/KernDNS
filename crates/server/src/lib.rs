@@ -1,11 +1,15 @@
-//! The KernDNS server: loads a Corefile into plugin chains and serves them on
-//! hickory-server listeners.
+//! The KernDNS server: loads a Corefile into plugin chains and serves them
+//! over UDP, TCP, DoT, DoH, DoH3, DoQ and gRPC.
 
 pub mod config;
 pub mod dispatch;
 pub mod doh;
+pub mod doh3;
+pub mod grpc;
+pub mod quic;
 pub mod tcp;
 pub mod udp;
+pub mod unpack;
 
 use std::net::SocketAddr;
 
@@ -21,10 +25,19 @@ pub struct ListenerInfo {
     /// e.g. `dns://:53`.
     pub label: String,
     pub zones: Vec<String>,
-    pub udp: SocketAddr,
-    pub tcp: SocketAddr,
+    /// The UDP socket (plain DNS, DoQ, DoH3), if any.
+    pub udp: Option<SocketAddr>,
+    /// The TCP socket (plain DNS, DoT, DoH, gRPC), if any.
+    pub tcp: Option<SocketAddr>,
     /// Servers on this address (`multisocket`, 1 without it).
     pub servers: usize,
+}
+
+impl ListenerInfo {
+    /// The listener's port.
+    pub fn port(&self) -> u16 {
+        self.tcp.or(self.udp).map_or(0, |a| a.port())
+    }
 }
 
 type ShutdownHook = Box<dyn FnOnce() + Send>;
@@ -32,7 +45,7 @@ type ShutdownHook = Box<dyn FnOnce() + Send>;
 struct Running {
     info: ListenerInfo,
     handle: DispatcherHandle,
-    /// Our UDP, TCP, DoT and DoH loops.
+    /// Our UDP, TCP, DoT, DoH, DoH3, DoQ and gRPC loops.
     tasks: tokio::task::JoinSet<()>,
 }
 
@@ -128,7 +141,9 @@ impl Instance {
         for mut r in old {
             match plan.listeners.iter().find(|l| l.label() == r.info.label) {
                 Some(l) => {
-                    if l.num_sockets.max(1) != r.info.servers {
+                    // QUIC listeners have one socket whatever `multisocket` says
+                    let quic = matches!(l.transport, Transport::Quic | Transport::Https3);
+                    if !quic && l.num_sockets.max(1) != r.info.servers {
                         kerndns_core::warning!(
                             "{}: multisocket changes from {} to {} after a restart, not on reload",
                             r.info.label,
@@ -187,19 +202,23 @@ fn check_transports(plan: &Plan) -> Result<(), StartError> {
     for l in &plan.listeners {
         match l.transport {
             Transport::Dns => {}
-            Transport::Tls | Transport::Https => {
+            // gRPC serves cleartext HTTP/2 without TLS, like CoreDNS
+            Transport::Grpc => {}
+            Transport::Https3 => {
+                if l.tls.is_none() {
+                    return Err(StartError::Other(format!(
+                        "{}: DoH3 requires TLS, no TLS config found",
+                        l.label()
+                    )));
+                }
+            }
+            Transport::Tls | Transport::Https | Transport::Quic => {
                 if l.tls.is_none() {
                     return Err(StartError::Other(format!(
                         "{}: no TLS configuration (use the tls plugin)",
                         l.label()
                     )));
                 }
-            }
-            t => {
-                return Err(StartError::Other(format!(
-                    "{}: the {t}:// transport is not supported by KernDNS yet",
-                    l.label()
-                )));
             }
         }
     }
@@ -215,40 +234,84 @@ fn udp_sockets() -> usize {
 }
 
 async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError> {
-    let with_udp = l.transport == Transport::Dns;
-    let (udp, tcp) = bind(&l.host, &l.port, with_udp, l.num_sockets).await?;
-    let tcp_local = tcp[0].local_addr().map_err(|e| StartError::Other(e.to_string()))?;
-    let udp_local = match udp.first() {
-        Some(u) => u.local_addr().map_err(|e| StartError::Other(e.to_string()))?,
-        None => tcp_local,
+    // `multisocket` (num_sockets > 0) gives that many UDP sockets and TCP
+    // listeners, each a server of its own; without it one TCP listener and
+    // one UDP socket per CPU. QUIC listeners use one UDP socket.
+    let n = l.num_sockets;
+    let (udp_count, tcp_count) = match l.transport {
+        Transport::Dns => (if n > 0 { n } else { udp_sockets() }, n.max(1)),
+        Transport::Tls | Transport::Https | Transport::Grpc => (0, n.max(1)),
+        Transport::Quic | Transport::Https3 => (1, 0),
     };
+    let (udp, tcp) = bind(&l.host, &l.port, udp_count, tcp_count).await?;
+    let local_err = |e: std::io::Error| StartError::Other(e.to_string());
+    let tcp_local = tcp.first().map(|t| t.local_addr()).transpose().map_err(local_err)?;
+    let udp_local = udp.first().map(|u| u.local_addr()).transpose().map_err(local_err)?;
+    let any_local = tcp_local.or(udp_local).expect("bound at least one socket");
     let label = l.label();
-    let dispatcher = Dispatcher::new(label.clone(), &l.zones, l.class_chaos, udp_local, tcp_local);
+    let dispatcher = Dispatcher::new(
+        label.clone(),
+        &l.zones,
+        l.class_chaos,
+        udp_local.unwrap_or(any_local),
+        tcp_local.unwrap_or(any_local),
+    );
     let handle = dispatcher.handle();
-    let servers = tcp.len();
-    let mut tasks = match l.transport {
-        Transport::Dns => udp::serve(udp, dispatcher.clone(), udp_local),
-        _ => tokio::task::JoinSet::new(),
+    let conn = tcp::Limits::from(&l.conn);
+    let tls = |alpn: &[&[u8]]| {
+        let mut cfg = (**l.tls.as_ref().expect("checked")).clone();
+        cfg.alpn_protocols = alpn.iter().map(|a| a.to_vec()).collect();
+        tokio_rustls::TlsAcceptor::from(std::sync::Arc::new(cfg))
     };
-    for tcp in tcp {
+    let quic_socket = |udp: Vec<UdpSocket>| {
+        udp.into_iter()
+            .next()
+            .expect("one socket")
+            .into_std()
+            .map_err(|e| StartError::Other(e.to_string()))
+    };
+    let servers = tcp.len().max(1);
+    let mut tasks = match l.transport {
+        Transport::Dns => udp::serve(udp, dispatcher.clone(), any_local),
+        Transport::Quic => {
+            let s = quic::Settings::new(&l.limits, &conn);
+            let ep = quic::endpoint(
+                quic_socket(udp)?,
+                l.tls.as_ref().expect("checked"),
+                &[b"doq"],
+                Some(s.max_streams),
+                s.idle_timeout,
+            )
+            .map_err(|e| StartError::Other(format!("{label}: {e}")))?;
+            quic::serve(ep, dispatcher.clone(), any_local, s)
+        }
+        Transport::Https3 => {
+            let s = doh3::Settings::new(&l.limits, &conn);
+            let ep = doh3::endpoint(quic_socket(udp)?, l.tls.as_ref().expect("checked"), &s)
+                .map_err(|e| StartError::Other(format!("{label}: {e}")))?;
+            doh3::serve(ep, dispatcher.clone(), any_local, s)
+        }
+        Transport::Tls | Transport::Https | Transport::Grpc => tokio::task::JoinSet::new(),
+    };
+    for t in tcp {
         let d = dispatcher.clone();
-        let t = match l.transport {
-            Transport::Dns => tcp::serve(tcp, d, tcp_local, None, tcp::Limits::from(&l.conn)),
-            Transport::Tls => {
-                let mut cfg = (**l.tls.as_ref().expect("checked")).clone();
-                cfg.alpn_protocols = vec![b"dot".to_vec()];
-                let acc = tokio_rustls::TlsAcceptor::from(std::sync::Arc::new(cfg));
-                tcp::serve(tcp, d, tcp_local, Some(acc), tcp::Limits::from(&l.conn))
+        let set = match l.transport {
+            Transport::Dns => tcp::serve(t, d, any_local, None, conn),
+            Transport::Tls => tcp::serve(t, d, any_local, Some(tls(&[b"dot"])), conn),
+            Transport::Https => doh::serve(
+                t,
+                d,
+                any_local,
+                tls(&[b"h2", b"http/1.1"]),
+                doh::Settings::new(&l.limits),
+            ),
+            Transport::Grpc => {
+                let acc = l.tls.as_ref().map(|_| tls(&[b"h2"]));
+                grpc::serve(t, d, any_local, acc, grpc::Settings::new(&l.limits))
             }
-            Transport::Https => {
-                let mut cfg = (**l.tls.as_ref().expect("checked")).clone();
-                cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-                let acc = tokio_rustls::TlsAcceptor::from(std::sync::Arc::new(cfg));
-                doh::serve(tcp, d, tcp_local, acc, "/dns-query")
-            }
-            _ => unreachable!("checked by check_transports"),
+            Transport::Quic | Transport::Https3 => unreachable!("no TCP listener"),
         };
-        tasks = merge(tasks, t);
+        tasks = merge(tasks, set);
     }
     let info = ListenerInfo {
         label,
@@ -270,18 +333,15 @@ fn merge(mut a: tokio::task::JoinSet<()>, b: tokio::task::JoinSet<()>) -> tokio:
     a
 }
 
-/// Bind UDP (several `SO_REUSEPORT` sockets) and TCP on `host:port`. An
-/// empty host means all interfaces: `[::]` (dual stack), falling back to
-/// `0.0.0.0` without IPv6. With `multisocket` (`num_sockets` > 0) there are
-/// that many UDP sockets and TCP listeners; without it one TCP listener and
-/// one UDP socket per CPU.
+/// Bind `udp_count` UDP sockets and `tcp_count` TCP listeners on
+/// `host:port`, all with `SO_REUSEPORT`. An empty host means all
+/// interfaces: `[::]` (dual stack), falling back to `0.0.0.0` without IPv6.
 async fn bind(
     host: &str,
     port: &str,
-    with_udp: bool,
-    num_sockets: usize,
+    udp_count: usize,
+    tcp_count: usize,
 ) -> Result<(Vec<UdpSocket>, Vec<TcpListener>), StartError> {
-    let udp_n = if num_sockets > 0 { num_sockets } else { udp_sockets() };
     let candidates: Vec<String> = if host.is_empty() {
         vec![format!("[::]:{port}"), format!("0.0.0.0:{port}")]
     } else if host.contains(':') {
@@ -298,8 +358,8 @@ async fn bind(
                 continue;
             }
         };
-        let udp = match if with_udp {
-            udp::bind_reuseport(sa, udp_n)
+        let udp = match if udp_count > 0 {
+            udp::bind_reuseport(sa, udp_count)
         } else {
             Ok(Vec::new())
         } {
@@ -316,7 +376,10 @@ async fn bind(
                 continue;
             }
         };
-        match tcp::bind_reuseport(sa, num_sockets.max(1)).await {
+        if tcp_count == 0 {
+            return Ok((udp, Vec::new()));
+        }
+        match tcp::bind_reuseport(sa, tcp_count).await {
             Ok(tcp) => return Ok((udp, tcp)),
             Err(e) => last_err = Some((addr.clone(), e)),
         }
