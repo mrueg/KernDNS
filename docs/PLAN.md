@@ -421,7 +421,10 @@ Each scenario runs N times and reports the median and spread.
   rewrites, AXFR, TSIG-signed queries and UPDATEs, kubernetes and
   `k8s_external` against the fake API server, ...). Leading `# about:`,
   `# queries:`, `# dnsperf:` and `# needs:` comments describe each case
-  (see `xtask/src/bench.rs`). The result is the CPU time per query added
+  (see `xtask/src/bench.rs`). DoQ, DoH3 and gRPC (`# dnsperf: -m doq`,
+  `-m doh3`, `-m grpc`), which dnsperf can't speak, run `cargo xtask
+  loadgen` instead: same arguments, same statistics output, plus latency
+  percentiles. The result is the CPU time per query added
   over the `whoami` baseline, next to max QPS, latency at a fixed rate and
   peak RSS, with a warning when CoreDNS and KernDNS answer with different
   response codes. `cargo xtask bench --level 2 --plugin cache` runs a
@@ -429,8 +432,7 @@ Each scenario runs N times and reports the median and spread.
   --check` (in CI, no dnsperf needed) fails for any plugin in KernDNS's
   registry without a `bench/plugins/<name>/` directory or an entry in
   `bench/plugins/EXEMPT` (only plugins with no per-query work: `bind`,
-  `root`, `debug`, `health`, `ready`, `reload`, `sign`, and the listener
-  plugins dnsperf can't drive), and checks that every case parses and
+  `root`, `debug`, `health`, `ready`, `reload`, `sign`), and checks that every case parses and
   uses its plugin. Still missing: forward failures. Follow-ups from the
   first full run (README), all fixed: the cache held a quarter of
   CoreDNS's entries in small caches (shard minimum 1 instead of 4) and

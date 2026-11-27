@@ -1,0 +1,11 @@
+# about: DNS over HTTPS listener over HTTP/3 with connection and stream limits + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -m doh3
+https3://.:{PORT} {
+    tls {BENCH}/shared/tls/cert.pem {BENCH}/shared/tls/key.pem
+    https3 {
+        max_streams 256
+        max_connections 1000
+    }
+    whoami
+}

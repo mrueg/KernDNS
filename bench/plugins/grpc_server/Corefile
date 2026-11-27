@@ -1,0 +1,10 @@
+# about: gRPC listener (CoreDNS's DnsService, cleartext HTTP/2) with connection and stream limits + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -m grpc
+grpc://.:{PORT} {
+    grpc_server {
+        max_streams 256
+        max_connections 1000
+    }
+    whoami
+}

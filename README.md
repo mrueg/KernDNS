@@ -57,7 +57,10 @@ laptop (i7-1065G7) and dnsperf on others, and reports the CPU time per query
 each case adds over a `whoami`-only server, next to max QPS and peak RSS.
 Plugins without per-query work are listed in
 [`bench/plugins/EXEMPT`](bench/plugins/EXEMPT); `cargo xtask bench --check`
-(in CI) fails for any other plugin without a scenario.
+(in CI) fails for any other plugin without a scenario. DoQ, DoH3 and gRPC
+cases (`quic`, `https3`, `grpc_server`) use `cargo xtask loadgen`, a small
+load generator with dnsperf's arguments and output, since dnsperf can't
+speak those transports.
 
 **These numbers are indicative only.** They come from one `cargo xtask bench
 --level 2 --duration 3 --runs 3` (median of 3 runs per case) on a laptop
@@ -250,6 +253,7 @@ cargo xtask bench                       # CoreDNS vs kerndns with dnsperf, every
 cargo xtask bench --plugin cache,forward  # level 2 cases of some plugins (+ whoami baseline)
 cargo xtask bench --level 3             # common setups only
 cargo xtask bench --check               # every plugin has a scenario (no dnsperf needed)
+cargo xtask loadgen -m doq -p 853 -d queries.txt -l 10  # DoQ/DoH3/gRPC load (dnsperf-style output)
 cargo xtask k8s-cases                   # regenerate the upstream kubernetes test cases (Go)
 cargo xtask k8s-bench                   # kubernetes plugin at 1k/10k/50k services
 # live-cluster comparison (workloads in namespaces testns/other):

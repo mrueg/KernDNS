@@ -13,7 +13,8 @@
 //! ```text
 //! # about: what the case measures
 //! # queries: {FIX}/q-file.txt       (dnsperf input; default {DIR}/queries.txt)
-//! # dnsperf: -m dot                 (extra dnsperf arguments)
+//! # dnsperf: -m dot                 (extra dnsperf arguments; -m doq, doh3
+//!                                    or grpc run `cargo xtask loadgen`)
 //! # needs: kubernetes               (start the fake Kubernetes API server)
 //! ```
 //!
@@ -439,9 +440,47 @@ fn free_port() -> Result<u16> {
     }
 }
 
-/// Waits until the server answers on `port` (UDP, or a TCP connect for
-/// TLS-only listeners).
-fn wait_up(port: u16, child: &mut Child, tcp_only: bool) -> Result<()> {
+/// How to tell that a server is up.
+#[derive(Debug, Clone, Copy)]
+enum Probe {
+    /// It answers a query over UDP.
+    Udp,
+    /// It accepts a TCP connection (TLS, HTTPS and gRPC listeners).
+    Tcp,
+    /// It answers a query over QUIC (DoQ, DoH3).
+    Quic(crate::loadgen::Mode),
+}
+
+impl Probe {
+    /// From a case's extra dnsperf arguments (`-m MODE`).
+    fn for_args(args: &[String]) -> Probe {
+        match loadgen_mode(args) {
+            Some(m @ (crate::loadgen::Mode::Doq | crate::loadgen::Mode::Doh3)) => Probe::Quic(m),
+            Some(crate::loadgen::Mode::Grpc) => Probe::Tcp,
+            None if args
+                .windows(2)
+                .any(|w| w[0] == "-m" && matches!(w[1].as_str(), "dot" | "doh")) =>
+            {
+                Probe::Tcp
+            }
+            None => Probe::Udp,
+        }
+    }
+}
+
+/// An optimized xtask binary for `loadgen` (bench itself may be a debug
+/// build), built by `run` when a selected case needs it.
+static LOADGEN: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// `-m doq|doh3|grpc`: modes dnsperf lacks, run with `cargo xtask loadgen`.
+fn loadgen_mode(args: &[String]) -> Option<crate::loadgen::Mode> {
+    args.windows(2)
+        .find(|w| w[0] == "-m")
+        .and_then(|w| crate::loadgen::Mode::parse(&w[1]))
+}
+
+/// Waits until the server answers on `port` (see [`Probe`]).
+fn wait_up(port: u16, child: &mut Child, probe: Probe) -> Result<()> {
     let sock = std::net::UdpSocket::bind("127.0.0.1:0")?;
     sock.set_read_timeout(Some(Duration::from_millis(100)))?;
     let q = [0x12, 0x34, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 1];
@@ -450,12 +489,22 @@ fn wait_up(port: u16, child: &mut Child, tcp_only: bool) -> Result<()> {
         if child.try_wait()?.is_some() {
             bail!("server exited during startup");
         }
-        if tcp_only {
-            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
-                return Ok(());
+        match probe {
+            Probe::Udp => {}
+            Probe::Tcp => {
+                if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                    return Ok(());
+                }
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
             }
-            std::thread::sleep(Duration::from_millis(50));
-            continue;
+            Probe::Quic(mode) => {
+                if crate::loadgen::probe(mode, port) {
+                    return Ok(());
+                }
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
+            }
         }
         let _ = sock.send_to(&q, ("127.0.0.1", port));
         let mut b = [0u8; 512];
@@ -466,7 +515,7 @@ fn wait_up(port: u16, child: &mut Child, tcp_only: bool) -> Result<()> {
     bail!("server did not start on port {port}")
 }
 
-fn start(bin: &Path, corefile: &Path, port: u16, cpus: &str, tcp_only: bool) -> Result<Proc> {
+fn start(bin: &Path, corefile: &Path, port: u16, cpus: &str, probe: Probe) -> Result<Proc> {
     let log = corefile.with_extension("log");
     let mut child = Command::new("taskset")
         .args(["-c", cpus])
@@ -478,7 +527,7 @@ fn start(bin: &Path, corefile: &Path, port: u16, cpus: &str, tcp_only: bool) -> 
         .stderr(fs::File::create(&log)?)
         .spawn()
         .with_context(|| format!("starting {}", bin.display()))?;
-    if let Err(e) = wait_up(port, &mut child, tcp_only) {
+    if let Err(e) = wait_up(port, &mut child, probe) {
         let _ = child.kill();
         let out = fs::read_to_string(&log).unwrap_or_default();
         bail!("{e}: {}\n{}", bin.display(), out.trim());
@@ -549,20 +598,18 @@ fn parse_rcodes(text: &str) -> Vec<(String, f64)> {
 
 fn dnsperf(cpus: &Cpus, port: u16, queries: &Path, secs: u32, rate: Option<u32>, extra: &[String]) -> Result<Run> {
     let mut cmd = Command::new("taskset");
-    cmd.args([
-        "-c",
-        &cpus.dnsperf,
-        "dnsperf",
-        "-s",
-        "127.0.0.1",
-        "-p",
-        &port.to_string(),
-        "-d",
-    ])
-    .arg(queries)
-    .args(["-c", "32", "-T", "2", "-q", "500", "-l", &secs.to_string()])
-    .args(extra)
-    .env("LC_ALL", "C");
+    cmd.args(["-c", &cpus.dnsperf]);
+    if loadgen_mode(extra).is_some() {
+        let exe = LOADGEN.get().cloned().map_or_else(std::env::current_exe, Ok)?;
+        cmd.arg(exe).arg("loadgen");
+    } else {
+        cmd.arg("dnsperf");
+    }
+    cmd.args(["-s", "127.0.0.1", "-p", &port.to_string(), "-d"])
+        .arg(queries)
+        .args(["-c", "32", "-T", "2", "-q", "500", "-l", &secs.to_string()])
+        .args(extra)
+        .env("LC_ALL", "C");
     if let Some(r) = rate {
         cmd.args(["-Q", &r.to_string()]);
     }
@@ -627,11 +674,7 @@ fn measure(
     secs: u32,
     rate: Option<u32>,
 ) -> Result<(Result1, u32)> {
-    let tcp_only = case
-        .dnsperf
-        .windows(2)
-        .any(|w| w[0] == "-m" && matches!(w[1].as_str(), "dot" | "doh"));
-    let p = start(bin, corefile, port, &cpus.server, tcp_only)?;
+    let p = start(bin, corefile, port, &cpus.server, Probe::for_args(&case.dnsperf))?;
     let pid = p.0.id();
     dnsperf(cpus, port, q, 2, None, &case.dnsperf)?; // warm up (fills caches)
     let (cpu0, _) = proc_usage(pid);
@@ -667,6 +710,20 @@ fn build_kerndns(root: &Path) -> Result<PathBuf> {
         bail!("building kerndns failed");
     }
     Ok(root.join("target/release/kerndns"))
+}
+
+/// A release build of xtask for `loadgen` (`cargo xtask` runs a debug
+/// build, too slow to load a server).
+fn build_loadgen(root: &Path) -> Result<PathBuf> {
+    if !Command::new(env!("CARGO"))
+        .current_dir(root)
+        .args(["build", "--release", "--package", "xtask"])
+        .status()?
+        .success()
+    {
+        bail!("building the load generator failed");
+    }
+    Ok(root.join("target/release/xtask"))
 }
 
 /// The reference CoreDNS: `path` if given, else built from the submodule.
@@ -779,6 +836,9 @@ pub fn run(args: &[String]) -> Result<()> {
     fs::create_dir_all(&fix)?;
     write_fixtures(&fix)?;
     let kerndns = build_kerndns(&root)?;
+    if cases.iter().any(|c| loadgen_mode(&c.dnsperf).is_some()) {
+        let _ = LOADGEN.set(build_loadgen(&root)?);
+    }
     let coredns = coredns(&root, coredns_bin)?;
 
     // the shared upstream for forward and secondary: CoreDNS serving the zone
@@ -795,7 +855,7 @@ pub fn run(args: &[String]) -> Result<()> {
             tls = tls.display()
         ),
     )?;
-    let _backend = start(&coredns, &backend_cf, backend_port, &cpus.backend, false)?;
+    let _backend = start(&coredns, &backend_cf, backend_port, &cpus.backend, Probe::Udp)?;
 
     // the fake Kubernetes API server for kubernetes and k8s_external
     let rt = tokio::runtime::Builder::new_multi_thread()

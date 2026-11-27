@@ -1,0 +1,12 @@
+# about: DNS over QUIC listener (RFC 9250) with connection, stream and worker limits + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -m doq
+quic://.:{PORT} {
+    tls {BENCH}/shared/tls/cert.pem {BENCH}/shared/tls/key.pem
+    quic {
+        max_streams 256
+        max_connections 1000
+        worker_pool_size 1024
+    }
+    whoami
+}
