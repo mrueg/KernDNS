@@ -48,7 +48,8 @@ impl Transport {
             ("https://", Transport::Https),
         ];
         for (prefix, t) in SCHEMES {
-            if s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix) {
+            // `get`: the key may have a multi-byte character where the prefix ends
+            if s.get(..prefix.len()).is_some_and(|p| p.eq_ignore_ascii_case(prefix)) {
                 return (*t, &s[prefix.len()..]);
             }
         }
@@ -212,6 +213,15 @@ pub fn reverse_zones(ip: IpAddr, prefix: u8) -> Result<Vec<String>, &'static str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Found by `fuzz/` (corefile target): a key with a multi-byte
+    /// character where a scheme prefix would end panicked.
+    #[test]
+    fn non_ascii_key() {
+        assert_eq!(Transport::split(".1.0/2\u{2fe}0"), (Transport::Dns, ".1.0/2\u{2fe}0"));
+        assert_eq!(Transport::split("quic\u{e9}//x"), (Transport::Dns, "quic\u{e9}//x"));
+        let _ = ZoneAddr::parse(".1.0/2\u{2fe}0", "53");
+    }
 
     fn p(k: &str) -> Vec<String> {
         ZoneAddr::parse(k, "53")
