@@ -76,6 +76,9 @@ pub struct Context {
     /// while synthesizing an answer, and inherited by every lookup made
     /// under them, so translation plugins don't re-enter each other.
     pub synthesis: bool,
+    /// The trace span the request is in (set by `trace`); the plugins
+    /// [`next_or_failure`] calls get child spans.
+    pub span: Option<crate::trace::SpanRef>,
     /// Signs every encoded response (set by `tsig`).
     pub signer: Option<Arc<dyn ResponseSigner>>,
     /// The normalized name of the TSIG key that `tsig` validated for this
@@ -117,6 +120,7 @@ impl Context {
             upstream: None,
             loop_count: 0,
             synthesis: false,
+            span: None,
             signer: None,
             tsig_key: None,
             on_sent: Vec::new(),
@@ -145,9 +149,35 @@ pub async fn next_or_failure(
     req: &Request,
 ) -> HandlerResult {
     match next {
-        Some(h) => h.serve_dns(ctx, w, req).await,
+        Some(h) => match ctx.span.clone() {
+            None => h.serve_dns(ctx, w, req).await,
+            Some(parent) => traced(h.as_ref(), parent, ctx, w, req).await,
+        },
         None => Err(PluginError::servfail(name, "no next plugin found")),
     }
+}
+
+/// Run `h` in a child span of `parent`, like `NextOrFailure` with a span
+/// in the context.
+async fn traced(
+    h: &dyn Handler,
+    parent: crate::trace::SpanRef,
+    ctx: &mut Context,
+    w: &mut dyn ResponseWriter,
+    req: &Request,
+) -> HandlerResult {
+    let id = crate::trace::new_id();
+    ctx.span = Some(crate::trace::SpanRef {
+        span_id: id,
+        ..parent.clone()
+    });
+    let (wall, start) = (std::time::SystemTime::now(), Instant::now());
+    let res = h.serve_dns(ctx, w, req).await;
+    ctx.span = Some(parent.clone());
+    parent
+        .tracer
+        .child_finished(&parent, id, h.name(), wall, start.elapsed());
+    res
 }
 
 /// The response code to act on for a handler result: the code, or the

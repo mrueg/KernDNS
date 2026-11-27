@@ -217,7 +217,7 @@ impl DispatcherHandle {
 impl Inner {
     /// Serve one request and return the messages to send. `parent` is the
     /// context that made an internal lookup through `upstream`: its loop
-    /// count and synthesis flag carry over.
+    /// count, synthesis flag and trace span carry over.
     async fn serve(&self, req: &Request, parent: Option<&Context>) -> Answer {
         let start = std::time::Instant::now();
         let op = req.msg.metadata.op_code;
@@ -304,6 +304,7 @@ impl Inner {
         if let Some(p) = parent {
             ctx.loop_count = p.loop_count;
             ctx.synthesis = p.synthesis;
+            ctx.span = p.span.clone();
         }
         if let Some(m) = &h.metadata {
             m.collect(&mut ctx, req);

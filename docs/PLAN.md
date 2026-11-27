@@ -199,7 +199,7 @@ reloads like the plain DNS ones:
 | 2: Kubernetes | `kubernetes`, `k8s_external` (done) |
 | 3: authoritative | `file`, `auto`, `secondary`, `transfer`, `any`, `minimal`, `loadbalance`, `local`, `tsig` (done) |
 | 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `autopath`, `nsid`, `tls` (done) |
-| 5: DNSSEC and the rest | `dnssec`, `sign`, `dnstap`, `grpc` (done); `siit`, `shed`, `proxyproto`, `on`, `pprof`, `geoip`, `trace` |
+| 5: DNSSEC and the rest | `dnssec`, `sign`, `dnstap`, `grpc`, `siit`, `shed`, `proxyproto`, `on`, `pprof`, `geoip`, `trace` (done) |
 
 Through the Go bridge until someone needs a port: `etcd`, `route53`,
 `clouddns`, `azure`, third-party plugins.
@@ -305,6 +305,14 @@ More wave 5 ports:
   unsigned width for numbers (the crate's own GeoIP2 structs reject the
   fixtures), and an IPv4 `edns-subnet` is looked up in its IPv4-mapped
   form, as CoreDNS does.
+- `trace` has its own small reporters instead of the Zipkin and Datadog
+  SDKs: Zipkin gets a `servedns` server span per sampled query with
+  CoreDNS's tags and a child span per plugin (from `next_or_failure`, like
+  `plugin.NextOrFailure`), as v2 JSON in batches like zipkin-go's HTTP
+  reporter (`zipkin_max_*`); Datadog gets the `servedns` span (no plugin
+  spans, as in CoreDNS) as JSON on the agent's `/v0.4/traces`. Not
+  supported: continuing a trace from a DoH request's B3 headers;
+  `client_server` has no effect.
 
 Performance follow-ups from the first benchmarks, done:
 

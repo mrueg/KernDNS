@@ -1,0 +1,6 @@
+# about: trace every query (a Zipkin server span plus a span per plugin, batched to a collector that isn't listening) + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    trace zipkin 127.0.0.1:9
+    whoami
+}
