@@ -141,7 +141,21 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
             let mut c = Controller::new(name, Dispenser::new(tokens), &mut cfg, &mut hooks, corefile_dir.clone());
             factory.setup(&mut c)?;
         }
-        kerndns_core::plugin::BlockHandlers::fill(&mut cfg);
+        // like validateZonesAndListeningAddresses: a block with filters
+        // (`view`) may share its zone with others
+        if cfg.filters.is_empty() {
+            for za in &cfg.keys {
+                if !seen.insert(za.clone()) {
+                    return Err(LoadError::Other(format!("cannot serve {za} - it is already defined")));
+                }
+            }
+        }
+        configs.push(cfg);
+    }
+
+    for cfg in &mut configs {
+        add_to_all_blocks(cfg, &hooks.all_blocks);
+        kerndns_core::plugin::BlockHandlers::fill(cfg);
         if cfg.plugins.iter().any(|(n, _)| *n == "prometheus") {
             // coredns_plugin_enabled for every handler in the block
             let hosts = if cfg.listen_hosts.is_empty() {
@@ -161,22 +175,28 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
                 }
             }
         }
-        // like validateZonesAndListeningAddresses: a block with filters
-        // (`view`) may share its zone with others
-        if cfg.filters.is_empty() {
-            for za in &cfg.keys {
-                if !seen.insert(za.clone()) {
-                    return Err(LoadError::Other(format!("cannot serve {za} - it is already defined")));
-                }
-            }
-        }
-        configs.push(cfg);
     }
 
     Ok(Plan {
         listeners: group_by_listener(&configs)?,
         hooks,
     })
+}
+
+/// Insert the handlers that setup added to every block
+/// (`AddPluginToAllServerBlocks`). CoreDNS runs each directive across all
+/// blocks before the next, so such a handler ends up after the block's
+/// handlers from earlier directives and before those from later ones.
+fn add_to_all_blocks(cfg: &mut BlockConfig, all: &[(&'static str, kerndns_core::PluginFn)]) {
+    for (name, f) in all {
+        let pos = order::position(name).unwrap_or(usize::MAX);
+        let at = cfg
+            .plugins
+            .iter()
+            .position(|(n, _)| order::position(n).unwrap_or(usize::MAX) > pos)
+            .unwrap_or(cfg.plugins.len());
+        cfg.plugins.insert(at, (name, f.clone()));
+    }
 }
 
 /// Plugins that work together through Go types (CoreDNS looks them up with

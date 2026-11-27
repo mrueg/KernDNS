@@ -1,13 +1,25 @@
-//! `tls`: the certificate for `tls://` (DoT) and `https://` (DoH) server
-//! blocks. Port of `plugin/tls` without ACME.
+//! `tls`: the certificate for `tls://` (DoT), `https://` (DoH),
+//! `https3://`, `quic://` and `grpc://` server blocks. Port of `plugin/tls`.
 //!
 //! ```text
 //! tls CERT KEY [CA] {
 //!     client_auth nocert|request|require|verify_if_given|require_and_verify
 //! }
+//!
+//! tls {
+//!     acme DOMAIN...
+//!     email EMAIL
+//!     ca URL
+//!     storage DIRECTORY
+//!     ca_root FILE
+//!     resolver ADDRESS
+//! }
 //! ```
 //!
-//! Not ported yet: ACME (`tls` without files) and `keylog`.
+//! Not ported yet: `keylog`.
+
+pub mod acme;
+mod issuer;
 
 use std::path::Path;
 
@@ -29,10 +41,8 @@ impl PluginFactory for Setup {
         while c.next() {
             let mut args = c.remaining_args();
             if args.is_empty() {
-                return Err(SetupError::new(
-                    "tls",
-                    "ACME certificates are not supported by KernDNS yet",
-                ));
+                c.config.tls = Some(acme::parse(c)?);
+                continue;
             }
             if args.len() < 2 || args.len() > 3 {
                 return Err(c.arg_err());

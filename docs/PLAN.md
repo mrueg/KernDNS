@@ -190,6 +190,56 @@ reloads like the plain DNS ones:
 - **Not yet:** settings changed by a reload (certificates, limits) don't apply
   to listeners that are kept, as for DoT and DoH.
 
+### ACME certificates (`tls { acme ... }`)
+
+The `tls` plugin obtains and renews certificates with ACME like CoreDNS
+1.15 (`plugin/tls/acme.go`), with the same syntax (`acme`, `email`, `ca`,
+`storage`, `ca_root`, `resolver`), defaults (Let's Encrypt production,
+`.coredns/acme` below the root) and setup errors. CoreDNS delegates to
+certmagic; KernDNS uses [instant-acme](https://crates.io/crates/instant-acme)
+for the protocol (with ring, hyper-rustls and rcgen; no OpenSSL, no
+aws-lc-rs) and implements the rest itself:
+
+- **DNS-01 only.** The first ACME block adds a challenge handler (directive
+  `tls`, so it runs early) to every server block, like
+  `AddPluginToAllServerBlocks`; it answers `_acme-challenge` TXT queries
+  (one question, class IN) for pending challenges and passes everything
+  else on. Challenge state is local to the process.
+- **Lifecycle.** Management starts after all listeners are up (startup
+  hook): stored certificates are loaded, then a task per configuration
+  obtains missing certificates and renews them when a third of their
+  lifetime is left, checking at least every 10 minutes and retrying failures
+  with growing waits (1 minute up to 6 hours). Listeners resolve the
+  certificate per handshake (SNI, exact name then wildcard, the first
+  domain without SNI; unmanaged names fail the handshake), so DoT, DoH,
+  DoH3, DoQ and gRPC use a renewed certificate without a restart. A
+  listener kept across a reload keeps its TLS config, which reads the same
+  certificate store as the new instance's manager, so renewals keep
+  applying. Blocks with identical ACME options share one manager and TLS
+  config; a domain in two different configurations is an error.
+- **Storage** uses certmagic's file layout and formats
+  (`certificates/<issuer>/<name>/<name>.crt|.key|.json`,
+  `acme/<issuer>/users/<email>/<user>.key|.json`), so KernDNS and CoreDNS
+  can share a directory. KernDNS writes PKCS#8 keys (certmagic reads them)
+  and reads certmagic's SEC1 ECDSA keys.
+- **`ca_root`** is added to the system roots for the ACME server. A server
+  certificate that is itself in `ca_root` is accepted for its names, as Go
+  accepts it (webpki refuses a self-signed CA certificate as the server's
+  own, which is what Go's `httptest` servers use).
+- **`resolver`** resolves the ACME server's name with A/AAAA queries over
+  UDP to that address.
+
+Like certmagic, each domain gets its own certificate. Not supported
+(certmagic features CoreDNS's syntax doesn't expose, or that KernDNS
+leaves out): On-Demand TLS, OCSP stapling, ACME Renewal Information (ARI), storage
+locks for several processes sharing a directory, the fallback to the
+Let's Encrypt staging CA after failures, External Account Binding, and
+key types other than ECDSA P-256. Accounts are only ECDSA P-256 keys.
+Validity of a `ca_root`-pinned server certificate is not checked.
+CoreDNS logs certmagic's structured messages; KernDNS logs its own
+(`obtaining certificate for "..."`, `certificate obtained successfully`,
+errors with the retry time).
+
 ## Plugin waves
 
 | Wave | Plugins |
