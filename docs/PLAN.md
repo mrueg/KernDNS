@@ -18,9 +18,9 @@ shows which tests and benchmarks changed.
 
 - **Hickory DNS for the wire, not for routing.** hickory-server's
   `Catalog`/`Authority` model doesn't match CoreDNS's plugin chain. KernDNS
-  uses hickory-server for listeners (UDP, TCP; later DoT, DoH, DoQ),
-  hickory-proto for messages, and hickory-resolver/recursor inside plugins
-  such as `forward`. Request routing and the chain are KernDNS's own.
+  uses hickory-proto for messages and hickory-resolver/recursor inside
+  plugins such as `forward`. The listeners (UDP, TCP, DoT, DoH, DoH3, DoQ,
+  gRPC), request routing and the chain are KernDNS's own.
 - **Mirror CoreDNS's plugin model**, so ports are mechanical and behaviour
   matches: `Handler` returns `(rcode, error)`, `ClientWrite` decides who writes
   error responses, execution order comes from `plugin.cfg` rather than the
@@ -36,7 +36,7 @@ shows which tests and benchmarks changed.
 ```
 crates/corefile   Caddyfile-dialect lexer/parser, Dispenser            (done, M0)
 crates/core       Handler, Request, ResponseWriter, Controller, Registry, order   (done, M0)
-crates/server     Corefile -> chains -> listeners (dns, tls, https), dispatch  (done)
+crates/server     Corefile -> chains -> listeners (dns, tls, https, https3, quic, grpc), dispatch  (done)
 crates/plugins    Rust plugin ports, each behind a cargo feature        (M0: 6 plugins)
 crates/kubernetes kubernetes + k8s_external                            (M2)
 crates/go-bridge  Rust side of the Go bridge (libloading)              (M3)
@@ -140,6 +140,57 @@ and the affinity check when a Corefile loads.
 provides the plugin, else an error saying how to build the bridge with it.
 `prefer go|rust` and `cache@go` override this for A/B tests and benchmarks.
 
+## Encrypted listeners (M4)
+
+Every transport CoreDNS serves has a KernDNS listener, all on the same
+dispatch path (one parse, one encode per response) and all kept across
+reloads like the plain DNS ones:
+
+| Scheme | Listener | Crates | Limits plugin |
+|---|---|---|---|
+| `tls://` | DoT | tokio-rustls | `timeouts` |
+| `https://` | DoH, HTTP/1.1 and HTTP/2 | hyper | `https` (`max_connections` 200, `max_streams` 250) |
+| `https3://` | DoH over HTTP/3 | quinn, h3, h3-quinn | `https3` (`max_connections` 200, `max_streams` 256) |
+| `quic://` | DoQ, RFC 9250 | quinn | `quic` (`max_connections` 200, `max_streams` 256, `worker_pool_size` 1024) |
+| `grpc://` | CoreDNS's `DnsService` over HTTP/2, h2c without `tls` | hyper | `grpc_server` (`max_connections` 200, `max_streams` 256) |
+
+- **Crates.** quinn (with rustls and ring, the provider the `tls` plugin
+  already uses) is the maintained Rust QUIC stack; h3/h3-quinn are its HTTP/3
+  layer (hyper has none). Together they add 11 small crates to the lock file
+  (quinn's proto and UDP parts, h3, and their helpers).
+  gRPC is a single unary method with a one-field message, so it is served on
+  hyper's HTTP/2 server directly (length-prefixed frame, hand-written
+  protobuf, `grpc-status` trailers, grpc-go's status codes and messages)
+  instead of pulling in tonic, prost, tower and a protobuf build step.
+- **Behaviour taken from CoreDNS:** ALPN (`doq`, `h3`, `h2`); DoQ protocol
+  errors close the connection with code 2, a stalled or reset stream is reset
+  with code 1 after the read timeout and the connection lives on, one
+  response per stream followed by FIN; connections beyond `max_connections`
+  are closed with code 0 (DoQ) or `H3_EXCESSIVE_LOAD` (DoH3), or wait in the
+  accept queue before the TLS handshake (DoH, gRPC); queries are read with
+  miekg/dns's default accept policy (`dnsutil.UnpackRequest`), so responses,
+  UPDATEs and multi-question messages are protocol errors, HTTP 400s or gRPC
+  errors rather than answers; DoQ and DoH3 clients count as `udp` (CoreDNS
+  derives the protocol from the remote address type), so `whoami` says
+  `_udp`, answers are truncated to the EDNS size and metrics say
+  `proto="udp"`; `coredns_dns_quic_responses_total`,
+  `coredns_dns_https_responses_total` and `coredns_dns_https3_responses_total`
+  are counted the same way (including CoreDNS's habit of counting a client's
+  normal DoQ connection close as `0x1`). Like CoreDNS, the listener plugins
+  only apply to a block's first key, except `https`'s `max_streams` and
+  `quic`'s `max_connections`, and conflicting DoH `max_streams` on one
+  listener are an error.
+- **Checked against CoreDNS** with a Go client (quic-go, http3, grpc-go) and
+  curl (nghttp2, ngtcp2/nghttp3) on the same Corefile: status codes, headers,
+  error codes, truncation, gRPC errors and metrics match. Remaining
+  differences: KernDNS compresses names (responses are shorter), parse errors
+  in gRPC error messages are worded by hickory rather than miekg/dns, HTTP/3
+  doesn't announce datagram support, and when a DoQ request gets no answer
+  KernDNS still ends the stream (CoreDNS leaves it open).
+- **Not yet:** settings changed by a reload (certificates, limits) don't apply
+  to listeners that are kept, as for DoT and DoH; the `grpc` forwarding
+  plugin.
+
 ## Plugin waves
 
 | Wave | Plugins |
@@ -158,13 +209,11 @@ Through the Go bridge until someone needs a port: `etcd`, `route53`,
 listeners), and so are `secondary` (with RFC 9432 catalog zones) and `dynupdate`
 (its database is KernDNS's own file format, replaced atomically per commit,
 instead of bbolt). `auto` loads zones from a directory and rescans it with
-the `file` zone code, and `multisocket` sets the number of `SO_REUSEPORT`
-servers (UDP socket and TCP listener each) per address. The upstream tests
-still failing are mostly blocked by the `https`/`https3`/`quic`/`grpc_server`
-listener plugins and transports (13), `autopath` (4), `dns64`, `dnssec`,
-`siit` and `shed` (4) and ACME (1); `view`'s two tests bind a port another
-running instance holds, which CoreDNS allows because all its listeners use
-`SO_REUSEPORT` and KernDNS refuses on purpose (2).
+the `file` zone code, `multisocket` sets the number of `SO_REUSEPORT`
+servers (UDP socket and TCP listener each) per address, and the listener
+plugins `https`, `https3`, `quic` and `grpc_server` come with DoH3, DoQ and
+gRPC listeners (see above). The upstream tests still failing are listed with
+their reasons in `go/compat/expectations.txt`.
 
 Performance follow-ups from the first benchmarks, done:
 

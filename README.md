@@ -36,15 +36,14 @@ Milestones **M0**, **M1** and **M2** are done.
 |---|---|
 | Corefile parser: server blocks, snippets, `import`, env vars, caddy-compatible dispenser | done |
 | Plugin model mirroring CoreDNS (`Handler`, `ResponseWriter`, `plugin.cfg` order, `ClientWrite` rules) | done |
-| Server: multi-socket UDP (`SO_REUSEPORT`), TCP, DoT (`tls://`), DoH (`https://`, HTTP/1.1 and HTTP/2), CoreDNS routing and error semantics, TSIG signing of every response including multi-message transfers, hot reload without dropping listeners | done |
-| Plugins | `acl`, `any`, `auto`, `autopath`, `bind`, `bufsize`, `cache`, `cancel`, `chaos`, `debug`, `dns64`, `dynupdate`, `erratic`, `errors`, `file`, `forward` (UDP/TCP/DoT), `header`, `health`, `hosts`, `k8s_external`, `kubernetes`, `loadbalance`, `local`, `log`, `loop`, `metadata`, `minimal`, `multisocket`, `nsid`, `prometheus`, `ready`, `reload`, `rewrite`, `root`, `secondary`, `template`, `timeouts`, `tls`, `transfer`, `tsig`, `view`, `whoami` |
+| Server: multi-socket UDP (`SO_REUSEPORT`), TCP, DoT (`tls://`), DoH (`https://`, HTTP/1.1 and HTTP/2), DoH3 (`https3://`, HTTP/3), DoQ (`quic://`, RFC 9250) and gRPC (`grpc://`, CoreDNS's `DnsService`), with the `https`, `https3`, `quic` and `grpc_server` connection and stream limits, CoreDNS routing and error semantics, TSIG signing of every response including multi-message transfers, hot reload without dropping listeners | done |
+| Plugins | `acl`, `any`, `auto`, `autopath`, `bind`, `bufsize`, `cache`, `cancel`, `chaos`, `debug`, `dns64`, `dynupdate`, `erratic`, `errors`, `file`, `forward` (UDP/TCP/DoT), `grpc_server`, `header`, `health`, `hosts`, `https`, `https3`, `k8s_external`, `kubernetes`, `loadbalance`, `local`, `log`, `loop`, `metadata`, `minimal`, `multisocket`, `nsid`, `prometheus`, `quic`, `ready`, `reload`, `rewrite`, `root`, `secondary`, `template`, `timeouts`, `tls`, `transfer`, `tsig`, `view`, `whoami` |
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
-| CoreDNS integration tests against KernDNS | 77 pass, 18 expected failures (plugins not ported yet), 22 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 |
+| CoreDNS integration tests against KernDNS | 89 pass, 5 expected failures (plugins not ported yet), 24 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | see below |
 | `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
 | Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `etcd`) | done (M3) |
-| DoQ / HTTP/3 / gRPC listeners | planned (M4) |
 
 ### Benchmarks
 
@@ -121,7 +120,7 @@ crates/
   corefile/   Corefile lexer, parser and token dispenser (no DNS dependencies)
   go-bridge/  loads the Go bridge and runs Go plugins in the chain
   core/       plugin model: Handler, Request, ResponseWriter, Controller, Registry, plugin order
-  server/     Corefile -> plugin chains -> hickory-server listeners, request dispatch
+  server/     Corefile -> plugin chains -> listeners (UDP, TCP, DoT, DoH, DoH3, DoQ, gRPC), request dispatch
   plugins/    Rust ports of CoreDNS plugins (and the shared service-backend lookup)
   kubernetes/ kubernetes and k8s_external
   kerndns/    the binary
