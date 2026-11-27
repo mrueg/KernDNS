@@ -24,6 +24,7 @@ pub mod metrics;
 pub mod order;
 pub mod plugin;
 pub mod protobuf;
+pub mod proxyproto;
 pub mod readiness;
 pub mod reload;
 pub mod request;

@@ -279,6 +279,14 @@ More wave 5 ports:
   `UDPDecorateWriterFunc`), so adding or removing `shed` takes a restart
   (a reload warns). Tokio has no equivalent of Go's per-socket write mutex
   limit; the plugin bounds the same backlog.
+- `proxyproto`: PROXY v1/v2 headers parsed with go-proxyproto's rules and
+  error messages (`kerndns_core::proxyproto`). UDP takes v2 headers in
+  front of the query, with Spectrum-style `udp_session_tracking`; TCP
+  takes v1 or v2 before the first message. The client address plugins
+  see is the header's source on `dns://`, `tls://`, `https://` and
+  `grpc://`; `tlv_metadata` publishes `proxyproto/tlv` for `dns://` and
+  `tls://`. Not supported yet: `quic://` and `https3://`. Settings are
+  fixed when a listener starts (a reload that changes them warns).
 
 Performance follow-ups from the first benchmarks, done:
 

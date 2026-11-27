@@ -72,6 +72,8 @@ pub struct ListenerPlan {
     /// Decorates the UDP sockets' writes (`shed`); the last block on the
     /// listener that sets one wins, like CoreDNS.
     pub udp_decorator: Option<Arc<dyn kerndns_core::udpwrite::UdpDecorator>>,
+    /// PROXY protocol settings merged from the listener's blocks.
+    pub proxy_proto: Option<Arc<kerndns_core::proxyproto::ProxyProtoConfig>>,
 }
 
 impl ListenerPlan {
@@ -252,6 +254,7 @@ fn group_by_listener(configs: &[BlockConfig]) -> Result<Vec<ListenerPlan>, LoadE
                             num_sockets: cfg.num_sockets,
                             limits,
                             udp_decorator: None,
+                            proxy_proto: None,
                         });
                         https_streams.push(None);
                         listeners.len() - 1
@@ -274,6 +277,11 @@ fn group_by_listener(configs: &[BlockConfig]) -> Result<Vec<ListenerPlan>, LoadE
                     l.tls = cfg.tls.clone();
                 }
                 l.conn.merge(&cfg.conn);
+                if let Some(pp) = &cfg.proxy_proto {
+                    let mut merged = l.proxy_proto.as_deref().cloned().unwrap_or_default();
+                    merged.merge(pp);
+                    l.proxy_proto = Some(Arc::new(merged));
+                }
                 if cfg.udp_decorator.is_some() {
                     l.udp_decorator = cfg.udp_decorator.clone();
                 }

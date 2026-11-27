@@ -6,15 +6,18 @@
 //! encoded and signed by [`crate::dispatch::encode`].
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
-use kerndns_core::Protocol;
+use kerndns_core::proxyproto::ProxyProtoConfig;
+use kerndns_core::{ConnInfo, Protocol};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use tokio_rustls::TlsAcceptor;
 
 use crate::dispatch::Dispatcher;
+use crate::proxyproto::Prefixed;
 use crate::udp::handle;
 
 const TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -84,6 +87,7 @@ pub fn serve(
     local: SocketAddr,
     tls: Option<TlsAcceptor>,
     limits: Limits,
+    proxy: Option<Arc<ProxyProtoConfig>>,
 ) -> JoinSet<()> {
     let mut set = JoinSet::new();
     set.spawn(async move {
@@ -94,12 +98,27 @@ pub fn serve(
             let _ = stream.set_nodelay(true);
             let d = dispatcher.clone();
             let tls = tls.clone();
+            let proxy = proxy.clone();
             tokio::spawn(async move {
+                // PROXY protocol: read the header before anything else
+                let (stream, src, local, info) = match &proxy {
+                    None => (Prefixed::new(Vec::new(), stream), src, local, ConnInfo::default()),
+                    Some(p) => match crate::proxyproto::accept(p, stream, src, limits.read).await {
+                        Some(a) => {
+                            let info = ConnInfo {
+                                proxy_tlvs: a.tlvs,
+                                ..Default::default()
+                            };
+                            (a.stream, a.client, a.local.unwrap_or(local), info)
+                        }
+                        None => return,
+                    },
+                };
                 match tls {
-                    None => connection(stream, &d, src, local, Protocol::Tcp, limits).await,
+                    None => connection(stream, &d, src, local, Protocol::Tcp, limits, info).await,
                     Some(acc) => {
                         if let Ok(Ok(s)) = tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, acc.accept(stream)).await {
-                            connection(s, &d, src, local, Protocol::Tls, limits).await;
+                            connection(s, &d, src, local, Protocol::Tls, limits, info).await;
                         }
                     }
                 }
@@ -116,6 +135,7 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
     local: SocketAddr,
     protocol: Protocol,
     limits: Limits,
+    info: ConnInfo,
 ) {
     let mut served: u64 = 0;
     loop {
@@ -133,7 +153,7 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
             Ok(Ok(_)) => {}
             _ => return,
         }
-        for wire in handle(d, &buf, src, local, protocol, Default::default()).await {
+        for wire in handle(d, &buf, src, local, protocol, info.clone()).await {
             let Ok(n) = u16::try_from(wire.len()) else {
                 kerndns_core::error!("dropping a {}-byte response: too big for TCP", wire.len());
                 continue;

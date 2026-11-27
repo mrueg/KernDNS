@@ -28,6 +28,7 @@ use hyper::body::{Body, Frame, Incoming, SizeHint};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use kerndns_core::Protocol;
 use kerndns_core::plugin::ListenerLimits;
+use kerndns_core::proxyproto::ProxyProtoConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
@@ -303,6 +304,7 @@ pub fn serve(
     local: SocketAddr,
     tls: Option<TlsAcceptor>,
     s: Settings,
+    proxy: Option<Arc<ProxyProtoConfig>>,
 ) -> JoinSet<()> {
     let limit = connection_limit(s.max_connections);
     let mut set = JoinSet::new();
@@ -317,9 +319,12 @@ pub fn serve(
                 continue;
             };
             let _ = stream.set_nodelay(true);
-            let (d, tls) = (d.clone(), tls.clone());
+            let (d, tls, proxy) = (d.clone(), tls.clone(), proxy.clone());
             tokio::spawn(async move {
                 let _permit = permit;
+                let Some((stream, src)) = crate::proxyproto::maybe_accept(proxy.as_deref(), stream, src).await else {
+                    return;
+                };
                 match tls {
                     None => connection(stream, d, src, local, s).await,
                     Some(acc) => {

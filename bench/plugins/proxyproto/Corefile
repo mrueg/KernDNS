@@ -1,0 +1,8 @@
+# about: proxyproto + whoami: every datagram goes through the PROXY policy and header check (dnsperf sends no headers)
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    proxyproto {
+        allow 127.0.0.0/8 ::1/128
+    }
+    whoami
+}

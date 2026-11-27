@@ -24,6 +24,7 @@ use http::{Method, Response, StatusCode, Uri};
 use http_body_util::{BodyExt, Full, Limited};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto;
+use kerndns_core::proxyproto::ProxyProtoConfig;
 use kerndns_core::typify::{MAXIMUM_DEFAULT_TTL, minimal_ttl, typify};
 use kerndns_core::{Protocol, Request};
 use prometheus::CounterVec;
@@ -170,7 +171,14 @@ pub fn connection_limit(max: u64) -> Option<Arc<Semaphore>> {
 }
 
 /// Serve DoH on `listener` with `tls` (whose ALPN should offer h2 and http/1.1).
-pub fn serve(listener: TcpListener, d: Dispatcher, local: SocketAddr, tls: TlsAcceptor, s: Settings) -> JoinSet<()> {
+pub fn serve(
+    listener: TcpListener,
+    d: Dispatcher,
+    local: SocketAddr,
+    tls: TlsAcceptor,
+    s: Settings,
+    proxy: Option<Arc<ProxyProtoConfig>>,
+) -> JoinSet<()> {
     let limit = connection_limit(s.max_connections);
     let max_streams = s.max_streams;
     let mut set = JoinSet::new();
@@ -184,9 +192,12 @@ pub fn serve(listener: TcpListener, d: Dispatcher, local: SocketAddr, tls: TlsAc
             let Ok((stream, src)) = listener.accept().await else {
                 continue;
             };
-            let (d, tls) = (d.clone(), tls.clone());
+            let (d, tls, proxy) = (d.clone(), tls.clone(), proxy.clone());
             tokio::spawn(async move {
                 let _permit = permit;
+                let Some((stream, src)) = crate::proxyproto::maybe_accept(proxy.as_deref(), stream, src).await else {
+                    return;
+                };
                 let Ok(Ok(conn)) = tokio::time::timeout(std::time::Duration::from_secs(5), tls.accept(stream)).await
                 else {
                     return;
