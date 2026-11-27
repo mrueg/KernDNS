@@ -25,7 +25,7 @@ regex = "1"
 futures-util = "0.3"
 arc-swap = "1"
 socket2 = { version = "0.6", features = ["all"] }
-sha2 = "0.10"
+sha2 = "0.11"
 # DNSSEC signing; the same ring that hickory-proto (dnssec-ring) and rustls use
 ring = "0.17"
 hmac = "0.12"
