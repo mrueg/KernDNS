@@ -144,8 +144,13 @@ Performance follow-ups from the first benchmarks, done:
   50k Services: 238 → 171 MiB.
 - TCP, DoT and DoH are KernDNS's own listeners; hickory-server is gone.
 
-Open: the `prometheus` plugin encodes each response once more to measure
-it, and label lookups cost ~1.7k instructions per query.
+- `prometheus` reports from a hook the server runs after its one final
+  encode, instead of encoding the response again to measure it
+  (`prometheus` + `whoami`: 20.7k → 14.9k instructions per query). The
+  size recorded is the bytes sent: unlike CoreDNS, it includes the echoed
+  OPT record and reflects truncation.
+
+Open: prometheus label lookups cost ~1.7k instructions per query.
 
 ## Kubernetes plugin port (M2)
 

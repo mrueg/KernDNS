@@ -110,7 +110,7 @@ impl Handler for Metrics {
     async fn serve_dns(&self, ctx: &mut Context, w: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
         let start = Instant::now();
         let zone = zones::matches(&self.zones, &req.name()).unwrap_or(".").to_string();
-        let mut rec = Recorder::new(w);
+        let mut rec = Recorder::rcode_only(w);
         let res = next_or_failure("prometheus", &self.next, ctx, &mut rec, req).await;
         let status = result_rcode(&res);
         let rcode = if client_write(status) {
@@ -119,7 +119,11 @@ impl Handler for Metrics {
             status
         };
         let view = ctx.view.clone().unwrap_or_default();
-        report(&ctx.server, req, &zone, &view, rcode, "", rec.len, start);
+        // reported once the server has encoded the response, with its size
+        let (server, req) = (ctx.server.clone(), req.clone());
+        ctx.on_sent.push(Arc::new(move |size| {
+            report(&server, &req, &zone, &view, rcode, "", size, start)
+        }));
         res
     }
 }

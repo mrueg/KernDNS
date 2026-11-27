@@ -51,6 +51,8 @@ pub struct Recorder<'a> {
     pub rcode: Option<ResponseCode>,
     pub len: usize,
     pub msg: Option<Message>,
+    /// Record the size and message (`false`: only the rcode).
+    full: bool,
 }
 
 impl<'a> Recorder<'a> {
@@ -60,6 +62,16 @@ impl<'a> Recorder<'a> {
             rcode: None,
             len: 0,
             msg: None,
+            full: true,
+        }
+    }
+
+    /// A recorder that only keeps the response code: no encoding to
+    /// measure the size, no copy of the message.
+    pub fn rcode_only(inner: &'a mut dyn ResponseWriter) -> Self {
+        Self {
+            full: false,
+            ..Self::new(inner)
         }
     }
 }
@@ -68,8 +80,10 @@ impl<'a> Recorder<'a> {
 impl ResponseWriter for Recorder<'_> {
     async fn write_msg(&mut self, msg: Message) -> io::Result<()> {
         self.rcode = Some(msg.metadata.response_code);
-        self.len += crate::wire::to_wire(&msg).map(|v| v.len()).unwrap_or(0);
-        self.msg = Some(msg.clone());
+        if self.full {
+            self.len += crate::wire::to_wire(&msg).map(|v| v.len()).unwrap_or(0);
+            self.msg = Some(msg.clone());
+        }
         self.inner.write_msg(msg).await
     }
 }

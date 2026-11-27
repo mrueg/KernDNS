@@ -77,7 +77,14 @@ pub struct Context {
     /// The normalized name of the TSIG key that `tsig` validated for this
     /// request (`tsig.ValidatedKeyName`).
     pub tsig_key: Option<String>,
+    /// Run once the response is encoded, with the bytes sent (all messages
+    /// together). `prometheus` reports its metrics here, so the response
+    /// is not encoded a second time just to measure it.
+    pub on_sent: Vec<SentHook>,
 }
+
+/// See [`Context::on_sent`].
+pub type SentHook = Arc<dyn Fn(usize) + Send + Sync>;
 
 /// Signs a response after its final encoding (and truncation), like the
 /// TSIG signing miekg/dns does when writing. Called once per message, in
@@ -98,6 +105,7 @@ impl Context {
             loop_count: 0,
             signer: None,
             tsig_key: None,
+            on_sent: Vec::new(),
         }
     }
 }
