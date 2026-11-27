@@ -115,8 +115,8 @@ pass  TestTsigBadKey
 pass  TestTsigBadSig
 pass  TestTsigBadTime
 pass  TestUppercaseServerBlockZone
-xfail TestView                                        Could not get CoreDNS serving instance: listen [::]:60562: Address already in use (os error 98)
-xfail TestViewServerBlockOrdering                     Could not start server: listen [::]:48056: Address already in use (os error 98)
+pass  TestView
+pass  TestViewServerBlockOrdering
 pass  TestZoneDanglingCNAMENegativeAuthority
 pass  TestZoneEDNS0Lookup
 pass  TestZoneExternalCNAMELookupWithProxy

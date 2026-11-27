@@ -22,24 +22,12 @@ use crate::dispatch::{Dispatcher, encode};
 /// Bind `n` UDP sockets to `addr` with `SO_REUSEPORT`. With port 0 the
 /// first socket picks the port and the others join it.
 ///
-/// `SO_REUSEPORT` would also let a second server process join the group
-/// and silently take half the queries. So the address is first bound
-/// without it: if anyone holds the port this fails with "address in use",
-/// like any other server; if not, the probe is released and the group bound.
+/// Like CoreDNS (`pkg/reuseport`), another server that also sets
+/// `SO_REUSEPORT` can bind the same port and share the queries. CoreDNS's
+/// integration tests rely on this (`TestView` starts a second server on a
+/// port that is still in use).
 pub fn bind_reuseport(addr: SocketAddr, n: usize) -> std::io::Result<Vec<UdpSocket>> {
     let mut addr = addr;
-    {
-        let domain = if addr.is_ipv4() { Domain::IPV4 } else { Domain::IPV6 };
-        let probe = Socket::new(domain, Type::DGRAM, Some(SockProto::UDP))?;
-        if addr.is_ipv6() {
-            let _ = probe.set_only_v6(false);
-        }
-        probe.bind(&addr.into())?;
-        if addr.port() == 0 {
-            // keep the port the kernel picked for the group
-            addr.set_port(probe.local_addr()?.as_socket().expect("inet socket").port());
-        }
-    }
     let mut socks = Vec::with_capacity(n);
     for _ in 0..n.max(1) {
         let domain = if addr.is_ipv4() { Domain::IPV4 } else { Domain::IPV6 };
