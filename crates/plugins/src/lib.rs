@@ -59,6 +59,7 @@ pub mod template;
 pub mod timeouts;
 pub mod tls;
 pub mod tlsconfig;
+pub mod trace;
 pub mod transfer;
 pub mod tsig;
 pub mod view;
@@ -126,5 +127,6 @@ pub fn registry() -> Registry {
     r.register(on::Setup);
     r.register(pprof::Setup);
     r.register(geoip::Setup);
+    r.register(trace::Setup);
     r
 }

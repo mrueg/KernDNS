@@ -29,6 +29,7 @@ pub mod readiness;
 pub mod reload;
 pub mod request;
 pub mod response;
+pub mod trace;
 pub mod transfer;
 pub mod typify;
 pub mod udpwrite;
