@@ -1,0 +1,24 @@
+[package]
+name = "kerndns-server"
+description = "KernDNS server: builds plugin chains from a Corefile and serves them over UDP, TCP, DoT and DoH"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kerndns-core.workspace = true
+tokio.workspace = true
+futures-util.workspace = true
+arc-swap.workspace = true
+socket2.workspace = true
+tokio-rustls.workspace = true
+rustls.workspace = true
+hyper = { workspace = true, features = ["http2"] }
+hyper-util = { workspace = true, features = ["server-auto", "http2"] }
+http-body-util.workspace = true
+bytes.workspace = true
+data-encoding.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+kerndns-plugins.workspace = true

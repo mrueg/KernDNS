@@ -1,0 +1,113 @@
+//! Per-query CPU cost of the server path (parse, dispatch, plugin chain,
+//! encode) without the network, for a few cheap chains. Run with
+//! `cargo test --release -p kerndns-server --test hotpath -- --ignored --nocapture`.
+
+use std::net::SocketAddr;
+use std::time::Instant;
+
+use kerndns_core::Protocol;
+use kerndns_core::proto::op::{Edns, Message, MessageType, OpCode, Query};
+use kerndns_core::proto::rr::{Name, RecordType};
+use kerndns_server::config::{Options, load};
+use kerndns_server::dispatch::Dispatcher;
+use kerndns_server::udp::handle;
+
+fn packet(name: &str, t: RecordType) -> Vec<u8> {
+    let mut m = Message::new(4242, MessageType::Query, OpCode::Query);
+    m.metadata.recursion_desired = true;
+    m.add_query(Query::query(Name::from_ascii(name).unwrap(), t));
+    let mut e = Edns::new();
+    e.set_max_payload(1232);
+    m.edns = Some(e);
+    m.to_vec().unwrap()
+}
+
+async fn measure(label: &str, corefile: &str, q: &[u8]) {
+    if std::env::var("HOTPATH_ONLY").is_ok_and(|o| o != label) {
+        return;
+    }
+    let registry = kerndns_plugins::registry();
+    let plan = load(corefile, "bench", &registry, &Options::default()).unwrap();
+    let l = &plan.listeners[0];
+    let local: SocketAddr = "127.0.0.1:53".parse().unwrap();
+    let src: SocketAddr = "127.0.0.1:40000".parse().unwrap();
+    let d = Dispatcher::new("dns://:53".into(), &l.zones, l.class_chaos, local, local);
+    let n: usize = std::env::var("HOTPATH_N")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(300_000);
+    for _ in 0..(n / 15).max(1) {
+        assert!(!handle(&d, q, src, local, Protocol::Udp).await.is_empty());
+    }
+    let t = Instant::now();
+    for _ in 0..n {
+        std::hint::black_box(handle(&d, q, src, local, Protocol::Udp).await);
+    }
+    println!("{label:<24} {:>6.0} ns/query", t.elapsed().as_nanos() as f64 / n as f64);
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore]
+async fn hotpath() {
+    let dir = std::env::temp_dir().join(format!("kerndns-hotpath-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let hosts = dir.join("hosts");
+    let mut h = String::new();
+    for i in 0..10_000 {
+        h.push_str(&format!("10.0.{}.{} host{i}.example.org\n", i / 250, i % 250));
+    }
+    std::fs::write(&hosts, h).unwrap();
+    let zone = dir.join("zone");
+    let mut z = String::from(
+        "example.org. 300 IN SOA ns.example.org. h.example.org. 1 60 60 60 60\nexample.org. 300 IN NS ns.example.org.\n",
+    );
+    for i in 0..10_000 {
+        z.push_str(&format!("host{i}.example.org. 300 IN A 10.1.{}.{}\n", i / 250, i % 250));
+    }
+    std::fs::write(&zone, z).unwrap();
+
+    let whoami = packet("example.org.", RecordType::A);
+    let n = 300_000;
+    let t = Instant::now();
+    for _ in 0..n {
+        std::hint::black_box(Message::from_vec(std::hint::black_box(&whoami)).unwrap());
+    }
+    println!("{:<24} {:>6.0} ns", "parse", t.elapsed().as_nanos() as f64 / n as f64);
+    let m = Message::from_vec(&whoami).unwrap();
+    let t = Instant::now();
+    for _ in 0..n {
+        std::hint::black_box(std::hint::black_box(&m).to_vec().unwrap());
+    }
+    println!("{:<24} {:>6.0} ns", "encode", t.elapsed().as_nanos() as f64 / n as f64);
+    let t = Instant::now();
+    for _ in 0..n {
+        std::hint::black_box(std::hint::black_box(&m).clone());
+    }
+    println!(
+        "{:<24} {:>6.0} ns",
+        "clone msg",
+        t.elapsed().as_nanos() as f64 / n as f64
+    );
+    let host = packet("host1234.example.org.", RecordType::A);
+    measure("whoami", ".:53 {\n whoami\n}", &whoami).await;
+    measure(
+        "prometheus + whoami",
+        ".:53 {\n prometheus 127.0.0.1:0\n whoami\n}",
+        &whoami,
+    )
+    .await;
+    measure(
+        "hosts 10k",
+        &format!(".:53 {{\n hosts {} {{\n fallthrough\n }}\n whoami\n}}", hosts.display()),
+        &host,
+    )
+    .await;
+    measure(
+        "file 10k",
+        &format!("example.org:53 {{\n file {}\n}}", zone.display()),
+        &host,
+    )
+    .await;
+    measure("cache (hit) + whoami", ".:53 {\n cache\n whoami\n}", &whoami).await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
