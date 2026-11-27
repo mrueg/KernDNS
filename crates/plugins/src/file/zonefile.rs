@@ -43,6 +43,7 @@ pub fn parse_zone(text: &str, origin: &Name, file: &Path) -> Result<Vec<Record>,
         def_ttl: None,
         ttl_by_directive: false,
         last_owner: None,
+        last_ttl: 0,
         records: Vec::new(),
     };
     st.read(text, file, 0)?;
@@ -58,6 +59,7 @@ pub fn new_rr(text: &str) -> Result<Option<Record>, ZoneFileError> {
         def_ttl: Some(3600),
         ttl_by_directive: false,
         last_owner: None,
+        last_ttl: 0,
         records: Vec::new(),
     };
     st.read(text, Path::new(""), 0)?;
@@ -224,6 +226,8 @@ struct State {
     def_ttl: Option<u32>,
     ttl_by_directive: bool,
     last_owner: Option<Name>,
+    /// TTL of the previous record (miekg/dns reuses its RR header).
+    last_ttl: u32,
     records: Vec<Record>,
 }
 
@@ -311,7 +315,9 @@ impl State {
 
         let data = parse_rdata(rtype, rdata_toks, &self.origin)?;
         // miekg/dns: an explicit TTL becomes the default unless $TTL set
-        // one; without any, a record that names its class gets TTL 0.
+        // one. Without any default, a record that omits its owner or names
+        // its class keeps the previous record's TTL (0 for the first one);
+        // only `owner TYPE ...` is an error.
         let ttl = match ttl {
             Some(t) => {
                 if !self.ttl_by_directive {
@@ -321,10 +327,11 @@ impl State {
             }
             None => match self.def_ttl {
                 Some(t) => t,
-                None if class_given => 0,
+                None if class_given || line.blank_owner => self.last_ttl,
                 None => return Err("missing TTL with no previous value".into()),
             },
         };
+        self.last_ttl = ttl;
         let mut rec = Record::from_rdata(owner, ttl, data);
         rec.dns_class = class;
         Ok(rec)
@@ -699,6 +706,22 @@ mod tests {
         let r = parse_zone("a IN A 192.0.2.1\n", &Name::root(), Path::new("db")).unwrap();
         assert_eq!(r[0].ttl, 0);
         assert!(parse_zone("a A 192.0.2.1\n", &Name::root(), Path::new("db")).is_err());
+        // without an owner the previous record's TTL is kept (checked
+        // against miekg/dns v1.1.73; auto's test zones look like this)
+        let r = parse_zone(
+            "@ IN SOA ns. host. 1 2 3 4 5\n\t\tNS a.ns.\nwww IN A 192.0.2.1\n",
+            &Name::from_ascii("example.org.").unwrap(),
+            Path::new("db"),
+        )
+        .unwrap();
+        assert_eq!(r.iter().map(|r| r.ttl).collect::<Vec<_>>(), [0, 0, 0]);
+        let r = parse_zone(
+            "a IN 60 A 192.0.2.1\nb IN A 192.0.2.2\n",
+            &Name::root(),
+            Path::new("db"),
+        )
+        .unwrap();
+        assert_eq!(r[1].ttl, 60);
     }
 
     #[test]
