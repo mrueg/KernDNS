@@ -311,4 +311,3 @@ skip forward TestSetupResolvconf/tests#2 the Go test writes the resolv.conf into
 skip forward TestSetupResolvconf/tests#3 the Go test writes the resolv.conf into its working directory
 xfail metrics TestPrometheusParse/tests#2 prometheus { runtime_metrics } (Go runtime metrics) is not supported by KernDNS
 xfail metrics TestPrometheusParse/tests#3 prometheus { runtime_metrics } (Go runtime metrics) is not supported by KernDNS
-xfail transfer TestParse/tests#0 IPv6 zone identifiers in transfer to are not supported by KernDNS yet
