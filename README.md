@@ -73,7 +73,7 @@ where other builds were running at the same time, so differences of a few
 | any | -8.9 | -5.7 | 121k → 178k | 58 → 10 MiB |
 | bufsize | +4.2 | +3.3 | 82k → 125k | 59 → 10 MiB |
 | cache¹ | -9.2 | -5.8 | 121k → 195k | 69 → 16 MiB |
-| cache/miss¹ | +55.5 | +66.4 | 35k → 20k | 65 → 15 MiB |
+| cache/miss² | +66.7 | +56.9 | 17k → 6k | 67 → 16 MiB |
 | cancel | +17.9 | -4.0 | 39k → 161k | 62 → 10 MiB |
 | chaos | +32.2 | +1.6 | 42k → 114k | 59 → 10 MiB |
 | dynupdate | +24.4 | +14.0 | 66k → 101k | 61 → 11 MiB |
@@ -81,7 +81,7 @@ where other builds were running at the same time, so differences of a few
 | erratic | +3.2 | -7.4 | 75k → 196k | 60 → 9 MiB |
 | errors | +5.1 | +1.8 | 78k → 128k | 61 → 9 MiB |
 | file | +12.6 | +8.3 | 96k → 124k | 71 → 31 MiB |
-| file/100k | +22.9 | +0.1 | 77k → 166k | 189 → 247 MiB |
+| file/100k² | +53.8 | +17.6 | 14k → 35k | 145 → 63 MiB |
 | file/8a | +3.6 | -2.2 | 106k → 183k | 62 → 11 MiB |
 | file/small | +10.3 | +6.3 | 87k → 131k | 62 → 10 MiB |
 | forward¹ | +31.8 | +23.5 | 27k → 30k | 64 → 14 MiB |
@@ -111,7 +111,7 @@ where other builds were running at the same time, so differences of a few
 | timeouts | -7.3 | -6.8 | 119k → 197k | 62 → 9 MiB |
 | tls | +2.2 | -2.4 | 124k → 138k | 59 → 10 MiB |
 | transfer | +13.7 | -0.8 | 93k → 173k | 71 → 32 MiB |
-| transfer/axfr | +195.3 | +321.2 | 18k → 11k | 61 → 10 MiB |
+| transfer/axfr² | +411.3 | +175.6 | 5k → 8k | 24 → 9 MiB |
 | tsig | +31.5 | +4.2 | 65k → 115k | 62 → 9 MiB |
 | view | +28.7 | -5.0 | 68k → 193k | 62 → 10 MiB |
 
@@ -119,10 +119,36 @@ where other builds were running at the same time, so differences of a few
 `whoami` baseline): in the full run, a burst of load from other processes cut
 KernDNS's cache throughput in half.
 
-What stands out: KernDNS is behind CoreDNS when the cache mostly misses (a
-small cache with constant evictions: lower QPS in every run so far), on
-AXFR (more CPU per transfer) and in memory for a 100k-name zone (247 vs
-189 MiB). Forward over DoT went either way between runs. Signed dynamic
+² After the fixes for the three follow-ups below, from a separate run of
+only these cases on a heavily loaded machine (`whoami` reached only 67k →
+59k QPS), so only the relative CPU and memory numbers mean much.
+
+What stood out in the first full run, and what it was:
+
+- **cache with misses and constant evictions** (35k → 20k QPS): KernDNS's
+  cache gave each of its 256 shards `capacity / 256` entries with a
+  minimum of 1, where CoreDNS's minimum is 4, so `success 256` held 256
+  answers instead of CoreDNS's 1024 and hit far less often. Every insert
+  also locked all 512 shards to update the `cache_entries` gauge. Now the
+  entry counts match CoreDNS exactly and the count is an atomic. The
+  max-QPS of this case is dominated by the forward backend dropping UDP
+  packets at overload (some queries then wait out forward's 2 s read
+  timeout, in both servers), so it swings a lot between runs; the rare
+  SERVFAILs come from those upstream timeouts, not from the cache.
+- **AXFR** (+321 vs +195 µs per transfer): splitting the zone into
+  messages encoded every record with hickory's encoder to size it, and
+  each message was encoded twice. Now records are sized with the fast
+  encoder and messages encoded once: 1.13M → 0.43M instructions per
+  transfer of the 100-name zone (callgrind, `hotpath` test), less than
+  half of CoreDNS's CPU per transfer in the run above.
+- **memory of a 100k-name zone** (247 vs 189 MiB): each name kept a map
+  of record lists whose first push reserved room for 4 records of 280
+  bytes, and the zone file was held as tokens and then as a record list
+  while loading. With one exactly sized list per name and records
+  inserted as they are parsed: peak 248 → 66 MiB, steady state 213 → 66
+  MiB (CoreDNS: 117 MiB after loading, 177 MiB after 3 s of queries).
+
+Forward over DoT went either way between runs. Signed dynamic
 updates (`dynupdate`) cost KernDNS about a third of CoreDNS's CPU. Latency at a fixed rate (half of CoreDNS's
 max) is in the detailed report (`target/bench/report.md`).
 

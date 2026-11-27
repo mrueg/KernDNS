@@ -432,12 +432,14 @@ Each scenario runs N times and reports the median and spread.
   `root`, `debug`, `health`, `ready`, `reload`, `sign`, and the listener
   plugins dnsperf can't drive), and checks that every case parses and
   uses its plugin. Still missing: forward failures. Follow-ups from the
-  first full run (README): the cache miss path (small cache, constant
-  evictions; that run's KernDNS cache held 256 entries where CoreDNS's
-  holds 1024, since fixed (4 per shard at least), to be re-measured) is
-  slower than CoreDNS's, AXFR
-  costs more CPU, and a 100k-name `file` zone uses more memory (247 vs
-  189 MiB).
+  first full run (README), all fixed: the cache held a quarter of
+  CoreDNS's entries in small caches (shard minimum 1 instead of 4) and
+  locked every shard on each insert; AXFR sized every record with
+  hickory's encoder and encoded each message twice (now 1.13M → 0.43M
+  instructions per 100-name transfer); and a 100k-name `file` zone took
+  248 MiB (now 66 MiB peak and steady, vs 117–177 MiB for CoreDNS)
+  because of over-reserved per-name record lists and a load that held
+  the whole file as tokens and records.
 - **Level 3, common setups:** `bench/setups/<name>/`, same format (today
   only the caching resolver). Planned: kubeadm cluster DNS, caching forwarder,
   authoritative server, split horizon, DoT/DoH frontend, and a mixed bridge
