@@ -1,0 +1,24 @@
+# about: caching forwarder for a site: local hosts entries, large cache with prefetch and serve_stale, forward over DoT
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    errors
+    health 127.0.0.1:0
+    prometheus 127.0.0.1:0
+    hosts {FIX}/hosts {
+        ttl 300
+        fallthrough
+    }
+    cache {
+        success 9984 3600
+        denial 9984 300
+        prefetch 10 1m 10%
+        serve_stale 1h
+    }
+    forward . tls://127.0.0.1:{BACKEND_DOT} {
+        tls {BENCH}/shared/tls/ca.pem
+        tls_servername kerndns.test
+        health_check 5s
+        max_concurrent 1000
+    }
+    loop
+}

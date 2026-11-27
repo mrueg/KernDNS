@@ -1,0 +1,15 @@
+# about: etcd service discovery as in CoreDNS's etcd docs: KernDNS runs etcd in Go through the bridge and the rest in Rust, CoreDNS all in Go
+# queries: {FIX}/q-etcd.txt
+# needs: etcd
+# bridge: etcd
+.:{PORT} {
+    errors
+    prometheus 127.0.0.1:0
+    etcd skydns.local {
+        path /skydns
+        endpoint http://127.0.0.1:{ETCD}
+    }
+    cache 160 skydns.local
+    loadbalance
+    forward . 127.0.0.1:{BACKEND}
+}
