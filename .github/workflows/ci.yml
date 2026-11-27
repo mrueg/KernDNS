@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 jobs:
@@ -50,12 +51,34 @@ jobs:
       - run: cargo xtask bench --level 2 --plugin cache,file,rewrite,tsig --duration 1
 
   image:
-    # the drop-in CoreDNS replacement image (built, not pushed), started
-    # the way kubeadm's Deployment runs it
+    # the drop-in CoreDNS replacement image, started the way kubeadm's
+    # Deployment runs it; pushed to ghcr.io on pushes to main and v* tags
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
-      - run: docker build -t kerndns:ci .
+      - uses: docker/setup-buildx-action@v3
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/kerndns
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.description=KernDNS, a prototype Rust port of CoreDNS. Not for production use.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: kerndns:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Serve with kubeadm's container settings
         run: |
           mkdir conf
@@ -67,6 +90,77 @@ jobs:
           curl -sf localhost:8080/health
           dig @127.0.0.1 -p 1053 whoami.example.org | grep -q 'status: NOERROR'
           docker logs kerndns
+      - if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+  kind:
+    # CoreDNS's end-to-end Kubernetes tests (github.com/coredns/ci,
+    # test/kubernetes) with the KernDNS image as the cluster DNS, set up
+    # the way coredns/ci's build/kubernetes/k8s_setup.sh does it for CoreDNS
+    runs-on: ubuntu-latest
+    env:
+      CI_REPO_COMMIT: 326aa942bde33d4dcd6b19e05e0dfb4fd7b79f68
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: third_party/coredns/go.mod
+          cache-dependency-path: third_party/coredns/go.sum
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image as "coredns", the name coredns/ci's patch uses
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: coredns:latest
+          cache-from: type=gha
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+      - name: Check out coredns/ci next to CoreDNS (its go.mod replaces ../coredns)
+        run: |
+          mkdir -p "$RUNNER_TEMP/src"
+          git clone -q https://github.com/coredns/ci "$RUNNER_TEMP/src/ci"
+          git -C "$RUNNER_TEMP/src/ci" checkout -q "$CI_REPO_COMMIT"
+          ln -s "$GITHUB_WORKSPACE/third_party/coredns" "$RUNNER_TEMP/src/coredns"
+      - name: Set up the cluster like coredns/ci
+        working-directory: ${{ runner.temp }}/src/ci/build/kubernetes
+        run: |
+          kind load docker-image coredns:latest --name kind
+          kubectl -n kube-system scale deployment/coredns --replicas=1
+          kubectl -n kube-system patch deployment coredns -p "$(cat coredns_deployment_patch.yaml)"
+          kubectl -n kube-system patch clusterroles system:coredns -p "$(cat coredns_clusterroles_patch.yaml)"
+          kubectl create -f dns-test.yaml
+          # no rollout wait: the patched Deployment mounts a Zonefile key the
+          # ConfigMap only gets when a test loads one (LoadCorefileAndZonefile),
+          # and the tests wait for the DNS pod to be ready themselves
+      - name: Run coredns/ci test/kubernetes
+        working-directory: ${{ runner.temp }}/src/ci/test/kubernetes
+        shell: bash
+        run: |
+          go mod tidy
+          go test -v -timeout 40m ./... 2>&1 | tee "$RUNNER_TEMP/kind-tests.log"
+      - if: always()
+        name: Summary
+        run: |
+          grep -E '^(--- |ok |FAIL)' "$RUNNER_TEMP/kind-tests.log" || true
+          kubectl -n kube-system get pods -l k8s-app=kube-dns -o wide || true
+          kubectl -n kube-system describe pods -l k8s-app=kube-dns | tail -40 || true
+          kubectl -n kube-system logs -l k8s-app=kube-dns --tail=200 || true
 
   fuzz:
     # builds the cargo-fuzz targets (fuzz/, nightly) and runs each for a
