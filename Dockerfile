@@ -9,10 +9,8 @@
 #
 #   docker build -t kerndns .
 
-ARG RUST_IMAGE=rust:1-trixie
-ARG BASE=gcr.io/distroless/cc-debian13:nonroot
-
-FROM ${RUST_IMAGE} AS build
+# base images pinned by digest; Dependabot keeps them current
+FROM rust:1-trixie@sha256:e84068000361bf3d4a5ba2b7647f62893528b1eb9f847d7a23b493f5ce8ea254 AS build
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -qq update \
     && apt-get -qq --no-install-recommends install libcap2-bin
@@ -26,7 +24,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && ln -s kerndns /out/coredns \
     && setcap cap_net_bind_service=+ep /out/kerndns
 
-FROM ${BASE}
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:29ee70762214fe8190cea04ef1c0a84a8365879e047ce8f911ae5a5ab2355fa2
 COPY --from=build /out/ /
 # numeric uid/gid (distroless "nonroot"), so runAsNonRoot can verify it
 USER 65532:65532
