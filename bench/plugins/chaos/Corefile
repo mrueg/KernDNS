@@ -1,0 +1,6 @@
+# about: chaos + whoami; dnsperf only sends class IN, so this is the pass-through cost
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    chaos KernDNS-bench admin@example.org
+    whoami
+}

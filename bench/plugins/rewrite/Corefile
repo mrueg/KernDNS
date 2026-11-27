@@ -1,0 +1,6 @@
+# about: exact name rewrite with the answer rewritten back + whoami (every other query matches)
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    rewrite name exact host1.example.org host1.example.net answer auto
+    whoami
+}

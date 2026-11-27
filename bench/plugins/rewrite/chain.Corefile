@@ -1,0 +1,10 @@
+# about: five rules (type, class, edns0, ttl, name) checked for every query + whoami
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    rewrite continue type ANY HINFO
+    rewrite continue class CH IN
+    rewrite continue edns0 local set 0xffee bench
+    rewrite continue ttl regex .* 30
+    rewrite name suffix .example.org .example.net answer auto
+    whoami
+}

@@ -25,18 +25,28 @@ pub struct Objects {
 }
 
 pub fn generate(n: usize, namespaces: usize) -> Objects {
+    generate_with(n, namespaces, false)
+}
+
+/// Like [`generate`]; with `external`, every Service also gets an
+/// `externalIPs` entry (172.16.x.y) for `k8s_external`.
+pub fn generate_with(n: usize, namespaces: usize, external: bool) -> Objects {
     let mut services = Vec::with_capacity(n);
     let mut slices = Vec::with_capacity(n);
     for i in 0..n {
         let ns = format!("ns-{}", i % namespaces);
         let name = format!("svc-{i}");
         let ip = format!("10.{}.{}.{}", 96 + (i >> 16), (i >> 8) & 255, i & 255);
-        services.push(json!({
+        let mut svc = json!({
             "apiVersion": "v1", "kind": "Service",
             "metadata": {"name": name, "namespace": ns, "uid": format!("s{i}"), "resourceVersion": "1"},
             "spec": {"type": "ClusterIP", "clusterIP": ip, "clusterIPs": [ip],
                      "ports": [{"name": "http", "port": 80, "protocol": "TCP"}, {"name": "metrics", "port": 9090, "protocol": "TCP"}]}
-        }));
+        });
+        if external {
+            svc["spec"]["externalIPs"] = json!([format!("172.16.{}.{}", (i >> 8) & 255, i & 255)]);
+        }
+        services.push(svc);
         let eps: Vec<Value> = (0..3)
             .map(|j| {
                 let k = i * 3 + j;

@@ -1,0 +1,6 @@
+# about: metadata collects the providers' values for every query + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    metadata
+    whoami
+}

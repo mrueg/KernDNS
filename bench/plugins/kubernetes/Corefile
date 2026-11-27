@@ -1,0 +1,8 @@
+# about: kubernetes with 1000 Services (fake API server): service A, SRV, PTR and NXDOMAIN
+# queries: {FIX}/q-k8s.txt
+# needs: kubernetes
+cluster.local:{PORT} in-addr.arpa:{PORT} {
+    kubernetes cluster.local in-addr.arpa {
+        kubeconfig {KUBECONFIG}
+    }
+}

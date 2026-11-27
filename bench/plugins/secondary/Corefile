@@ -1,0 +1,7 @@
+# about: secondary zone (10k names) transferred from the shared upstream
+# queries: {FIX}/q-file.txt
+example.org:{PORT} {
+    secondary {
+        transfer from 127.0.0.1:{BACKEND}
+    }
+}

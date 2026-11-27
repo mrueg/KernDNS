@@ -1,0 +1,8 @@
+# about: hosts file with 10k names (20k entries): A, AAAA and PTR hits
+# queries: {FIX}/q-hosts.txt
+.:{PORT} {
+    hosts {FIX}/hosts {
+        fallthrough
+    }
+    whoami
+}

@@ -1,0 +1,14 @@
+# about: two views on one port; the first view's expression rejects every query
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    view other {
+        expr incidr(client_ip(), '192.0.2.0/24')
+    }
+    chaos
+}
+.:{PORT} {
+    view local {
+        expr incidr(client_ip(), '127.0.0.0/8') && type() in ['A', 'AAAA']
+    }
+    whoami
+}

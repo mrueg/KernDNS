@@ -1,0 +1,7 @@
+# about: DNS over TLS listener (tls plugin) + whoami; dnsperf keeps its connections open
+# queries: {FIX}/q-example.txt
+# dnsperf: -m dot
+tls://.:{PORT} {
+    tls {BENCH}/shared/tls/cert.pem {BENCH}/shared/tls/key.pem
+    whoami
+}

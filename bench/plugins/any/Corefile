@@ -1,0 +1,6 @@
+# about: any answers every ANY query with an RFC 8482 HINFO
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    any
+    whoami
+}

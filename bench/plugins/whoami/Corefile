@@ -1,0 +1,5 @@
+# about: baseline: the cheapest possible chain
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    whoami
+}

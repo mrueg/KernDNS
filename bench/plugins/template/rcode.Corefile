@@ -1,0 +1,8 @@
+# about: template answers every query in the zone with NXDOMAIN and an SOA
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    template ANY ANY example.org {
+        rcode NXDOMAIN
+        authority "example.org. 60 IN SOA ns.example.org. hostmaster.example.org. (1 60 60 60 60)"
+    }
+}

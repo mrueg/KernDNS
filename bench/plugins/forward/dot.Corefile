@@ -1,0 +1,8 @@
+# about: forward over DNS-over-TLS to a shared upstream
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    forward . tls://127.0.0.1:{BACKEND_DOT} {
+        tls {BENCH}/shared/tls/ca.pem
+        tls_servername kerndns.test
+    }
+}

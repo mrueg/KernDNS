@@ -7,7 +7,9 @@
 //!               CoreDNS plugins: target/bridge/libkerndns_bridge.so.
 //! difftest      Serve the same zones from CoreDNS and kerndns and diff the
 //!               answers to generated queries (see go/difftest).
-//! bench         Benchmark CoreDNS vs kerndns per scenario with dnsperf.
+//! bench         Benchmark CoreDNS vs kerndns per scenario with dnsperf
+//!               (bench/plugins: one directory per plugin; bench/setups);
+//!               --check: every registered plugin has a scenario.
 //! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_cases.json by
 //!               running CoreDNS's kubernetes handler test suites in Go.
 
@@ -27,10 +29,11 @@ const USAGE: &str =
     "usage: cargo xtask compat-test [--release] [--run REGEX] [--update] [--target coredns] [--bridge [LIB]]
        cargo xtask build-bridge [--plugins etcd,whoami,...] [--out PATH]
        cargo xtask difftest [--release] [--zone NAME] [--show N]
-       cargo xtask bench [--scenario NAME] [--duration SECONDS]
+       cargo xtask bench [--level 2,3] [--plugin NAME,...] [--scenario CASE,...] [--duration SECONDS] [--runs N] [--coredns PATH] [--list]
+       cargo xtask bench --check
        cargo xtask k8s-cases
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
-       cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS]
+       cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS] [--coredns PATH]
 
   --release         build and test the release binary
   --run REGEX       only run upstream tests matching REGEX

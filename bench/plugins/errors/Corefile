@@ -1,0 +1,6 @@
+# about: errors + whoami (no errors happen: the cost of the wrapper)
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    errors
+    whoami
+}

@@ -2623,6 +2623,9 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "kerndns-corefile",
+ "kerndns-kubernetes",
+ "kerndns-plugins",
  "serde_json",
  "tokio",
 ]

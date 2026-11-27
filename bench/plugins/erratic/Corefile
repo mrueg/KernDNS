@@ -1,0 +1,7 @@
+# about: erratic answers every A/AAAA query (drop 0: nothing is dropped)
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    erratic {
+        drop 0
+    }
+}

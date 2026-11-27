@@ -1,0 +1,7 @@
+# about: bufsize caps the EDNS0 buffer size of every query + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -e
+.:{PORT} {
+    bufsize 1232
+    whoami
+}

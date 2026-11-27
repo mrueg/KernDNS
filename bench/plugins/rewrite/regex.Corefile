@@ -1,0 +1,9 @@
+# about: regex rewrite with a capture group and an answer regex + whoami
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    rewrite stop {
+        name regex ^host([0-9]+)\.example\.org\.$ h{1}.rewritten.example.net.
+        answer name ^h([0-9]+)\.rewritten\.example\.net\.$ host{1}.example.org.
+    }
+    whoami
+}

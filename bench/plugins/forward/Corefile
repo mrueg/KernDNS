@@ -1,0 +1,5 @@
+# about: forward over UDP to a shared upstream (no cache)
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    forward . 127.0.0.1:{BACKEND}
+}

@@ -1,0 +1,6 @@
+# about: local answers localhost names; half the queries fall through to whoami
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    local
+    whoami
+}

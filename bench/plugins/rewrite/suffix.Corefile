@@ -1,0 +1,6 @@
+# about: suffix rewrite example.org -> example.net with the answer rewritten back + whoami
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    rewrite name suffix .example.org .example.net answer auto
+    whoami
+}

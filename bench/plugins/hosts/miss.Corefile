@@ -1,0 +1,8 @@
+# about: hosts file with 10k names; every query misses and falls through to whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    hosts {FIX}/hosts {
+        fallthrough
+    }
+    whoami
+}

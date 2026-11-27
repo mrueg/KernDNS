@@ -1,0 +1,5 @@
+# about: authoritative zone with 100 names
+# queries: {FIX}/q-file-100.txt
+example.org:{PORT} {
+    file {FIX}/db.100.example.org
+}
