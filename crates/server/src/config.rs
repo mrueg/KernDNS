@@ -43,6 +43,11 @@ pub struct ZoneHandler {
     pub chain: Next,
     pub debug: bool,
     pub allow_update: bool,
+    /// `FilterFuncs` of the block (`view`).
+    pub filters: Vec<Arc<dyn kerndns_core::plugin::RequestFilter>>,
+    pub view_name: Option<String>,
+    /// Set when the block runs the `metadata` plugin.
+    pub metadata: Option<kerndns_core::plugin::Metadata>,
 }
 
 /// One listen address with the zones it serves.
@@ -56,6 +61,8 @@ pub struct ListenerPlan {
     pub class_chaos: bool,
     /// Server TLS for `tls://` and `https://` (from the `tls` plugin).
     pub tls: Option<Arc<rustls::ServerConfig>>,
+    /// TCP/DoT timeouts merged from the listener's blocks (`timeouts`).
+    pub conn: kerndns_core::plugin::ConnLimits,
 }
 
 impl ListenerPlan {
@@ -91,12 +98,7 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
         for key in &block.keys {
             let addrs = ZoneAddr::parse(key, &opts.dns_port)
                 .map_err(|e| LoadError::Parse(ParseError::at(&block.key_token, e)))?;
-            for za in addrs {
-                if !seen.insert(za.clone()) {
-                    return Err(LoadError::Other(format!("cannot serve {za} - it is already defined")));
-                }
-                keys.push(za);
-            }
+            keys.extend(addrs);
         }
         for d in &block.directives {
             if order::position(&d.name).is_none() {
@@ -143,6 +145,15 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
                 }
             }
         }
+        // like validateZonesAndListeningAddresses: a block with filters
+        // (`view`) may share its zone with others
+        if cfg.filters.is_empty() {
+            for za in &cfg.keys {
+                if !seen.insert(za.clone()) {
+                    return Err(LoadError::Other(format!("cannot serve {za} - it is already defined")));
+                }
+            }
+        }
         configs.push(cfg);
     }
 
@@ -167,6 +178,9 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
                 chain: cfg.chain(),
                 debug: cfg.debug,
                 allow_update: cfg.allow_update,
+                filters: cfg.filters.clone(),
+                view_name: cfg.view_name.clone(),
+                metadata: kerndns_core::plugin::Metadata::enabled_in(cfg),
             });
             for host in &hosts {
                 let pos = listeners
@@ -182,6 +196,7 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
                             zones: Vec::new(),
                             class_chaos: false,
                             tls: None,
+                            conn: Default::default(),
                         });
                         listeners.last_mut().unwrap()
                     }
@@ -190,6 +205,7 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
                 if l.tls.is_none() {
                     l.tls = cfg.tls.clone();
                 }
+                l.conn.merge(&cfg.conn);
                 l.zones.push((key.zone.clone(), handler.clone()));
             }
         }

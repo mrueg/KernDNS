@@ -140,3 +140,49 @@ pub static HOSTS_RELOAD_TIME: LazyLock<GaugeVec> = LazyLock::new(|| {
         &[],
     )
 });
+
+// acl
+fn acl(name: &str, help: &str, labels: &[&str]) -> CounterVec {
+    counter("acl", name, help, labels)
+}
+pub static ACL_BLOCKED: LazyLock<CounterVec> = LazyLock::new(|| {
+    acl(
+        "blocked_requests_total",
+        "Counter of DNS requests being blocked.",
+        &["server", "zone", "view"],
+    )
+});
+pub static ACL_FILTERED: LazyLock<CounterVec> = LazyLock::new(|| {
+    acl(
+        "filtered_requests_total",
+        "Counter of DNS requests being filtered.",
+        &["server", "zone", "view"],
+    )
+});
+pub static ACL_ALLOWED: LazyLock<CounterVec> = LazyLock::new(|| {
+    acl(
+        "allowed_requests_total",
+        "Counter of DNS requests being allowed.",
+        &["server", "view"],
+    )
+});
+pub static ACL_DROPPED: LazyLock<CounterVec> = LazyLock::new(|| {
+    acl(
+        "dropped_requests_total",
+        "Counter of DNS requests being dropped.",
+        &["server", "zone", "view"],
+    )
+});
+
+// local
+pub static LOCALHOST_REQUESTS: LazyLock<IntCounter> = LazyLock::new(|| {
+    register_int_counter!(
+        Opts::new(
+            "localhost_requests_total",
+            "Counter of special localhost subdomain requests."
+        )
+        .namespace("coredns")
+        .subsystem("local")
+    )
+    .unwrap()
+});

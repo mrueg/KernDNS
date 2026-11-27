@@ -11,7 +11,8 @@ use std::sync::Arc;
 use kerndns_corefile::{Dispenser, ParseError};
 
 use crate::address::{Transport, ZoneAddr};
-use crate::handler::{Handler, Next};
+use crate::handler::{Context, Handler, Next};
+use crate::request::Request;
 
 /// Builds a plugin's handler around the rest of the chain, like CoreDNS's
 /// `plugin.Plugin` (`func(next Handler) Handler`). It is called once per
@@ -113,6 +114,13 @@ pub struct BlockConfig {
     /// UPDATE requests reach the chain (`AllowOpcode`, set by `dynupdate`);
     /// otherwise the server answers NOTIMP like miekg/dns.
     pub allow_update: bool,
+    /// Decide whether this block handles a request (`FilterFuncs`, set by
+    /// `view`); blocks with filters may share a zone with other blocks.
+    pub filters: Vec<Arc<dyn RequestFilter>>,
+    /// `ViewName`, from `view`.
+    pub view_name: Option<String>,
+    /// Connection timeouts and limits for TCP/DoT (`timeouts`).
+    pub conn: ConnLimits,
     /// Handlers registered by setup, with their directive names, in the
     /// order setup ran (which is the execution order).
     pub plugins: Vec<(&'static str, PluginFn)>,
@@ -133,6 +141,9 @@ impl BlockConfig {
             class_chaos: false,
             tls: None,
             allow_update: false,
+            filters: Vec::new(),
+            view_name: None,
+            conn: ConnLimits::default(),
             plugins: Vec::new(),
             extensions: Extensions::default(),
         }
@@ -266,5 +277,87 @@ impl CacheBypass {
     pub fn contains(&self, name: &str) -> bool {
         let z = self.0.read().unwrap();
         !z.is_empty() && crate::zones::matches(&z, name).is_some()
+    }
+}
+
+/// `dnsserver.FilterFunc`: whether a server block handles a request.
+pub trait RequestFilter: Send + Sync {
+    fn filter(&self, ctx: &Context, req: &Request) -> bool;
+}
+
+/// `metadata.Provider`: a plugin that adds values to
+/// [`Context::metadata`] before the block's filters and plugins run.
+pub trait MetadataProvider: Send + Sync {
+    fn metadata(&self, ctx: &mut Context, req: &Request);
+}
+
+#[derive(Default)]
+struct MetadataInner {
+    /// Set when the `metadata` plugin is enabled in the block.
+    zones: Option<Vec<String>>,
+    providers: Vec<Arc<dyn MetadataProvider>>,
+}
+
+/// The block's metadata providers, collected by the `metadata` plugin
+/// (`metadata.Collect`) for requests in its zones.
+#[derive(Clone, Default)]
+pub struct Metadata(Arc<std::sync::RwLock<MetadataInner>>);
+
+impl Metadata {
+    /// The registry of this block (created on first use).
+    pub fn of(cfg: &mut BlockConfig) -> Metadata {
+        if cfg.extensions.get::<Metadata>().is_none() {
+            cfg.extensions.insert(Metadata::default());
+        }
+        cfg.extensions.get::<Metadata>().cloned().expect("inserted above")
+    }
+
+    /// The block's collector, if the `metadata` plugin is enabled.
+    pub fn enabled_in(cfg: &BlockConfig) -> Option<Metadata> {
+        cfg.extensions
+            .get::<Metadata>()
+            .filter(|m| m.0.read().unwrap().zones.is_some())
+            .cloned()
+    }
+
+    pub fn add_provider(&self, p: Arc<dyn MetadataProvider>) {
+        self.0.write().unwrap().providers.push(p);
+    }
+
+    /// Collect for requests in `zones` (`metadata` plugin setup).
+    pub fn enable(&self, zones: Vec<String>) {
+        self.0.write().unwrap().zones = Some(zones);
+    }
+
+    pub fn collect(&self, ctx: &mut Context, req: &Request) {
+        let inner = self.0.read().unwrap();
+        let Some(zones) = &inner.zones else { return };
+        if crate::zones::matches(zones, &req.name()).is_none() {
+            return;
+        }
+        for p in &inner.providers {
+            p.metadata(ctx, req);
+        }
+    }
+}
+
+/// `ReadTimeout`, `WriteTimeout`, `IdleTimeout` and `MaxTCPQueries` of a
+/// server block; `None` keeps the server's default.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ConnLimits {
+    pub read: Option<std::time::Duration>,
+    pub write: Option<std::time::Duration>,
+    pub idle: Option<std::time::Duration>,
+    /// `-1` is unlimited.
+    pub max_tcp_queries: Option<i64>,
+}
+
+impl ConnLimits {
+    /// Fill in what `other` sets, like CoreDNS merging site configs.
+    pub fn merge(&mut self, other: &ConnLimits) {
+        self.read = other.read.or(self.read);
+        self.write = other.write.or(self.write);
+        self.idle = other.idle.or(self.idle);
+        self.max_tcp_queries = other.max_tcp_queries.or(self.max_tcp_queries);
     }
 }

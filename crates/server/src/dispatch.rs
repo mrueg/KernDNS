@@ -232,45 +232,68 @@ impl Inner {
 
         let qname = req.name();
         let is_ds = req.qtype() == RecordType::DS;
-        let mut ds_handler: Option<&Arc<ZoneHandler>> = None;
+        let mut ds_handler: Option<(&Arc<ZoneHandler>, Context)> = None;
 
-        // Longest match first: try "a.b.c.", then "b.c.", then "c.".
+        // Longest match first: try "a.b.c.", then "b.c.", then "c.". Blocks
+        // for the same zone are tried in order until one's filters (`view`)
+        // accept the request.
         let mut off = 0;
         loop {
-            if let Some(handlers) = routes.zones.get(&qname[off..])
-                && let Some(h) = handlers.first()
-            {
-                if h.chain.is_none() {
-                    return vec![self.dropped(req, ResponseCode::Refused, start)].into();
+            if let Some(handlers) = routes.zones.get(&qname[off..]) {
+                for h in handlers {
+                    if h.chain.is_none() {
+                        return vec![self.dropped(req, ResponseCode::Refused, start)].into();
+                    }
+                    let Some(ctx) = self.accept(h, req, loop_count) else {
+                        continue;
+                    };
+                    if update && !h.allow_update {
+                        return vec![self.dropped(req, ResponseCode::NotImp, start)].into();
+                    }
+                    if !is_ds {
+                        return self.run(h, req, ctx).await;
+                    }
+                    // DS belongs to the parent: remember and keep looking up.
+                    ds_handler = Some((h, ctx));
                 }
-                if update && !h.allow_update {
-                    return vec![self.dropped(req, ResponseCode::NotImp, start)].into();
-                }
-                if !is_ds {
-                    return self.run(h, req, loop_count).await;
-                }
-                // DS belongs to the parent: remember and keep looking up.
-                ds_handler = Some(h);
             }
             match next_label(&qname, off) {
                 Some(n) => off = n,
                 None => break,
             }
         }
-        if let Some(h) = ds_handler {
-            return self.run(h, req, loop_count).await;
+        if let Some((h, ctx)) = ds_handler {
+            return self.run(h, req, ctx).await;
         }
-        if let Some(h) = routes
-            .zones
-            .get(".")
-            .and_then(|hs| hs.iter().find(|h| h.chain.is_some()))
-        {
+        for h in routes.zones.get(".").into_iter().flatten() {
+            if h.chain.is_none() {
+                continue;
+            }
+            let Some(ctx) = self.accept(h, req, loop_count) else {
+                continue;
+            };
             if update && !h.allow_update {
                 return vec![self.dropped(req, ResponseCode::NotImp, start)].into();
             }
-            return self.run(h, req, loop_count).await;
+            return self.run(h, req, ctx).await;
         }
         vec![self.dropped(req, ResponseCode::Refused, start)].into()
+    }
+
+    /// The request context for `h` if the block takes the request: its
+    /// metadata is collected first, then its filters run, like CoreDNS.
+    fn accept(&self, h: &ZoneHandler, req: &Request, loop_count: u8) -> Option<Context> {
+        let mut ctx = Context::new(h.zone.clone(), self.label.clone());
+        ctx.upstream = Some(self.upstream.clone());
+        ctx.loop_count = loop_count;
+        if let Some(m) = &h.metadata {
+            m.collect(&mut ctx, req);
+        }
+        if !h.filters.iter().all(|f| f.filter(&ctx, req)) {
+            return None;
+        }
+        ctx.view = h.view_name.clone();
+        Some(ctx)
     }
 
     /// `errorAndMetricsFunc`: an error answer from the server itself,
@@ -291,11 +314,8 @@ impl Inner {
         m
     }
 
-    async fn run(&self, zh: &ZoneHandler, req: &Request, loop_count: u8) -> Answer {
+    async fn run(&self, zh: &ZoneHandler, req: &Request, mut ctx: Context) -> Answer {
         let chain: &Arc<dyn Handler> = zh.chain.as_ref().expect("checked by caller");
-        let mut ctx = Context::new(zh.zone.clone(), self.label.clone());
-        ctx.upstream = Some(self.upstream.clone());
-        ctx.loop_count = loop_count;
         let mut w = CaptureWriter::new();
 
         let fut = chain.serve_dns(&mut ctx, &mut w, req);
