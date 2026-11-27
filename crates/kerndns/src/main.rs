@@ -237,6 +237,8 @@ async fn run(flags: Flags, corefile: String, path: String, port: String, registr
     }
 
     serve_until_shutdown(&mut inst, &corefile, &path, &opts, &registry).await;
+    // caddy's ShutdownEvent comes before the shutdown callbacks
+    inst.emit(kerndns_core::Event::Shutdown).await;
     inst.stop().await;
     if let Some(pidfile) = &flags.pidfile {
         let _ = std::fs::remove_file(pidfile);

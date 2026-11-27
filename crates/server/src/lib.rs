@@ -66,6 +66,8 @@ pub struct Instance {
     running: Vec<Running>,
     listeners: Vec<ListenerInfo>,
     shutdown_hooks: Vec<(&'static str, ShutdownHook)>,
+    /// Event hooks of the running configuration (`on`).
+    event_hooks: Vec<(String, kerndns_core::EventHook)>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -104,6 +106,7 @@ impl Instance {
             listeners: running.iter().map(|r| r.info.clone()).collect(),
             running,
             shutdown_hooks: Vec::new(),
+            event_hooks: plan.hooks.events,
         };
         inst.shutdown_hooks = plan.hooks.shutdown;
         for (name, hook) in plan.hooks.startup {
@@ -112,6 +115,7 @@ impl Instance {
                 return Err(StartError::Other(format!("plugin/{name}: {e}")));
             }
         }
+        inst.emit(kerndns_core::Event::Startup).await;
         Ok(inst)
     }
 
@@ -195,7 +199,22 @@ impl Instance {
                 kerndns_core::error!("plugin/{name}: {e}");
             }
         }
+        self.event_hooks = plan.hooks.events;
+        self.emit(kerndns_core::Event::Startup).await;
         Ok(())
+    }
+
+    /// Run the event hooks for `event`, like caddy's `EmitEvent`: one
+    /// after the other, errors logged. They may block (`on` runs
+    /// commands), so they run on the blocking pool.
+    pub async fn emit(&self, event: kerndns_core::Event) {
+        for (name, hook) in &self.event_hooks {
+            let (name, hook) = (name.clone(), hook.clone());
+            let res = tokio::task::spawn_blocking(move || hook(event)).await;
+            if let Ok(Err(e)) = res {
+                println!("error on '{name}' hook: {e}");
+            }
+        }
     }
 
     pub fn listeners(&self) -> &[ListenerInfo] {

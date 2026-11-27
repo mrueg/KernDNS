@@ -195,11 +195,32 @@ impl BlockConfig {
 type StartupHook = Box<dyn FnOnce() -> Result<(), String> + Send>;
 type ShutdownHook = Box<dyn FnOnce() + Send>;
 
+/// Process events that event hooks run on (caddy's `EventName`s that
+/// CoreDNS's `on` plugin supports).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Event {
+    /// An instance (the first one, or the one a reload created) started:
+    /// caddy's `InstanceStartupEvent`.
+    Startup,
+    /// The process is shutting down on SIGTERM or SIGINT, before the
+    /// shutdown callbacks: caddy's `ShutdownEvent` (not on reload).
+    Shutdown,
+    /// A certificate was renewed: caddy's `CertRenewEvent`. CoreDNS never
+    /// emits it, and neither does KernDNS.
+    CertRenew,
+}
+
+/// An event hook, like caddy's `EventHook`: called for every event, it
+/// acts on the ones it cares about. Errors are logged, not fatal.
+pub type EventHook = Arc<dyn Fn(Event) -> Result<(), String> + Send + Sync>;
+
 /// Lifecycle callbacks registered during setup.
 #[derive(Default)]
 pub struct Hooks {
     pub startup: Vec<(&'static str, StartupHook)>,
     pub shutdown: Vec<(&'static str, ShutdownHook)>,
+    /// Event hooks by name (`on-<id>`), in registration order.
+    pub events: Vec<(String, EventHook)>,
 }
 
 /// What a plugin's setup gets: a [`Dispenser`] over its tokens (available
@@ -252,6 +273,11 @@ impl<'a> Controller<'a> {
     /// Run `f` when the server shuts down (or reloads).
     pub fn on_shutdown(&mut self, f: impl FnOnce() + Send + 'static) {
         self.hooks.shutdown.push((self.directive, Box::new(f)));
+    }
+
+    /// Register an event hook named `name` (`caddy.RegisterEventHook`).
+    pub fn on_event(&mut self, name: String, f: impl Fn(Event) -> Result<(), String> + Send + Sync + 'static) {
+        self.hooks.events.push((name, Arc::new(f)));
     }
 
     /// Wrap a parse error as this plugin's setup error, like `plugin.Error`.

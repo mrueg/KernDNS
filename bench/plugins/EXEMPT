@@ -11,3 +11,4 @@ https3: sets DoH3 listener limits; no per-query work, and dnsperf has no HTTP/3 
 quic: sets DoQ listener limits; no per-query work, and dnsperf has no DoQ mode
 grpc_server: sets gRPC listener limits; no per-query work, and dnsperf has no gRPC mode
 sign: signs zone files in the background (at startup and every 5 hours); no per-query work
+on: runs commands on startup and shutdown; no per-query work

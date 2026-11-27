@@ -287,6 +287,12 @@ More wave 5 ports:
   `grpc://`; `tlv_metadata` publishes `proxyproto/tlv` for `dns://` and
   `tls://`. Not supported yet: `quic://` and `https3://`. Settings are
   fixed when a listener starts (a reload that changes them warns).
+- `on` (caddy's `onevent`): `startup` commands run after the server
+  starts and after every reload, `shutdown` commands on SIGTERM/SIGINT,
+  `&` runs one in the background, `certrenew` is accepted and never fires.
+  A reload replaces the hooks; caddy keeps adding them, so with the
+  `reload` plugin CoreDNS reruns the startup commands of every
+  configuration loaded so far.
 
 Performance follow-ups from the first benchmarks, done:
 
