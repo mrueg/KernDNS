@@ -1,6 +1,6 @@
 [package]
 name = "kerndns-server"
-description = "KernDNS server: builds plugin chains from a Corefile and serves them over UDP, TCP, DoT and DoH"
+description = "KernDNS server: builds plugin chains from a Corefile and serves them over UDP, TCP, DoT, DoH, DoH3, DoQ and gRPC"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,7 +19,14 @@ http-body-util.workspace = true
 bytes.workspace = true
 data-encoding.workspace = true
 thiserror.workspace = true
+prometheus.workspace = true
+http.workspace = true
+quinn.workspace = true
+h3.workspace = true
+h3-quinn.workspace = true
 
 [dev-dependencies]
+hyper = { workspace = true, features = ["client", "http2"] }
+rustls-pki-types.workspace = true
 kerndns-plugins.workspace = true
 kerndns-go-bridge.workspace = true

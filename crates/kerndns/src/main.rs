@@ -27,7 +27,8 @@ const USAGE: &str = "Usage of kerndns:
   -version
         Show version
   -report-listeners
-        Print one 'KERNDNS_LISTENER <label> udp=<addr> tcp=<addr>' line per server and
+        Print one 'KERNDNS_LISTENER <label> udp=<addr> tcp=<addr>' line per server (an
+        address is empty if the listener has no such socket) and
         'KERNDNS_READY' on stdout once serving, plus 'KERNDNS_METRICS <addr>' per metrics
         endpoint (used by the CoreDNS compatibility tests)";
 
@@ -216,7 +217,7 @@ async fn run(flags: Flags, corefile: String, path: String, port: String, registr
                 } else {
                     format!("{scheme}://")
                 };
-                println!("{prefix}{z}:{}", l.tcp.port());
+                println!("{prefix}{z}:{}", l.port());
             }
         }
         println!("{}", version_string());
@@ -224,8 +225,9 @@ async fn run(flags: Flags, corefile: String, path: String, port: String, registr
     if flags.report_listeners {
         for l in inst.listeners() {
             // one line per server, like CoreDNS's i.Servers() with multisocket
+            let addr = |a: Option<std::net::SocketAddr>| a.map(|a| a.to_string()).unwrap_or_default();
             for _ in 0..l.servers {
-                println!("KERNDNS_LISTENER {} udp={} tcp={}", l.label, l.udp, l.tcp);
+                println!("KERNDNS_LISTENER {} udp={} tcp={}", l.label, addr(l.udp), addr(l.tcp));
             }
         }
         for addr in kerndns_core::metrics::listen_addrs() {

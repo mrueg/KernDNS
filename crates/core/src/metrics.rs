@@ -105,6 +105,39 @@ pub static RESPONSE_RCODE: LazyLock<CounterVec> = LazyLock::new(|| {
     .unwrap()
 });
 
+fn responses_by_status(name: &str, help: &str) -> CounterVec {
+    register_counter_vec!(
+        Opts::new(name, help).namespace("coredns").subsystem("dns"),
+        &["server", "status"]
+    )
+    .unwrap()
+}
+
+/// `coredns_dns_https_responses_total`: DoH responses by HTTP status.
+pub static HTTPS_RESPONSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    responses_by_status(
+        "https_responses_total",
+        "Counter of DoH responses per server and http status code.",
+    )
+});
+
+/// `coredns_dns_https3_responses_total`: DoH3 responses by HTTP status.
+pub static HTTPS3_RESPONSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    responses_by_status(
+        "https3_responses_total",
+        "Counter of DoH3 responses per server and http status code.",
+    )
+});
+
+/// `coredns_dns_quic_responses_total`: DoQ streams by application code
+/// (`0x0`, `0x1`, `0x2`).
+pub static QUIC_RESPONSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    responses_by_status(
+        "quic_responses_total",
+        "Counter of DoQ responses per server and QUIC application code.",
+    )
+});
+
 pub static PANICS: LazyLock<IntCounter> = LazyLock::new(|| {
     register_int_counter!(Opts::new("panics_total", "A metrics that counts the number of panics.").namespace("coredns"))
         .unwrap()

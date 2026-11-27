@@ -40,11 +40,13 @@ pub enum Protocol {
 }
 
 impl Protocol {
-    /// "udp" or "tcp", as CoreDNS's `Proto()` reports it: everything that is
-    /// not plain UDP is connection-oriented and reported as "tcp".
+    /// "udp" or "tcp", as CoreDNS's `Proto()` reports it. That looks at the
+    /// type of the remote address: DoQ and DoH3 run over QUIC, whose remote
+    /// is a UDP address, so they count as "udp" (and get UDP's size limit);
+    /// TCP, DoT, DoH and gRPC are "tcp".
     pub fn proto(&self) -> &'static str {
         match self {
-            Protocol::Udp => "udp",
+            Protocol::Udp | Protocol::Quic | Protocol::Https3 => "udp",
             _ => "tcp",
         }
     }
@@ -177,7 +179,7 @@ impl Request {
     /// Largest response the client accepts: 64K over TCP, otherwise the EDNS
     /// buffer size but at least 512, like `Size()`.
     pub fn size(&self) -> u16 {
-        if self.protocol != Protocol::Udp {
+        if self.proto() != "udp" {
             return MAX_MSG_SIZE;
         }
         self.bufsize().max(MIN_MSG_SIZE)
@@ -280,6 +282,9 @@ mod tests {
         assert_eq!(r.size(), 512);
         assert_eq!(req("a.", Protocol::Tls).size(), 65535);
         assert_eq!(req("a.", Protocol::Tls).proto(), "tcp");
+        assert_eq!(req("a.", Protocol::Grpc).proto(), "tcp");
+        assert_eq!(req("a.", Protocol::Quic).proto(), "udp");
+        assert_eq!(req("a.", Protocol::Https3).size(), 512);
         let reply = r.reply();
         assert_eq!(reply.metadata.id, 42);
         assert!(reply.metadata.recursion_desired);

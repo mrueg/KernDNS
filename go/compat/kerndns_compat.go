@@ -207,15 +207,25 @@ wait:
 
 	servers := make([]caddy.Server, 0, len(listeners))
 	for _, l := range listeners {
-		udp, err := net.ResolveUDPAddr("udp", l.udp)
-		if err != nil {
-			proc.stop()
-			return nil, fmt.Errorf("bad udp address %q: %w", l.udp, err)
+		// A listener without UDP (DoT, DoH, gRPC) or without TCP (DoQ,
+		// DoH3) reports an empty address, which stays nil, as the CoreDNS
+		// server's Listen or ListenPacket returns nil.
+		var udp, tcp net.Addr
+		if l.udp != "" {
+			a, err := net.ResolveUDPAddr("udp", l.udp)
+			if err != nil {
+				proc.stop()
+				return nil, fmt.Errorf("bad udp address %q: %w", l.udp, err)
+			}
+			udp = a
 		}
-		tcp, err := net.ResolveTCPAddr("tcp", l.tcp)
-		if err != nil {
-			proc.stop()
-			return nil, fmt.Errorf("bad tcp address %q: %w", l.tcp, err)
+		if l.tcp != "" {
+			a, err := net.ResolveTCPAddr("tcp", l.tcp)
+			if err != nil {
+				proc.stop()
+				return nil, fmt.Errorf("bad tcp address %q: %w", l.tcp, err)
+			}
+			tcp = a
 		}
 		servers = append(servers, &kerndnsServer{label: l.label, proc: proc, udp: udp, tcp: tcp})
 	}
@@ -241,10 +251,16 @@ type kerndnsServer struct {
 }
 
 func (s *kerndnsServer) Listen() (net.Listener, error) {
+	if s.tcp == nil {
+		return nil, nil
+	}
 	return &fakeListener{addr: s.tcp, done: s.proc.done}, nil
 }
 
 func (s *kerndnsServer) ListenPacket() (net.PacketConn, error) {
+	if s.udp == nil {
+		return nil, nil
+	}
 	return &fakePacketConn{addr: s.udp, done: s.proc.done}, nil
 }
 
