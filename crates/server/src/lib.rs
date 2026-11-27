@@ -6,12 +6,14 @@ pub mod dispatch;
 pub mod doh;
 pub mod doh3;
 pub mod grpc;
+pub mod proxyproto;
 pub mod quic;
 pub mod tcp;
 pub mod udp;
 pub mod unpack;
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use kerndns_core::{Registry, Transport};
 use tokio::net::{TcpListener, UdpSocket};
@@ -47,9 +49,10 @@ struct Running {
     handle: DispatcherHandle,
     /// Our UDP, TCP, DoT, DoH, DoH3, DoQ and gRPC loops.
     tasks: tokio::task::JoinSet<()>,
-    /// Whether its UDP writes are decorated (`shed`), fixed when the
-    /// listener started.
+    /// Socket settings fixed when the listener started: whether its UDP
+    /// writes are decorated (`shed`) and its PROXY protocol settings.
     shed: bool,
+    proxy: Option<Arc<kerndns_core::proxyproto::ProxyProtoConfig>>,
 }
 
 impl Running {
@@ -157,6 +160,12 @@ impl Instance {
                     if l.udp_decorator.is_some() != r.shed {
                         kerndns_core::warning!(
                             "{}: adding or removing shed takes effect after a restart, not on reload",
+                            r.info.label
+                        );
+                    }
+                    if l.proxy_proto != r.proxy {
+                        kerndns_core::warning!(
+                            "{}: proxyproto changes take effect after a restart, not on reload",
                             r.info.label
                         );
                     }
@@ -281,7 +290,13 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
     };
     let servers = tcp.len().max(1);
     let mut tasks = match l.transport {
-        Transport::Dns => udp::serve(udp, dispatcher.clone(), any_local, l.udp_decorator.clone()),
+        Transport::Dns => udp::serve(
+            udp,
+            dispatcher.clone(),
+            any_local,
+            l.udp_decorator.clone(),
+            l.proxy_proto.clone().map(|p| Arc::new(proxyproto::UdpProxy::new(p))),
+        ),
         Transport::Quic => {
             let s = quic::Settings::new(&l.limits, &conn);
             let ep = quic::endpoint(
@@ -305,18 +320,26 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
     for t in tcp {
         let d = dispatcher.clone();
         let set = match l.transport {
-            Transport::Dns => tcp::serve(t, d, any_local, None, conn),
-            Transport::Tls => tcp::serve(t, d, any_local, Some(tls(&[b"dot"])), conn),
+            Transport::Dns => tcp::serve(t, d, any_local, None, conn, l.proxy_proto.clone()),
+            Transport::Tls => tcp::serve(t, d, any_local, Some(tls(&[b"dot"])), conn, l.proxy_proto.clone()),
             Transport::Https => doh::serve(
                 t,
                 d,
                 any_local,
                 tls(&[b"h2", b"http/1.1"]),
                 doh::Settings::new(&l.limits),
+                l.proxy_proto.clone(),
             ),
             Transport::Grpc => {
                 let acc = l.tls.as_ref().map(|_| tls(&[b"h2"]));
-                grpc::serve(t, d, any_local, acc, grpc::Settings::new(&l.limits))
+                grpc::serve(
+                    t,
+                    d,
+                    any_local,
+                    acc,
+                    grpc::Settings::new(&l.limits),
+                    l.proxy_proto.clone(),
+                )
             }
             Transport::Quic | Transport::Https3 => unreachable!("no TCP listener"),
         };
@@ -334,6 +357,7 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
         handle,
         tasks,
         shed: l.udp_decorator.is_some(),
+        proxy: l.proxy_proto.clone(),
     })
 }
 

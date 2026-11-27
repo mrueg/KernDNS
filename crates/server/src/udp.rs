@@ -19,6 +19,7 @@ use tokio::net::UdpSocket;
 use tokio::task::JoinSet;
 
 use crate::dispatch::{Dispatcher, encode};
+use crate::proxyproto::UdpProxy;
 
 /// Bind `n` UDP sockets to `addr` with `SO_REUSEPORT`. With port 0 the
 /// first socket picks the port and the others join it.
@@ -55,11 +56,13 @@ pub fn serve(
     dispatcher: Dispatcher,
     local: SocketAddr,
     decorator: Option<Arc<dyn UdpDecorator>>,
+    proxy: Option<Arc<UdpProxy>>,
 ) -> JoinSet<()> {
     let mut set = JoinSet::new();
     for sock in socks {
         let sock = Arc::new(sock);
         let d = dispatcher.clone();
+        let proxy = proxy.clone();
         let writer = decorator.as_ref().map(|dec| {
             let (w, task) = dec.decorate(d.label(), sock.clone());
             set.spawn(task);
@@ -72,13 +75,28 @@ pub fn serve(
                     Ok(x) => x,
                     Err(_) => continue,
                 };
-                let packet = buf[..n].to_vec();
+                // PROXY protocol: the client is the header's source
+                let (packet, client, tlvs) = match &proxy {
+                    None => (buf[..n].to_vec(), src, None),
+                    Some(p) => match p.read(&buf[..n], src) {
+                        Ok(Some(dg)) => (buf[dg.offset..n].to_vec(), dg.client, dg.tlvs),
+                        Ok(None) => continue,
+                        Err(e) => {
+                            kerndns_core::warning!(
+                                "dropping invalid Proxy Protocol packet from {}: {e}",
+                                crate::proxyproto::canonical(src)
+                            );
+                            continue;
+                        }
+                    },
+                };
                 let (sock, d, writer) = (sock.clone(), d.clone(), writer.clone());
                 tokio::spawn(async move {
                     let conn = ConnInfo {
                         udp_writer: writer.clone(),
+                        proxy_tlvs: tlvs,
                     };
-                    let wires = handle(&d, &packet, src, local, Protocol::Udp, conn).await;
+                    let wires = handle(&d, &packet, client, local, Protocol::Udp, conn).await;
                     for wire in wires {
                         match &writer {
                             Some(w) => w.write(wire, src),

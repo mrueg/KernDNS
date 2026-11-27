@@ -19,13 +19,26 @@ use crate::request::Request;
 /// zone key of the server block.
 pub type PluginFn = Arc<dyn Fn(Next) -> Arc<dyn Handler> + Send + Sync>;
 
-/// An error from a plugin's setup, shown as `plugin/<name>: <cause>`.
-#[derive(Debug, thiserror::Error)]
-#[error("plugin/{plugin}: {msg}")]
+/// An error from a plugin's setup, shown as `plugin/<name>: <cause>`, or
+/// as the bare cause when `plugin` is empty (a setup function that returns
+/// a parse error without `plugin.Error`).
+#[derive(Debug)]
 pub struct SetupError {
     pub plugin: String,
     pub msg: String,
 }
+
+impl std::fmt::Display for SetupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.plugin.is_empty() {
+            f.write_str(&self.msg)
+        } else {
+            write!(f, "plugin/{}: {}", self.plugin, self.msg)
+        }
+    }
+}
+
+impl std::error::Error for SetupError {}
 
 impl SetupError {
     pub fn new(plugin: impl Into<String>, msg: impl std::fmt::Display) -> Self {
@@ -135,6 +148,8 @@ pub struct BlockConfig {
     /// Takes over the UDP listener's writes (`UDPDecorateWriterFunc`, set
     /// by `shed`).
     pub udp_decorator: Option<Arc<dyn crate::udpwrite::UdpDecorator>>,
+    /// PROXY protocol on this block's listeners (`proxyproto`).
+    pub proxy_proto: Option<Arc<crate::proxyproto::ProxyProtoConfig>>,
     /// Handlers registered by setup, with their directive names, in the
     /// order setup ran (which is the execution order).
     pub plugins: Vec<(&'static str, PluginFn)>,
@@ -161,6 +176,7 @@ impl BlockConfig {
             num_sockets: 0,
             limits: ListenerLimits::default(),
             udp_decorator: None,
+            proxy_proto: None,
             plugins: Vec::new(),
             extensions: Extensions::default(),
         }

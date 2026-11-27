@@ -85,12 +85,16 @@ pub struct Request {
 pub struct ConnInfo {
     /// The UDP socket's decorated writer (`shed`), if any.
     pub udp_writer: Option<std::sync::Arc<dyn crate::udpwrite::UdpWriter>>,
+    /// The raw PROXY protocol v2 TLV vector of the connection, captured
+    /// when `proxyproto` has `tlv_metadata`.
+    pub proxy_tlvs: Option<std::sync::Arc<[u8]>>,
 }
 
 impl fmt::Debug for ConnInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ConnInfo")
             .field("udp_writer", &self.udp_writer.is_some())
+            .field("proxy_tlvs", &self.proxy_tlvs)
             .finish()
     }
 }
