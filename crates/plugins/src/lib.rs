@@ -15,6 +15,7 @@ pub mod cancel;
 pub mod chaos;
 pub mod debug;
 pub mod dns64;
+pub mod dnssec;
 pub mod dnstap;
 pub mod dynupdate;
 pub mod erratic;
@@ -110,5 +111,6 @@ pub fn registry() -> Registry {
     r.register(https3::Setup);
     r.register(grpc_server::Setup);
     r.register(quic::Setup);
+    r.register(dnssec::Setup);
     r
 }

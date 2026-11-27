@@ -81,6 +81,26 @@ pub static CACHE_EVICTIONS: LazyLock<CounterVec> = LazyLock::new(|| {
     )
 });
 
+// dnssec
+pub static DNSSEC_CACHE_ENTRIES: LazyLock<GaugeVec> = LazyLock::new(|| {
+    gauge(
+        "dnssec",
+        "cache_entries",
+        "The number of elements in the dnssec cache.",
+        &["server", "type"],
+    )
+});
+pub static DNSSEC_CACHE_HITS: LazyLock<CounterVec> =
+    LazyLock::new(|| counter("dnssec", "cache_hits_total", "The count of cache hits.", &["server"]));
+pub static DNSSEC_CACHE_MISSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "dnssec",
+        "cache_misses_total",
+        "The count of cache misses.",
+        &["server"],
+    )
+});
+
 // forward / proxy
 pub static PROXY_REQUEST_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
     register_histogram_vec!(

@@ -101,3 +101,29 @@ where
 {
     Some(std::sync::Arc::new(Reply(f)))
 }
+
+/// A directory removed on drop (`t.TempDir()`).
+pub struct TempDir(pub std::path::PathBuf);
+
+impl TempDir {
+    pub fn new(tag: &str) -> TempDir {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let n = N.fetch_add(1, Ordering::Relaxed);
+        let p = std::env::temp_dir().join(format!("kerndns-{tag}-{}-{n}", std::process::id()));
+        std::fs::create_dir_all(&p).unwrap();
+        TempDir(p)
+    }
+
+    pub fn write(&self, name: &str, content: &str) -> std::path::PathBuf {
+        let p = self.0.join(name);
+        std::fs::write(&p, content).unwrap();
+        p
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
