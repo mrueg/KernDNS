@@ -2,7 +2,10 @@
 //! and hostname. Port of `plugin/chaos`.
 //!
 //! The version is `KernDNS-<version>`: KernDNS reports its own name, not
-//! CoreDNS's.
+//! CoreDNS's. CoreDNS builds it from `caddy.AppName` and `caddy.AppVersion`,
+//! which the program embedding CoreDNS sets; KernDNS takes a replacement
+//! from `$KERNDNS_CHAOS_VERSION` (the compatibility tests set it to their
+//! own `caddy.AppName-caddy.AppVersion`).
 
 use std::sync::Arc;
 
@@ -18,7 +21,12 @@ use kerndns_core::{
 pub const OWNERS: &[&str] = &["The KernDNS authors"];
 
 pub fn default_version() -> String {
-    format!("KernDNS-{}", kerndns_core::VERSION)
+    version_or_default(std::env::var("KERNDNS_CHAOS_VERSION").ok())
+}
+
+fn version_or_default(env: Option<String>) -> String {
+    env.filter(|v| !v.is_empty())
+        .unwrap_or_else(|| format!("KernDNS-{}", kerndns_core::VERSION))
 }
 
 /// TXT strings are limited to 255 bytes.
@@ -147,6 +155,14 @@ mod tests {
         assert!(setup_ok(&Setup, "chaos"));
         assert!(setup_ok(&Setup, "chaos v1 alice bob"));
         assert!(setup_err(&Setup, "chaos {\n foo\n}").contains("unknown property 'foo'"));
+    }
+
+    #[test]
+    fn version_override() {
+        let own = format!("KernDNS-{}", kerndns_core::VERSION);
+        assert_eq!(version_or_default(None), own);
+        assert_eq!(version_or_default(Some(String::new())), own);
+        assert_eq!(version_or_default(Some("CoreDNS-1.15.0".into())), "CoreDNS-1.15.0");
     }
 
     #[tokio::test]
