@@ -43,7 +43,7 @@ pub use address::{Transport, ZoneAddr};
 pub use handler::{
     Context, Handler, HandlerResult, Next, PluginError, ResponseSigner, client_write, next_or_failure, result_rcode,
 };
-pub use plugin::{BlockConfig, Controller, Hooks, PluginFactory, PluginFn, Registry, SetupError};
+pub use plugin::{BlockConfig, Controller, Event, EventHook, Hooks, PluginFactory, PluginFn, Registry, SetupError};
 pub use request::{ConnInfo, Protocol, Request};
 pub use response::{CaptureWriter, Recorder, ResponseWriter};
 pub use upstream::Upstream;

@@ -41,6 +41,7 @@ pub mod metrics;
 pub mod minimal;
 pub mod multisocket;
 pub mod nsid;
+pub mod on;
 pub mod pluginmetrics;
 pub mod proxyproto;
 pub mod quic;
@@ -120,5 +121,6 @@ pub fn registry() -> Registry {
     r.register(siit::Setup);
     r.register(shed::Setup);
     r.register(proxyproto::Setup);
+    r.register(on::Setup);
     r
 }
