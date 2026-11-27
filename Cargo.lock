@@ -3066,14 +3066,22 @@ dependencies = [
  "anyhow",
  "bytes",
  "futures-util",
+ "h3",
+ "h3-quinn",
+ "http",
  "http-body-util",
  "hyper",
  "hyper-util",
+ "kerndns-core",
  "kerndns-corefile",
  "kerndns-kubernetes",
  "kerndns-plugins",
+ "quinn",
+ "rustls",
+ "rustls-pki-types",
  "serde_json",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]
