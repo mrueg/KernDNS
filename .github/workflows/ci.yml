@@ -145,9 +145,9 @@ jobs:
           kubectl -n kube-system patch deployment coredns -p "$(cat coredns_deployment_patch.yaml)"
           kubectl -n kube-system patch clusterroles system:coredns -p "$(cat coredns_clusterroles_patch.yaml)"
           kubectl create -f dns-test.yaml
-          kubectl -n kube-system rollout status deployment/coredns --timeout=180s
-          kubectl -n kube-system get pods -l k8s-app=kube-dns -o wide
-          kubectl -n kube-system logs -l k8s-app=kube-dns --tail=20
+          # no rollout wait: the patched Deployment mounts a Zonefile key the
+          # ConfigMap only gets when a test loads one (LoadCorefileAndZonefile),
+          # and the tests wait for the DNS pod to be ready themselves
       - name: Run coredns/ci test/kubernetes
         working-directory: ${{ runner.temp }}/src/ci/test/kubernetes
         shell: bash
@@ -158,6 +158,8 @@ jobs:
         name: Summary
         run: |
           grep -E '^(--- |ok |FAIL)' "$RUNNER_TEMP/kind-tests.log" || true
+          kubectl -n kube-system get pods -l k8s-app=kube-dns -o wide || true
+          kubectl -n kube-system describe pods -l k8s-app=kube-dns | tail -40 || true
           kubectl -n kube-system logs -l k8s-app=kube-dns --tail=200 || true
 
   fuzz:
