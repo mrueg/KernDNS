@@ -874,7 +874,7 @@ pub fn etcd(args: &[String]) -> Result<()> {
         "0-{}",
         std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1) - 1
     );
-    let _etcd = crate::bench::start_etcd(&work, etcd_port, &cpus, &work)?;
+    let etcd_proc = crate::bench::start_etcd(&work, etcd_port, &cpus, &work)?;
     let grant = crate::bench::etcd_post(etcd_port, "/v3/lease/grant", r#"{"TTL":"7200"}"#)?
         .context("granting a lease failed")?;
     let lease: i64 = grant
@@ -1000,6 +1000,8 @@ pub fn etcd(args: &[String]) -> Result<()> {
     }
     if total_diffs > 0 {
         println!("\n{total_diffs} differences");
+        // process::exit skips destructors: stop etcd first
+        drop(etcd_proc);
         std::process::exit(1);
     }
     println!("\nno differences");
