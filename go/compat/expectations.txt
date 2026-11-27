@@ -73,7 +73,7 @@ skip  TestMetricsAvailableAfterReload                 calls caddy.Restart, which
 skip  TestMetricsAvailableAfterReloadAndFailedReload  calls caddy.Restart, which starts an in-process CoreDNS
 pass  TestMetricsPluginEnabled
 pass  TestMetricsRefused
-xfail TestMetricsRewriteRequestSize                   Available metrics without rewrite:
+skip  TestMetricsRewriteRequestSize                   counts from two servers in one process (one shared metrics registry); KernDNS reports 5 of 5 in le=100 for each
 pass  TestMetricsServer
 pass  TestMetricsSeveralBlocs
 skip  TestMultiZoneBlockConfigs                       reads dnsserver.Config through reflection on the caddy instance
