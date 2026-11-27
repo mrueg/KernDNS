@@ -199,7 +199,7 @@ reloads like the plain DNS ones:
 | 2: Kubernetes | `kubernetes`, `k8s_external` (done) |
 | 3: authoritative | `file`, `auto`, `secondary`, `transfer`, `any`, `minimal`, `loadbalance`, `local`, `tsig` (done) |
 | 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `autopath`, `nsid`, `tls` (done) |
-| 5: DNSSEC and the rest | `dnssec`, `sign`, `siit`, `shed`, `proxyproto`, `on`, `pprof`, `geoip`, `trace`, `dnstap`, `grpc` |
+| 5: DNSSEC and the rest | `dnssec`, `sign`, `dnstap`, `grpc` (done); `siit`, `shed`, `proxyproto`, `on`, `pprof`, `geoip`, `trace` |
 
 Through the Go bridge until someone needs a port: `etcd`, `route53`,
 `clouddns`, `azure`, third-party plugins.
@@ -251,6 +251,18 @@ CLIENT_RESPONSE carries the response as the client gets it (EDNS echoed,
 truncated over UDP); KernDNS emits it once the chain returns rather than
 inside the write, so `extra` sees metadata set later in the chain the way
 CoreDNS's lazily evaluated metadata does.
+
+`dnssec` and `sign` sign with ring, the crypto library hickory-proto
+(`dnssec-ring`) and rustls already use: ECDSA P-256/P-384, Ed25519 and
+RSASHA256/RSASHA512 (2048 to 8192 bits). ring signs neither RSASHA1 nor
+shorter RSA keys, so such keys are refused at startup with an error instead
+of answering unsigned, and `key aws_secretsmanager` is not supported. RRSIGs
+are made with hickory's canonical encoding (`TBS`) and checked in the unit
+tests with hickory's verifier for every algorithm; `sign`'s output passes
+`ldns-verify-zone`, and `cargo xtask difftest --dnssec` serves every `file`
+test zone signed on the fly by both servers, compares the answers without
+signature bytes and times, and verifies every RRSIG of both with the same
+validator (miekg/dns).
 
 Performance follow-ups from the first benchmarks, done:
 
@@ -367,10 +379,13 @@ Each scenario runs N times and reports the median and spread.
   --check` (in CI, no dnsperf needed) fails for any plugin in KernDNS's
   registry without a `bench/plugins/<name>/` directory or an entry in
   `bench/plugins/EXEMPT` (only plugins with no per-query work: `bind`,
-  `root`, `debug`, `health`, `ready`, `reload`), and checks that every case
-  parses and uses its plugin. Still missing: DNSSEC cold/warm and forward
-  failures. Follow-ups from the first full run (README): the cache miss
-  path (small cache, constant evictions) is slower than CoreDNS's, AXFR
+  `root`, `debug`, `health`, `ready`, `reload`, `sign`, and the listener
+  plugins dnsperf can't drive), and checks that every case parses and
+  uses its plugin. Still missing: forward failures. Follow-ups from the
+  first full run (README): the cache miss path (small cache, constant
+  evictions; that run's KernDNS cache held 256 entries where CoreDNS's
+  holds 1024, since fixed (4 per shard at least), to be re-measured) is
+  slower than CoreDNS's, AXFR
   costs more CPU, and a 100k-name `file` zone uses more memory (247 vs
   189 MiB).
 - **Level 3, common setups:** `bench/setups/<name>/`, same format (today
