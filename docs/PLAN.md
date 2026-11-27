@@ -433,8 +433,10 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
   10k and 50k services (see README).
 - `autopath @kubernetes` works with `pods verified`: the search path comes
   from the client pod's namespace, like CoreDNS's `AutoPath`.
-- Not ported yet: `multicluster`, `zonal`, `apiserver_*` limits, AXFR
-  (needs `transfer`), `coredns_kubernetes_*` DNS
+- Zone transfers (`transfer`) of the cluster zone and k8s_external zones;
+  CoreDNS's xfr_test.go and k8s_external's own tests replay identically.
+- Not ported yet: `multicluster`, `zonal`, `apiserver_*` limits,
+  `coredns_kubernetes_*` DNS
   programming latency metrics. The `coredns/ci` kind tests haven't been
   run yet. Resident memory after a large sync is higher than the live
   index needs because the allocator keeps freed list pages; a different

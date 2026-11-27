@@ -64,6 +64,20 @@ struct Data {
     pods: Vec<Pod>,
     missing_namespaces: Vec<String>,
     suites: Vec<Suite>,
+    transfers: Vec<Xfr>,
+}
+
+/// One `Transfer` call and the records it streamed.
+#[derive(Deserialize)]
+struct Xfr {
+    name: String,
+    zones: Vec<String>,
+    namespaces: Vec<String>,
+    local_ips: Vec<String>,
+    zone: String,
+    serial: u32,
+    error: String,
+    records: Vec<String>,
 }
 
 /// `APIConnServeTest`.
@@ -151,8 +165,27 @@ fn to_msg(m: &Msg) -> Message {
     out
 }
 
-#[tokio::test]
-async fn upstream_kubernetes_cases() {
+/// The fake API objects of `APIConnServeTest`, ready for [`Fake`].
+struct Objects {
+    services: HashMap<String, Vec<Arc<Service>>>,
+    endpoints: HashMap<String, Vec<Arc<Endpoints>>>,
+    pods: Vec<Arc<Pod>>,
+    missing: HashSet<String>,
+}
+
+impl Objects {
+    fn fake(&self, synced: bool) -> Fake {
+        Fake {
+            services: self.services.clone(),
+            endpoints: self.endpoints.clone(),
+            pods: self.pods.clone(),
+            missing: self.missing.clone(),
+            synced,
+        }
+    }
+}
+
+fn load() -> (Objects, Vec<Suite>, Vec<Xfr>) {
     let data: Data =
         serde_json::from_str(include_str!("../testdata/upstream_cases.json")).expect("valid upstream_cases.json");
     let wrap = |m: HashMap<String, Vec<Service>>| {
@@ -179,19 +212,71 @@ async fn upstream_kubernetes_cases() {
         .collect();
     let pods: Vec<Arc<Pod>> = data.pods.into_iter().map(Arc::new).collect();
     let missing: HashSet<String> = data.missing_namespaces.into_iter().collect();
+    let objects = Objects {
+        services,
+        endpoints,
+        pods,
+        missing,
+    };
+    (objects, data.suites, data.transfers)
+}
 
+/// xfr_test.go: every Transfer call streams the same records, in the same
+/// order, as the Go plugin.
+#[test]
+fn upstream_kubernetes_transfers() {
+    let (objects, _, transfers) = load();
+    assert!(!transfers.is_empty());
+    let mut failures = Vec::new();
+    for x in &transfers {
+        let mut k = Kubernetes::new(x.zones.clone());
+        k.namespaces = x.namespaces.iter().cloned().collect();
+        *k.local_ips.write().unwrap() = x.local_ips.iter().map(|s| s.parse().unwrap()).collect();
+        k.set_api(Arc::new(objects.fake(true)));
+        let got = k.transfer(&x.zone, x.serial);
+        match (&got, x.error.is_empty()) {
+            (Err(e), false) => {
+                assert_eq!(
+                    *e,
+                    kerndns_core::transfer::TransferError::NotAuthoritative,
+                    "{}",
+                    x.name
+                );
+                continue;
+            }
+            (Err(e), true) => {
+                failures.push(format!("{}: Rust failed with {e:?}", x.name));
+                continue;
+            }
+            (Ok(_), false) => {
+                failures.push(format!("{}: Go failed with {:?}, Rust transferred", x.name, x.error));
+                continue;
+            }
+            (Ok(_), true) => {}
+        }
+        let want: Vec<String> = x.records.iter().map(|h| decode(h).to_string()).collect();
+        let got: Vec<String> = got.unwrap().into_iter().flatten().map(|r| r.to_string()).collect();
+        if want != got {
+            failures.push(format!(
+                "{}:\n    go:   {}\n    rust: {}",
+                x.name,
+                want.join("\n          "),
+                got.join("\n          ")
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "transfers differ:\n  {}", failures.join("\n  "));
+}
+
+#[tokio::test]
+async fn upstream_kubernetes_cases() {
+    let (objects, suites, _) = load();
     let mut failures = Vec::new();
     let mut total = 0;
-    for suite in &data.suites {
+    for suite in &suites {
         for (i, case) in suite.cases.iter().enumerate() {
             total += 1;
-            let fake = Fake {
-                services: services.clone(),
-                endpoints: endpoints.clone(),
-                pods: pods.clone(),
-                missing: missing.clone(),
-                synced: !suite.not_synced,
-            };
+            let fake = objects.fake(!suite.not_synced);
             let mut k = Kubernetes::new(suite.zones.clone());
             k.namespaces = suite.namespaces.clone().unwrap_or_default().into_iter().collect();
             k.pod_mode = match suite.pod_mode.as_str() {

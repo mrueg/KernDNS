@@ -15,8 +15,8 @@
 //! kind-test     Run coredns/ci's end-to-end Kubernetes tests against the
 //!               cluster DNS of a kind cluster and compare with
 //!               go/compat/expectations-kind.txt (CI job `kind`).
-//! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_cases.json by
-//!               running CoreDNS's kubernetes handler test suites in Go.
+//! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_*cases.json by
+//!               running CoreDNS's kubernetes and k8s_external test suites in Go.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -43,6 +43,7 @@ const USAGE: &str =
        cargo xtask k8s-cases
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
        cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS] [--coredns PATH]
+       cargo xtask fake-api KUBECONFIG [--services N]
 
   --release         build and test the release binary
   --run REGEX       only run upstream tests matching REGEX
@@ -61,11 +62,40 @@ fn main() -> Result<()> {
         Some("k8s-cases") => k8s_cases(),
         Some("k8s-difftest") => difftest::k8s(&args[1..]),
         Some("k8s-bench") => bench::k8s(&args[1..]),
+        Some("fake-api") => fake_api(&args[1..]),
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);
         }
     }
+}
+
+/// `cargo xtask fake-api KUBECONFIG [--services N]`: serve the benchmarks'
+/// fake Kubernetes API (N Services with external IPs, their
+/// EndpointSlices, 10 namespaces) until killed, with a kubeconfig for it,
+/// for running CoreDNS and kerndns side by side by hand.
+fn fake_api(args: &[String]) -> Result<()> {
+    let mut kubeconfig = None;
+    let mut services = 1000;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--services" => services = it.next().context("--services needs a number")?.parse()?,
+            path => kubeconfig = Some(PathBuf::from(path)),
+        }
+    }
+    let kubeconfig = kubeconfig.context("usage: cargo xtask fake-api KUBECONFIG [--services N]")?;
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()?;
+    rt.block_on(async {
+        let (addr, task) = fakeapi::serve(fakeapi::generate_with(services, 10, true)).await?;
+        fs::write(&kubeconfig, bench::kubeconfig_for(&addr.to_string()))?;
+        eprintln!("fake API at {addr}, kubeconfig {}", kubeconfig.display());
+        task.await?;
+        Ok(())
+    })
 }
 
 pub(crate) fn root() -> PathBuf {
@@ -499,21 +529,38 @@ fn k8s_cases() -> Result<()> {
         "Replace": {
             upstream.join("plugin/kubernetes/kerndns_dump_test.go").to_string_lossy():
                 root.join("go/k8sdump/kerndns_dump_test.go").to_string_lossy(),
+            upstream.join("plugin/k8s_external/kerndns_dump_test.go").to_string_lossy():
+                root.join("go/k8sdump/kerndns_external_dump_test.go").to_string_lossy(),
         }
     });
     fs::write(&overlay, serde_json::to_vec_pretty(&json)?)?;
-    let out = root.join("crates/kubernetes/testdata/upstream_cases.json");
-    let st = Command::new("go")
-        .current_dir(&upstream)
-        .args(["test", "-count=1", "-run", "TestKernDNSDump", "-overlay"])
-        .arg(&overlay)
-        .arg("./plugin/kubernetes/")
-        .env("KERNDNS_K8S_DUMP", &out)
-        .status()?;
-    if !st.success() {
-        bail!("go test failed");
+    for (pkg, test, env, file) in [
+        (
+            "kubernetes",
+            "TestKernDNSDump",
+            "KERNDNS_K8S_DUMP",
+            "upstream_cases.json",
+        ),
+        (
+            "k8s_external",
+            "TestKernDNSExternalDump",
+            "KERNDNS_K8S_EXTERNAL_DUMP",
+            "upstream_external_cases.json",
+        ),
+    ] {
+        let out = root.join("crates/kubernetes/testdata").join(file);
+        let st = Command::new("go")
+            .current_dir(&upstream)
+            .args(["test", "-count=1", "-run", test, "-overlay"])
+            .arg(&overlay)
+            .arg(format!("./plugin/{pkg}/"))
+            .env(env, &out)
+            .status()?;
+        if !st.success() {
+            bail!("go test failed");
+        }
+        println!("wrote {}", out.display());
     }
-    println!("wrote {}", out.display());
     Ok(())
 }
 

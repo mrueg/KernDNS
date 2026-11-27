@@ -1162,7 +1162,7 @@ fn start_etcd(work: &Path, port: u16, cpus: &str, fix: &Path) -> Result<Proc> {
     Ok(etcd)
 }
 
-fn kubeconfig_for(addr: &str) -> String {
+pub(crate) fn kubeconfig_for(addr: &str) -> String {
     format!(
         "apiVersion: v1\nkind: Config\nclusters:\n- name: fake\n  cluster:\n    server: http://{addr}\ncontexts:\n- name: fake\n  context:\n    cluster: fake\n    user: fake\ncurrent-context: fake\nusers:\n- name: fake\n  user: {{}}\n"
     )

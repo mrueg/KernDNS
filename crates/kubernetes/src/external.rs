@@ -12,7 +12,7 @@
 //! }
 //! ```
 //!
-//! Zone transfers (AXFR) need `transfer`, which isn't ported yet.
+//! Zone transfers go through `transfer` ([`ExternalTransfer`]).
 
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
@@ -20,6 +20,7 @@ use std::sync::{Arc, OnceLock};
 use kerndns_core::proto::op::ResponseCode;
 use kerndns_core::proto::rr::rdata::{A, AAAA, NS, SOA};
 use kerndns_core::proto::rr::{DNSClass, Name, RData, Record, RecordType};
+use kerndns_core::transfer::{TransferError, TransferRegistry, Transferer};
 use kerndns_core::zones::{self, Fall, extract_address_from_reverse, is_subdomain};
 use kerndns_core::{
     BlockConfig, Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request,
@@ -175,6 +176,7 @@ impl Kubernetes {
             .collect()
     }
 
+    /// `ExternalSerial`.
     fn external_serial(&self) -> u32 {
         self.api().map(|a| a.modified() as u32).unwrap_or(0)
     }
@@ -241,6 +243,10 @@ impl PluginFactory for Setup {
             Ok(())
         });
         let cfg = Arc::new(cfg);
+        TransferRegistry::of(c.config).add_source(Arc::new(ExternalTransfer {
+            cfg: cfg.clone(),
+            k: k.clone(),
+        }));
         c.add_plugin(move |next| {
             Arc::new(External {
                 cfg: cfg.clone(),
@@ -264,9 +270,9 @@ fn rr(owner: &str, ttl: u32, data: RData) -> Record {
     r
 }
 
-impl External {
+impl Config {
     fn soa(&self, k: &Kubernetes, zone: &str) -> Record {
-        let c = &self.cfg;
+        let c = self;
         let soa = SOA::new(
             Name::from_ascii(backend::join(&["ns1", &c.apex, zone])).unwrap_or_default(),
             Name::from_ascii(backend::join(&["hostmaster", &c.apex, zone])).unwrap_or_default(),
@@ -280,11 +286,11 @@ impl External {
     }
 
     fn addresses(&self, k: &Kubernetes, zone: &str, owner: &str) -> Vec<Record> {
-        k.ns_addrs_ext(true, self.cfg.headless, zone)
+        k.ns_addrs_ext(true, self.headless, zone)
             .into_iter()
             .map(|(_, ip)| match ip {
-                std::net::IpAddr::V4(v4) => rr(owner, self.cfg.ttl, RData::A(A(v4))),
-                std::net::IpAddr::V6(v6) => rr(owner, self.cfg.ttl, RData::AAAA(AAAA(v6))),
+                std::net::IpAddr::V4(v4) => rr(owner, self.ttl, RData::A(A(v4))),
+                std::net::IpAddr::V6(v6) => rr(owner, self.ttl, RData::AAAA(AAAA(v6))),
             })
             .collect()
     }
@@ -315,7 +321,7 @@ impl Handler for External {
         for z in &c.zones {
             if name == *z {
                 match req.qtype() {
-                    RecordType::SOA => m.answers = vec![self.soa(&k, &zone)],
+                    RecordType::SOA => m.answers = vec![self.cfg.soa(&k, &zone)],
                     RecordType::NS => {
                         let ns_name = backend::join(&["ns1", &c.apex, &zone]);
                         m.answers = vec![rr(
@@ -323,9 +329,9 @@ impl Handler for External {
                             c.ttl,
                             RData::NS(NS(Name::from_ascii(&ns_name).unwrap_or_default())),
                         )];
-                        m.additionals = self.addresses(&k, &zone, &backend::join(&["ns1", &c.apex, &qname]));
+                        m.additionals = self.cfg.addresses(&k, &zone, &backend::join(&["ns1", &c.apex, &qname]));
                     }
-                    _ => m.authorities = vec![self.soa(&k, &zone)],
+                    _ => m.authorities = vec![self.cfg.soa(&k, &zone)],
                 }
                 return write(w, m).await;
             }
@@ -335,18 +341,19 @@ impl Handler for External {
                 match labels.len() {
                     2 if labels[0] == "ns1" => {
                         m.answers = self
+                            .cfg
                             .addresses(&k, &zone, &qname)
                             .into_iter()
                             .filter(|r| r.record_type() == req.qtype())
                             .collect();
                         if m.answers.is_empty() {
-                            m.authorities = vec![self.soa(&k, &zone)];
+                            m.authorities = vec![self.cfg.soa(&k, &zone)];
                         }
                     }
-                    1 => m.authorities = vec![self.soa(&k, &zone)],
+                    1 => m.authorities = vec![self.cfg.soa(&k, &zone)],
                     _ => {
                         m.metadata.response_code = ResponseCode::NXDomain;
-                        m.authorities = vec![self.soa(&k, &zone)];
+                        m.authorities = vec![self.cfg.soa(&k, &zone)];
                     }
                 }
                 return write(w, m).await;
@@ -359,7 +366,7 @@ impl Handler for External {
                 return next_or_failure("k8s_external", &self.next, ctx, w, req).await;
             }
             m.metadata.response_code = rcode;
-            m.authorities = vec![self.soa(&k, &zone)];
+            m.authorities = vec![self.cfg.soa(&k, &zone)];
             return write(w, m).await;
         }
         let b: &dyn ServiceBackend = &*k;
@@ -406,10 +413,10 @@ impl Handler for External {
                     }
                 }
             }
-            _ => m.authorities = vec![self.soa(&k, &zone)],
+            _ => m.authorities = vec![self.cfg.soa(&k, &zone)],
         }
         if m.answers.is_empty() {
-            m.authorities = vec![self.soa(&k, &zone)];
+            m.authorities = vec![self.cfg.soa(&k, &zone)];
         }
         write(w, m).await
     }
@@ -479,4 +486,254 @@ async fn write(w: &mut dyn ResponseWriter, m: kerndns_core::proto::op::Message) 
         .await
         .map_err(|e| PluginError::servfail("k8s_external", e.to_string()))?;
     Ok(ResponseCode::NoError)
+}
+
+/// `kubernetes.Endpoint` and `kubernetes.PortProtocol`: what a group of
+/// headless records in [`Kubernetes::external_services`] answers for.
+pub const ENDPOINT: &str = "endpoint";
+pub const PORT_PROTOCOL: &str = "port.protocol";
+
+/// Records of headless services, grouped by `<key>/endpoint` or
+/// `<key>/port.protocol`, in first-seen order (Go's map order is random).
+pub type HeadlessGroups = Vec<(String, Vec<Service>)>;
+
+fn port_key(base: &str, protocol: &str, name: &str) -> String {
+    format!("{base}/_{}/_{}", protocol.to_lowercase(), name.to_lowercase())
+}
+
+impl Kubernetes {
+    /// `ExternalServices`: every service with external IPs and, with
+    /// `headless`, the records of headless services.
+    pub fn external_services(&self, zone: &str, headless: bool) -> (Vec<Service>, HeadlessGroups) {
+        let zone_path = backend::path(zone, "c");
+        let mut services = Vec::new();
+        let mut groups: HeadlessGroups = Vec::new();
+        let mut add = |key: String, s: Service| match groups.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, v)) => v.push(s),
+            None => groups.push((key, vec![s])),
+        };
+        let Some(api) = self.api() else {
+            return (services, groups);
+        };
+        let mut list = api.service_list();
+        list.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.namespace.cmp(&b.namespace)));
+        for svc in list {
+            let base = format!("{zone_path}/{}/{}", svc.namespace, svc.name);
+            if headless && svc.external_ips.is_empty() && svc.headless() {
+                for ep in api.ep_index(&crate::object::Service::key(&svc.name, &svc.namespace)) {
+                    for sub in &ep.subsets {
+                        for addr in &sub.addresses {
+                            for p in &sub.ports {
+                                let mut s = Service {
+                                    host: addr.ip.clone(),
+                                    port: p.port,
+                                    ttl: self.ttl,
+                                    key: format!("{base}/{}", endpoint_hostname(addr, self.endpoint_name_mode)),
+                                    ..Default::default()
+                                };
+                                add(format!("{base}/{ENDPOINT}"), s.clone());
+                                // unnamed ports have no SRV record of their own
+                                if p.name.is_empty() {
+                                    continue;
+                                }
+                                s.host = backend::domain(&s.key);
+                                s.key = port_key(&base, &p.protocol, &p.name);
+                                add(format!("{}/{PORT_PROTOCOL}", s.key), s);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            for ip in &svc.external_ips {
+                for p in &svc.ports {
+                    let mut s = Service {
+                        host: ip.clone(),
+                        port: p.port,
+                        ttl: self.ttl,
+                        key: base.clone(),
+                        ..Default::default()
+                    };
+                    services.push(s.clone());
+                    s.key = port_key(&base, &p.protocol, &p.name);
+                    s.target_strip = 2;
+                    services.push(s);
+                }
+            }
+        }
+        (services, groups)
+    }
+}
+
+/// `External.a` / `External.aaaa` for a transfer: the address records of
+/// `services` (deduplicated by address) named `owner`.
+fn address_records(services: &[Service], owner: &str, ttl: u32, v6: bool) -> Vec<Record> {
+    let mut dup = HashSet::new();
+    let mut out = Vec::new();
+    for s in services {
+        match s.host_type() {
+            HostType::A(ip) if !v6 && dup.insert(s.host.clone()) => out.push(rr(owner, ttl, RData::A(A(ip)))),
+            HostType::Aaaa(ip) if v6 && dup.insert(s.host.clone()) => out.push(rr(owner, ttl, RData::AAAA(AAAA(ip)))),
+            // CoreDNS also looks the target up, but without a server in the
+            // transfer's context that lookup always fails
+            HostType::Cname => out.push(s.new_cname(owner, &s.host)),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The answer records of `External.srv` (no glue, no lookups).
+fn srv_records(services: &[Service], owner: &str) -> Vec<Record> {
+    let mut w: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    for s in services {
+        *w.entry(s.priority).or_insert(0) += if s.weight != 0 { s.weight } else { 100 };
+    }
+    let mut dup: HashSet<(String, u16)> = HashSet::new();
+    let mut out = Vec::new();
+    for s in services {
+        if s.port == -1 {
+            continue;
+        }
+        let mut w1 = 100.0 / w[&s.priority] as f64;
+        w1 *= if s.weight == 0 { 100.0 } else { s.weight as f64 };
+        let weight = (w1.floor() as u16).max(1);
+        let r = match s.host_type() {
+            HostType::Cname => s.new_srv(owner, weight),
+            HostType::A(_) | HostType::Aaaa(_) => {
+                let mut s2 = s.clone();
+                s2.host = backend::domain(&s.key);
+                s2.new_srv(owner, weight)
+            }
+            HostType::Txt => continue,
+        };
+        let target = match &r.data {
+            RData::SRV(x) => x.target.to_ascii(),
+            _ => unreachable!(),
+        };
+        if dup.insert((target, s.port as u16)) {
+            out.push(r);
+        }
+    }
+    out
+}
+
+impl External {
+    /// `k8s_external ZONES` (default `apex` and `ttl`) in front of `k`,
+    /// for tests.
+    pub fn new(zones: Vec<String>, headless: bool, k: Arc<Kubernetes>, next: Next) -> Self {
+        let slot = KubernetesSlot::default();
+        slot.set(k);
+        let cfg = Config {
+            zones,
+            fall: Fall::default(),
+            apex: "dns".into(),
+            ttl: 5,
+            headless,
+        };
+        External {
+            cfg: Arc::new(cfg),
+            k: slot,
+            next,
+        }
+    }
+
+    /// The zone source `transfer` uses for this plugin.
+    pub fn transferer(&self) -> ExternalTransfer {
+        ExternalTransfer {
+            cfg: self.cfg.clone(),
+            k: self.k.clone(),
+        }
+    }
+}
+
+/// `k8s_external` as a zone source for `transfer` (`External.Transfer`).
+pub struct ExternalTransfer {
+    cfg: Arc<Config>,
+    k: KubernetesSlot,
+}
+
+impl Transferer for ExternalTransfer {
+    fn transfer(&self, zone: &str, serial: u32) -> Result<Vec<Vec<Record>>, TransferError> {
+        if zones::matches(&self.cfg.zones, zone) != Some(zone) {
+            return Err(TransferError::NotAuthoritative);
+        }
+        let Some(k) = self.k.get() else {
+            return Err(TransferError::NotAuthoritative);
+        };
+        Ok(self.cfg.transfer(k, zone, serial))
+    }
+}
+
+impl Config {
+    /// `External.Transfer`.
+    fn transfer(&self, k: &Kubernetes, zone: &str, serial: u32) -> Vec<Vec<Record>> {
+        let soa = self.soa(k, zone);
+        let mut out = vec![vec![soa.clone()]];
+        let soa_serial = match &soa.data {
+            RData::SOA(s) => s.serial,
+            _ => 0,
+        };
+        if serial != 0 && serial >= soa_serial {
+            return out;
+        }
+        let ns_name = backend::join(&["ns1", &self.apex, zone]);
+        out.push(vec![rr(
+            zone,
+            self.ttl,
+            RData::NS(NS(Name::from_ascii(&ns_name).unwrap_or_default())),
+        )]);
+        for r in self.addresses(k, zone, &ns_name) {
+            out.push(vec![r]);
+        }
+
+        let (svcs, headless) = k.external_services(zone, self.headless);
+        let mut srv_seen = HashSet::new();
+        for s in &svcs {
+            let name = backend::domain(&s.key);
+            let one = std::slice::from_ref(s);
+            if s.target_strip == 0 {
+                for v6 in [false, true] {
+                    let rs = address_records(one, &name, self.ttl, v6);
+                    if !rs.is_empty() {
+                        out.push(rs);
+                    }
+                }
+            }
+            for srv in srv_records(one, &name) {
+                if srv_seen.insert(srv.name.to_ascii()) {
+                    out.push(vec![srv]);
+                }
+            }
+        }
+        for (key, svcs) in &headless {
+            let (base, kind) = key.rsplit_once('/').unwrap_or((key, ""));
+            let name = backend::domain(base);
+            match kind {
+                ENDPOINT => {
+                    // like CoreDNS, the SRV records go out twice: as one
+                    // batch and one by one
+                    let mut emit = |svcs: &[Service], name: &str| {
+                        for v6 in [false, true] {
+                            let rs = address_records(svcs, name, self.ttl, v6);
+                            if !rs.is_empty() {
+                                out.push(rs);
+                            }
+                        }
+                        let recs = srv_records(svcs, name);
+                        out.push(recs.clone());
+                        out.extend(recs.into_iter().map(|r| vec![r]));
+                    };
+                    emit(svcs, &name);
+                    for s in svcs {
+                        emit(std::slice::from_ref(s), &backend::domain(&s.key));
+                    }
+                }
+                PORT_PROTOCOL => out.push(srv_records(svcs, &name)),
+                _ => {}
+            }
+        }
+        out.push(vec![soa]);
+        out
+    }
 }
