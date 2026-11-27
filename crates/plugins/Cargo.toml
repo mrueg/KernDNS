@@ -11,6 +11,7 @@ kerndns-core.workspace = true
 tokio.workspace = true
 thiserror.workspace = true
 data-encoding.workspace = true
+regex.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 http-body-util.workspace = true

@@ -1144,6 +1144,7 @@ dependencies = [
  "kerndns-core",
  "md-5",
  "prometheus",
+ "regex",
  "rustls",
  "rustls-native-certs",
  "rustls-pki-types",

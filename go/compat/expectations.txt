@@ -59,7 +59,7 @@ skip  TestJSONLoggingProcessHelper                    does not start a server th
 xfail TestKubernetesAutopathCacheRefresh              isolated test failed: exit status 1
 pass  TestLargeAXFR
 xfail TestLookupAutoPathErratic                       Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestLookupBalanceRewriteCacheDnssec             Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'rewrite' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestLookupBalanceRewriteCacheDnssec             Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'dnssec' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestLookupCache
 pass  TestLookupCacheWithoutEdns
 pass  TestLookupDS
@@ -100,8 +100,8 @@ pass  TestReverse
 pass  TestReverseCorefile
 pass  TestReverseExpansion
 pass  TestReverseInAddr
-xfail TestRewrite                                     Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'rewrite' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestRewriteFailure                              Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'rewrite' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestRewrite                                     Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestRewriteFailure
 xfail TestSIITAfterForward                            could not start CoreDNS test server: stdin:2 - Error during parsing: Directive 'siit' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestSecondaryFallthrough
 pass  TestSecondaryZoneNotify

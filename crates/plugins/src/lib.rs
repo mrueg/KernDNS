@@ -27,6 +27,7 @@ pub mod nsid;
 pub mod pluginmetrics;
 pub mod ready;
 pub mod reload;
+pub mod rewrite;
 pub mod root;
 pub mod secondary;
 pub mod tls;
@@ -58,6 +59,7 @@ pub fn registry() -> Registry {
     r.register(metrics::Setup);
     r.register(ready::Setup);
     r.register(reload::Setup);
+    r.register(rewrite::Setup);
     r.register(root::Setup);
     r.register(secondary::Setup);
     r.register(dynupdate::Setup);
