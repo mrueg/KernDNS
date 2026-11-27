@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+kerndns-corefile = { path = "crates/corefile" }
+kerndns-core = { path = "crates/core" }
+kerndns-server = { path = "crates/server" }
+kerndns-plugins = { path = "crates/plugins" }
+kerndns-kubernetes = { path = "crates/kubernetes" }
+
+hickory-proto = { version = "0.26", features = ["dnssec-ring"] }
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+thiserror = "2"
+anyhow = "1"
+glob = "0.3"
+futures-util = "0.3"
+arc-swap = "1"
+socket2 = { version = "0.6", features = ["all"] }
+sha2 = "0.10"
+hmac = "0.12"
+sha1 = "0.10"
+md-5 = "0.10"
+prometheus = { version = "0.14", default-features = false, features = ["process", "protobuf"] }
+data-encoding = "2"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls-native-certs = "0.8"
+rustls-pki-types = { version = "1", features = ["std"] }
