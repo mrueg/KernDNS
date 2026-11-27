@@ -161,7 +161,7 @@ fn setup(
             registry,
         )?;
         let mut cfg = BlockConfig::new(keys);
-        for &name in order::DIRECTIVES {
+        for name in order::directives() {
             let tokens = block.tokens_for(name);
             if tokens.is_empty() {
                 continue;

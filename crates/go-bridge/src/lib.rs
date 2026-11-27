@@ -42,6 +42,7 @@ struct Api {
     init: unsafe extern "C" fn(WriteFn, NextFn, DoneFn),
     free: unsafe extern "C" fn(*mut c_char),
     list_plugins: unsafe extern "C" fn() -> *mut c_char,
+    directives: unsafe extern "C" fn() -> *mut c_char,
     setup: unsafe extern "C" fn(
         *const c_char,
         *const c_char,
@@ -85,11 +86,12 @@ pub struct Bridge {
     api: Api,
     _lib: Library,
     plugins: Vec<String>,
+    directives: Vec<String>,
 }
 
 static BRIDGE: OnceLock<Arc<Bridge>> = OnceLock::new();
 
-const VERSION: c_int = 1;
+const VERSION: c_int = 2;
 
 /// What a Go plugin reported for one request.
 enum Event {
@@ -180,6 +182,7 @@ impl Bridge {
             init: sym!(b"kb_init"),
             free: sym!(b"kb_free"),
             list_plugins: sym!(b"kb_list_plugins"),
+            directives: sym!(b"kb_directives"),
             setup: sym!(b"kb_setup"),
             startup: sym!(b"kb_startup"),
             shutdown: sym!(b"kb_shutdown"),
@@ -191,7 +194,7 @@ impl Bridge {
         };
         // SAFETY: plain calls into the bridge; returned strings are freed
         // with kb_free.
-        let plugins = unsafe {
+        let (plugins, directives) = unsafe {
             let v = (api.version)();
             if v != VERSION {
                 return Err(format!(
@@ -200,15 +203,18 @@ impl Bridge {
                 ));
             }
             (api.init)(on_write, on_next, on_done);
-            let p = (api.list_plugins)();
-            let s = CStr::from_ptr(p).to_string_lossy().into_owned();
-            (api.free)(p);
-            parse_string_list(&s)
+            let list = |p: *mut c_char| {
+                let s = CStr::from_ptr(p).to_string_lossy().into_owned();
+                (api.free)(p);
+                parse_string_list(&s)
+            };
+            (list((api.list_plugins)()), list((api.directives)()))
         };
         let b = Arc::new(Bridge {
             api,
             _lib: lib,
             plugins,
+            directives,
         });
         let _ = BRIDGE.set(b.clone());
         kerndns_core::metrics::set_extra_gatherer(gather);
@@ -222,7 +228,11 @@ impl Bridge {
 
     /// Register a factory for every Go directive that has no Rust port,
     /// and for those in `prefer` even if it has. Returns the names used.
+    ///
+    /// Directives the bridge's `dnsserver.Directives` adds (out-of-tree
+    /// plugins) join the execution order where that list puts them.
     pub fn register(self: &Arc<Self>, registry: &mut Registry, prefer: &[String]) -> Vec<&'static str> {
+        kerndns_core::order::add_directives(&self.directives);
         let mut used = Vec::new();
         for p in &self.plugins {
             if registry.get(p).is_some() && !prefer.contains(p) {
