@@ -74,7 +74,7 @@ func bytesPtr(b []byte) (*C.uint8_t, C.size_t) {
 }
 
 //export kb_version
-func kb_version() C.int { return 1 }
+func kb_version() C.int { return 2 }
 
 //export kb_init
 func kb_init(w C.kb_write_fn, n C.kb_next_fn, d C.kb_done_fn) {
@@ -96,6 +96,15 @@ func kb_list_plugins() *C.char {
 		}
 	}
 	b, _ := json.Marshal(out)
+	return cstr(string(b))
+}
+
+// kb_directives returns the bridge's directive order, dnsserver.Directives
+// (JSON), which out-of-tree plugins extend with their own directives.
+//
+//export kb_directives
+func kb_directives() *C.char {
+	b, _ := json.Marshal(dnsserver.Directives)
 	return cstr(string(b))
 }
 
@@ -326,12 +335,12 @@ type bridgeWriter struct {
 	remote, local net.Addr
 }
 
-func (w *bridgeWriter) LocalAddr() net.Addr      { return w.local }
-func (w *bridgeWriter) RemoteAddr() net.Addr     { return w.remote }
-func (w *bridgeWriter) Close() error             { return nil }
-func (w *bridgeWriter) TsigStatus() error        { return nil }
-func (w *bridgeWriter) TsigTimersOnly(bool)      {}
-func (w *bridgeWriter) Hijack()                  {}
+func (w *bridgeWriter) LocalAddr() net.Addr  { return w.local }
+func (w *bridgeWriter) RemoteAddr() net.Addr { return w.remote }
+func (w *bridgeWriter) Close() error         { return nil }
+func (w *bridgeWriter) TsigStatus() error    { return nil }
+func (w *bridgeWriter) TsigTimersOnly(bool)  {}
+func (w *bridgeWriter) Hijack()              {}
 func (w *bridgeWriter) Write(b []byte) (int, error) {
 	p, n := bytesPtr(b)
 	C.kb_call_write(C.uint64_t(w.token), p, n)
