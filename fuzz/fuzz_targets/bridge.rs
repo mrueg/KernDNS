@@ -15,7 +15,7 @@ use kerndns_core::proto::rr::{Name, RecordType};
 use kerndns_core::{CaptureWriter, Context, Next, Protocol, Request};
 use kerndns_corefile::tokenize;
 use kerndns_fuzz::{fixtures, registry, runtime};
-use kerndns_go_bridge::fuzz::{Callback, plugin_list, replay};
+use kerndns_go_bridge::fuzz::{Callback, caddy_lex, plugin_list, replay};
 use kerndns_go_bridge::render_tokens;
 use kerndns_server::config::{Options, load};
 use libfuzzer_sys::arbitrary::{self, Arbitrary};
@@ -97,9 +97,29 @@ fuzz_target!(|input: Input| {
 
     let _ = plugin_list(&input.plugin_list);
 
-    // render_tokens(tokens) is what Go's setup lexes again
+    // the Go side lexes render_tokens' output with caddy's lexer
     let tokens = tokenize(&input.corefile, "Corefile");
-    let again = tokenize(&render_tokens(&tokens), "Corefile");
-    let texts = |t: &[kerndns_corefile::Token]| t.iter().map(|t| t.text.clone()).collect::<Vec<_>>();
-    assert_eq!(texts(&tokens), texts(&again), "rendered: {:?}", render_tokens(&tokens));
+    if tokens.iter().all(|t| representable(&t.text)) {
+        let rendered = render_tokens(&tokens);
+        let texts: Vec<String> = tokens.iter().map(|t| t.text.clone()).collect();
+        assert_eq!(texts, caddy_lex(&rendered), "rendered: {rendered:?}");
+    }
 });
+
+/// Whether caddy's lexer can produce `text` at all: not if it needs quotes
+/// and has an odd run of backslashes before a quote or at its end.
+fn representable(text: &str) -> bool {
+    let needs_quotes = text.is_empty() || text.starts_with('"') || text.chars().any(|c| c.is_whitespace() || c == '#');
+    if !needs_quotes {
+        return true;
+    }
+    let mut run = 0;
+    for c in text.chars() {
+        match c {
+            '\\' => run += 1,
+            '"' if run % 2 == 1 => return false,
+            _ => run = 0,
+        }
+    }
+    run % 2 == 0
+}

@@ -332,7 +332,14 @@ fn parse_string_list(s: &str) -> Vec<String> {
 }
 
 /// Corefile text for the directive's tokens, line by line, quoting tokens
-/// the lexer would otherwise split.
+/// that caddy's lexer (on the Go side) would otherwise split or drop.
+///
+/// That lexer takes a token verbatim (backslashes included) unless it
+/// contains white space or `#` or starts with `"`. Inside quotes, `\"` is
+/// a quote and any other backslash pair stays as it is, so only quotes are
+/// escaped. (A token that needs quotes and has an odd run of backslashes
+/// before a quote or at its end can't be written for that lexer; it can't
+/// come from that lexer either.)
 pub fn render_tokens(tokens: &[kerndns_corefile::Token]) -> String {
     let mut out = String::new();
     let mut line = None;
@@ -343,19 +350,14 @@ pub fn render_tokens(tokens: &[kerndns_corefile::Token]) -> String {
             out.push(' ');
         }
         line = Some((t.file.clone(), t.line));
-        let plain = !t.text.is_empty()
-            && !t
-                .text
-                .chars()
-                .any(|c| c.is_whitespace() || matches!(c, '"' | '#' | '\\' | '`'))
-            || t.text == "{"
-            || t.text == "}";
+        let plain =
+            !t.text.is_empty() && !t.text.starts_with('"') && !t.text.chars().any(|c| c.is_whitespace() || c == '#');
         if plain {
             out.push_str(&t.text);
         } else {
             out.push('"');
             for c in t.text.chars() {
-                if c == '"' || c == '\\' {
+                if c == '"' {
                     out.push('\\');
                 }
                 out.push(c);
@@ -701,6 +703,66 @@ pub mod fuzz {
     pub fn plugin_list(s: &str) -> Vec<String> {
         parse_string_list(s)
     }
+
+    /// The token texts caddy's lexer (`github.com/coredns/caddy`
+    /// `caddyfile/lexer.go`, which the Go side uses on
+    /// [`render_tokens`]'s output) reads from `input`.
+    pub fn caddy_lex(input: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut it = input.chars();
+        loop {
+            let mut val = String::new();
+            let (mut comment, mut quoted, mut escaped) = (false, false, false);
+            let done = loop {
+                let Some(ch) = it.next() else {
+                    break !val.is_empty();
+                };
+                if quoted {
+                    if !escaped {
+                        if ch == '\\' {
+                            escaped = true;
+                            continue;
+                        } else if ch == '"' {
+                            break true;
+                        }
+                    }
+                    if escaped && ch != '"' {
+                        val.push('\\');
+                    }
+                    val.push(ch);
+                    escaped = false;
+                    continue;
+                }
+                if ch.is_whitespace() {
+                    if ch == '\r' {
+                        continue;
+                    }
+                    if ch == '\n' {
+                        comment = false;
+                    }
+                    if !val.is_empty() {
+                        break true;
+                    }
+                    continue;
+                }
+                if ch == '#' {
+                    comment = true;
+                }
+                if comment {
+                    continue;
+                }
+                if val.is_empty() && ch == '"' {
+                    quoted = true;
+                    continue;
+                }
+                val.push(ch);
+            };
+            if !done {
+                return out;
+            }
+            out.push(val);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -731,6 +793,38 @@ mod tests {
         assert_eq!(
             render_tokens(&t),
             "etcd skydns.local {\npath \"/sky dns\"\nendpoint http://localhost:2379\n}\n"
+        );
+    }
+
+    /// Found by `fuzz/` (bridge target): backslashes were escaped inside
+    /// quotes, but caddy's lexer keeps `\\` as two backslashes, so a Go
+    /// plugin got `a\\.b` for the regex `a\.b`.
+    #[test]
+    fn rendered_tokens_lex_back() {
+        let t = [
+            tok("rewrite", 1),
+            tok(r"a\.b", 1),
+            tok(r"with space\d", 1),
+            tok(r#"q"uote"#, 1),
+            tok(r#""lead"#, 1),
+            tok("has#hash", 1),
+            tok("", 1),
+            tok(r"\\", 2),
+        ];
+        let rendered = render_tokens(&t);
+        assert_eq!(
+            rendered,
+            "rewrite a\\.b \"with space\\d\" q\"uote \"\\\"lead\" \"has#hash\" \"\"\n\\\\\n"
+        );
+        let texts: Vec<String> = t.iter().map(|t| t.text.clone()).collect();
+        assert_eq!(fuzz::caddy_lex(&rendered), texts);
+    }
+
+    #[test]
+    fn caddy_lexer() {
+        assert_eq!(
+            fuzz::caddy_lex("a \"b c\" \"d\\\"e\" \"f\\g\" # x\nh\"i ``"),
+            vec!["a", "b c", "d\"e", "f\\g", "h\"i", "``"]
         );
     }
 
