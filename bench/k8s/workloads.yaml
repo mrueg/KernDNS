@@ -1,0 +1,172 @@
+# Test workloads for `cargo xtask k8s-difftest`: one of each kind of
+# Service the kubernetes plugin answers differently for.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testns
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: other
+---
+# a plain ClusterIP service with two named ports
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: testns
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: testns
+spec:
+  selector: {app: web}
+  ports:
+    - {name: http, port: 80, protocol: TCP}
+    - {name: dns, port: 53, protocol: UDP}
+---
+# headless with stable hostnames (StatefulSet)
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: testns
+spec:
+  clusterIP: None
+  selector: {app: db}
+  ports:
+    - {name: pg, port: 5432, protocol: TCP}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: testns
+spec:
+  serviceName: db
+  replicas: 2
+  selector:
+    matchLabels: {app: db}
+  template:
+    metadata:
+      labels: {app: db}
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+---
+# headless without hostnames
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdls
+  namespace: other
+spec:
+  clusterIP: None
+  selector: {app: hdls}
+  ports:
+    - {name: tcp-8080, port: 8080, protocol: TCP}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hdls
+  namespace: other
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: hdls}
+  template:
+    metadata:
+      labels: {app: hdls}
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+---
+# ExternalName
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext
+  namespace: testns
+spec:
+  type: ExternalName
+  externalName: example.org
+---
+# no endpoints (selector matches nothing)
+apiVersion: v1
+kind: Service
+metadata:
+  name: empty
+  namespace: testns
+spec:
+  selector: {app: nothing}
+  ports:
+    - {port: 9000}
+---
+# selector-less service with a manual EndpointSlice (fixed addresses)
+apiVersion: v1
+kind: Service
+metadata:
+  name: manual
+  namespace: other
+spec:
+  clusterIP: None
+  ports:
+    - {name: https, port: 443, protocol: TCP}
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: manual-1
+  namespace: other
+  labels:
+    kubernetes.io/service-name: manual
+addressType: IPv4
+ports:
+  - {name: https, port: 443, protocol: TCP}
+endpoints:
+  - addresses: ["192.0.2.10"]
+    hostname: alpha
+  - addresses: ["192.0.2.11"]
+  - addresses: ["192.0.2.12"]
+    conditions: {ready: false}
+---
+# a port without a name
+apiVersion: v1
+kind: Service
+metadata:
+  name: noname
+  namespace: other
+spec:
+  selector: {app: hdls}
+  ports:
+    - {port: 8080}
+---
+# external IPs (for k8s_external)
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb
+  namespace: testns
+spec:
+  selector: {app: web}
+  externalIPs: ["203.0.113.10", "203.0.113.11"]
+  ports:
+    - {name: http, port: 80, protocol: TCP}
+    - {name: https, port: 443, protocol: TCP}

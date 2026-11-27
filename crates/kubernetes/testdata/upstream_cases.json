@@ -1,0 +1,1907 @@
+{
+ "services": {
+  "external-to-service.testns": [
+   {
+    "Version": "",
+    "Name": "external-to-service",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": null,
+    "Type": "ExternalName",
+    "ExternalName": "svc1.testns.svc.cluster.local.",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "external.testns": [
+   {
+    "Version": "",
+    "Name": "external",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": null,
+    "Type": "ExternalName",
+    "ExternalName": "ext.interwebs.test",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "hdls1.testns": [
+   {
+    "Version": "",
+    "Name": "hdls1",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": [
+     "None"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": null,
+    "ExternalIPs": null
+   }
+  ],
+  "hdlsprtls.testns": [
+   {
+    "Version": "",
+    "Name": "hdlsprtls",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": [
+     "None"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": null,
+    "ExternalIPs": null
+   }
+  ],
+  "kubedns.kube-system": [
+   {
+    "Version": "",
+    "Name": "kubedns",
+    "Namespace": "kube-system",
+    "Index": "",
+    "ClusterIPs": [
+     "10.0.0.10"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": [
+     {
+      "name": "dns",
+      "protocol": "udp",
+      "port": 53,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "svc-dual-stack.testns": [
+   {
+    "Version": "",
+    "Name": "svc-dual-stack",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": [
+     "10.0.0.3",
+     "10::3"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "svc1.testns": [
+   {
+    "Version": "",
+    "Name": "svc1",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": [
+     "10.0.0.1"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "svc1.unexposedns": [
+   {
+    "Version": "",
+    "Name": "svc1",
+    "Namespace": "unexposedns",
+    "Index": "",
+    "ClusterIPs": [
+     "10.0.0.2"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "svc6.testns": [
+   {
+    "Version": "",
+    "Name": "svc6",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": [
+     "1234:abcd::1"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ],
+  "svcempty.testns": [
+   {
+    "Version": "",
+    "Name": "svcempty",
+    "Namespace": "testns",
+    "Index": "",
+    "ClusterIPs": [
+     "10.0.0.1"
+    ],
+    "Type": "ClusterIP",
+    "ExternalName": "",
+    "Ports": [
+     {
+      "name": "http",
+      "protocol": "tcp",
+      "port": 80,
+      "targetPort": 0
+     }
+    ],
+    "ExternalIPs": null
+   }
+  ]
+ },
+ "endpoints": {
+  "hdls1.testns": [
+   {
+    "Version": "",
+    "Name": "hdls1-slice1",
+    "Namespace": "testns",
+    "Index": "hdls1.testns",
+    "IndexIP": null,
+    "Subsets": [
+     {
+      "Addresses": [
+       {
+        "IP": "172.0.0.2",
+        "Hostname": "",
+        "NodeName": "",
+        "TargetRefName": ""
+       },
+       {
+        "IP": "172.0.0.3",
+        "Hostname": "",
+        "NodeName": "",
+        "TargetRefName": ""
+       },
+       {
+        "IP": "172.0.0.4",
+        "Hostname": "dup-name",
+        "NodeName": "",
+        "TargetRefName": ""
+       },
+       {
+        "IP": "172.0.0.5",
+        "Hostname": "dup-name",
+        "NodeName": "",
+        "TargetRefName": ""
+       },
+       {
+        "IP": "5678:abcd::1",
+        "Hostname": "",
+        "NodeName": "",
+        "TargetRefName": ""
+       },
+       {
+        "IP": "5678:abcd::2",
+        "Hostname": "",
+        "NodeName": "",
+        "TargetRefName": ""
+       }
+      ],
+      "Ports": [
+       {
+        "Port": 80,
+        "Name": "http",
+        "Protocol": "tcp"
+       }
+      ]
+     }
+    ],
+    "Zones": null
+   }
+  ],
+  "hdlsprtls.testns": [
+   {
+    "Version": "",
+    "Name": "hdlsprtls-slice1",
+    "Namespace": "testns",
+    "Index": "hdlsprtls.testns",
+    "IndexIP": null,
+    "Subsets": [
+     {
+      "Addresses": [
+       {
+        "IP": "172.0.0.20",
+        "Hostname": "",
+        "NodeName": "",
+        "TargetRefName": ""
+       }
+      ],
+      "Ports": [
+       {
+        "Port": -1,
+        "Name": "",
+        "Protocol": ""
+       }
+      ]
+     }
+    ],
+    "Zones": null
+   }
+  ],
+  "kubedns.kube-system": [
+   {
+    "Version": "",
+    "Name": "kubedns",
+    "Namespace": "kube-system",
+    "Index": "kubedns.kube-system",
+    "IndexIP": null,
+    "Subsets": [
+     {
+      "Addresses": [
+       {
+        "IP": "172.0.0.100",
+        "Hostname": "",
+        "NodeName": "",
+        "TargetRefName": ""
+       }
+      ],
+      "Ports": [
+       {
+        "Port": 53,
+        "Name": "dns",
+        "Protocol": "udp"
+       }
+      ]
+     }
+    ],
+    "Zones": null
+   }
+  ],
+  "svc1.testns": [
+   {
+    "Version": "",
+    "Name": "svc1-slice1",
+    "Namespace": "testns",
+    "Index": "svc1.testns",
+    "IndexIP": null,
+    "Subsets": [
+     {
+      "Addresses": [
+       {
+        "IP": "172.0.0.1",
+        "Hostname": "ep1a",
+        "NodeName": "",
+        "TargetRefName": ""
+       }
+      ],
+      "Ports": [
+       {
+        "Port": 80,
+        "Name": "http",
+        "Protocol": "tcp"
+       }
+      ]
+     }
+    ],
+    "Zones": null
+   }
+  ],
+  "svcempty.testns": [
+   {
+    "Version": "",
+    "Name": "svcempty-slice1",
+    "Namespace": "testns",
+    "Index": "svcempty.testns",
+    "IndexIP": null,
+    "Subsets": [
+     {
+      "Addresses": null,
+      "Ports": [
+       {
+        "Port": 80,
+        "Name": "http",
+        "Protocol": "tcp"
+       }
+      ]
+     }
+    ],
+    "Zones": null
+   }
+  ]
+ },
+ "pods": [
+  {
+   "Version": "",
+   "PodIPs": [
+    "10.240.0.1"
+   ],
+   "Name": "foo",
+   "Namespace": "podns",
+   "Labels": {
+    "app.kubernetes.io/name": "foo",
+    "bar": "baz"
+   }
+  }
+ ],
+ "missing_namespaces": [
+  "pod-nons",
+  "nsnoexist"
+ ],
+ "suites": [
+  {
+   "name": "serve",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": [
+    "testns"
+   ],
+   "pod_mode": "disabled",
+   "ignore_empty_service": false,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "svc1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "047376633106746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svcempty.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "08737663656d70747906746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc1.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "047376633106746573746e730373766307636c7573746572056c6f63616c0000210001000000050025000000640050047376633106746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "047376633106746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svcempty.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "08737663656d70747906746573746e730373766307636c7573746572056c6f63616c000021000100000005002900000064005008737663656d70747906746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "08737663656d70747906746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc6.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "047376633606746573746e730373766307636c7573746572056c6f63616c0000210001000000050025000000640050047376633606746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "047376633606746573746e730373766307636c7573746572056c6f63616c00001c00010000000500101234abcd000000000000000000000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "_http._tcp.svc1.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "055f68747470045f746370047376633106746573746e730373766307636c7573746572056c6f63616c0000210001000000050025000000640050047376633106746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "047376633106746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "_http._tcp.svcempty.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "055f68747470045f74637008737663656d70747906746573746e730373766307636c7573746572056c6f63616c000021000100000005002900000064005008737663656d70747906746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "08737663656d70747906746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "hdls1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000002",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000003",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000004",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000005"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "hdlsprtls.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0968646c737072746c7306746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000014"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc1.testns.svc.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc0.testns.svc.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc0.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc0.svc-nons.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "dns-version.cluster.local.",
+     "qtype": 16,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0b646e732d76657273696f6e07636c7573746572056c6f63616c000010000100007080000605312e312e30"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc1.testns.svc.cluster.local.",
+     "qtype": 16,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc0.svc-nons.svc.cluster.local.",
+     "qtype": 16,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "bogusendpoint.hdls1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "bogusendpoint.svc0.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc6.testns.svc.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "047376633606746573746e730373766307636c7573746572056c6f63616c00001c00010000000500101234abcd000000000000000000000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "_http._tcp.svc6.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "055f68747470045f746370047376633606746573746e730373766307636c7573746572056c6f63616c0000210001000000050025000000640050047376633606746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "047376633606746573746e730373766307636c7573746572056c6f63616c00001c00010000000500101234abcd000000000000000000000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "hdls1.testns.svc.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c00001c00010000000500105678abcd000000000000000000000001",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c00001c00010000000500105678abcd000000000000000000000002"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc.cluster.local.",
+     "qtype": 2,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "testns.svc.cluster.local.",
+     "qtype": 2,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "foo.cluster.local.",
+     "qtype": 2,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "foo.svc.cluster.local.",
+     "qtype": 2,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc-dual-stack.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0e7376632d6475616c2d737461636b06746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000003"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc-dual-stack.testns.svc.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0e7376632d6475616c2d737461636b06746573746e730373766307636c7573746572056c6f63616c00001c000100000005001000100000000000000000000000000003"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc-dual-stack.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0e7376632d6475616c2d737461636b06746573746e730373766307636c7573746572056c6f63616c000021000100000005002f0000003200500e7376632d6475616c2d737461636b06746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "0e7376632d6475616c2d737461636b06746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000003",
+       "0e7376632d6475616c2d737461636b06746573746e730373766307636c7573746572056c6f63616c00001c000100000005001000100000000000000000000000000003"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc1.testns.svc.cluster.local.",
+     "qtype": 6,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "endpoint.external.testns.svc.cluster.local.",
+     "qtype": 5,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "subdomain.subdomain.external.testns.svc.cluster.local.",
+     "qtype": 5,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "_http._tcp.hdls1.testns.svc.cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "055f68747470045f7463700568646c733106746573746e730373766307636c7573746572056c6f63616c0000210001000000050030000000100050093137322d302d302d320568646c733106746573746e730373766307636c7573746572056c6f63616c00",
+       "055f68747470045f7463700568646c733106746573746e730373766307636c7573746572056c6f63616c0000210001000000050030000000100050093137322d302d302d330568646c733106746573746e730373766307636c7573746572056c6f63616c00",
+       "055f68747470045f7463700568646c733106746573746e730373766307636c7573746572056c6f63616c000021000100000005002f000000100050086475702d6e616d650568646c733106746573746e730373766307636c7573746572056c6f63616c00",
+       "055f68747470045f7463700568646c733106746573746e730373766307636c7573746572056c6f63616c00002100010000000500330000001000500c353637382d616263642d2d310568646c733106746573746e730373766307636c7573746572056c6f63616c00",
+       "055f68747470045f7463700568646c733106746573746e730373766307636c7573746572056c6f63616c00002100010000000500330000001000500c353637382d616263642d2d320568646c733106746573746e730373766307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "093137322d302d302d320568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000002",
+       "093137322d302d302d330568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000003",
+       "086475702d6e616d650568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000004",
+       "086475702d6e616d650568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000005",
+       "0c353637382d616263642d2d310568646c733106746573746e730373766307636c7573746572056c6f63616c00001c00010000000500105678abcd000000000000000000000001",
+       "0c353637382d616263642d2d320568646c733106746573746e730373766307636c7573746572056c6f63616c00001c00010000000500105678abcd000000000000000000000002"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "hdls1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000002",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000003",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000004",
+       "0568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000005"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "5678-abcd--2.hdls1.testns.svc.cluster.local",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0c353637382d616263642d2d320568646c733106746573746e730373766307636c7573746572056c6f63616c00001c00010000000500105678abcd000000000000000000000002"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "5678-abcd--1.hdls1.testns.svc.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0c353637382d616263642d2d310568646c733106746573746e730373766307636c7573746572056c6f63616c00001c00010000000500105678abcd000000000000000000000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "172-0-0-20.hdlsprtls.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0a3137322d302d302d32300968646c737072746c7306746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000014"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "172-0-0-2.hdls1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "093137322d302d302d320568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000002"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "172-0-0-3.hdls1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "093137322d302d302d330568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000003"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "dup-name.hdls1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "086475702d6e616d650568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000004",
+       "086475702d6e616d650568646c733106746573746e730373766307636c7573746572056c6f63616c0000010001000000050004ac000005"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "external.testns.svc.cluster.local.",
+     "qtype": 5,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0865787465726e616c06746573746e730373766307636c7573746572056c6f63616c00000500010000000500140365787409696e74657277656273047465737400"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "external.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [
+      {
+       "name": "ext.interwebs.test.",
+       "qtype": 1,
+       "response": {
+        "rcode": 0,
+        "aa": false,
+        "tc": true,
+        "answer": [
+         "0365787409696e746572776562730474657374000001000100000005000401020304"
+        ],
+        "ns": [],
+        "extra": []
+       }
+      }
+     ],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": true,
+      "answer": [
+       "0865787465726e616c06746573746e730373766307636c7573746572056c6f63616c00000500010000000500140365787409696e74657277656273047465737400",
+       "0365787409696e746572776562730474657374000001000100000005000401020304"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "external-to-service.testns.svc.cluster.local",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "1365787465726e616c2d746f2d7365727669636506746573746e730373766307636c7573746572056c6f63616c000005000100000005001f047376633106746573746e730373766307636c7573746572056c6f63616c00",
+       "047376633106746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "namespaces",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "disabled",
+   "ignore_empty_service": false,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "svc1.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "047376633106746573746e730373766307636c7573746572056c6f63616c00000100010000000500040a000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svc1.nsnoexist.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "not_synced",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": [
+    "testns"
+   ],
+   "pod_mode": "disabled",
+   "ignore_empty_service": false,
+   "not_synced": true,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "svc0.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 2,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "pods_disabled",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "disabled",
+   "ignore_empty_service": false,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "10-240-0-1.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "172-0-0-2.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "pods_insecure",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "insecure",
+   "ignore_empty_service": false,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "10-240-0-1.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0a31302d3234302d302d3105706f646e7303706f6407636c7573746572056c6f63616c00000100010000000500040af00001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "172-0-0-2.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "093137322d302d302d3205706f646e7303706f6407636c7573746572056c6f63616c0000010001000000050004ac000002"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "blah.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "blah.podns.pod.cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "blah.podns.pod.cluster.local.",
+     "qtype": 13,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "blah.pod-nons.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "pods_verified",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "verified",
+   "ignore_empty_service": false,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "10-240-0-1.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0a31302d3234302d302d3105706f646e7303706f6407636c7573746572056c6f63616c00000100010000000500040af00001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "svcns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "pod-nons.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "172-0-0-2.podns.pod.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "ignore_empty_service",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "disabled",
+   "ignore_empty_service": true,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "svcempty.testns.svc.cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "external.testns.svc.cluster.local.",
+     "qtype": 5,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "0865787465726e616c06746573746e730373766307636c7573746572056c6f63616c00000500010000000500140365787409696e74657277656273047465737400"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "apex",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "disabled",
+   "ignore_empty_service": false,
+   "not_synced": false,
+   "local_ips": [
+    "127.0.0.1"
+   ],
+   "cases": [
+    {
+     "qname": "cluster.local.",
+     "qtype": 6,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "cluster.local.",
+     "qtype": 13,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "cluster.local.",
+     "qtype": 2,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "07636c7573746572056c6f63616c0000020001000000050016026e7303646e7307636c7573746572056c6f63616c00"
+      ],
+      "ns": [],
+      "extra": [
+       "026e7303646e7307636c7573746572056c6f63616c00000100010000000500047f000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "cluster.local.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "cluster.local.",
+     "qtype": 28,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "cluster.local.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07636c7573746572056c6f63616c0000060001000000050044026e7303646e7307636c7573746572056c6f63616c000a686f73746d617374657207636c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  },
+  {
+   "name": "preserve_case",
+   "zones": [
+    "cluster.local."
+   ],
+   "namespaces": null,
+   "pod_mode": "disabled",
+   "ignore_empty_service": true,
+   "not_synced": false,
+   "local_ips": null,
+   "cases": [
+    {
+     "qname": "not-a-service.testns.svc.ClUsTeR.lOcAl.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 3,
+      "aa": true,
+      "tc": false,
+      "answer": [],
+      "ns": [
+       "07436c5573546552056c4f63416c0000060001000000050044026e7303646e7307436c5573546552056c4f63416c000a686f73746d617374657207436c5573546552056c4f63416c000000000300001c20000007080001518000000005"
+      ],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "SvC1.TeStNs.SvC.cLuStEr.LoCaL.",
+     "qtype": 1,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "045376433106546553744e730353764307634c7553744572054c6f43614c00000100010000000500040a000001"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "_HtTp._TcP.sVc1.TeStNs.SvC.cLuStEr.LoCaL.",
+     "qtype": 33,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "055f48745470045f546350047356633106546553744e730353764307634c7553744572054c6f43614c0000210001000000050025000000640050047376633106746573746e730373766307634c7553744572054c6f43614c00"
+      ],
+      "ns": [],
+      "extra": [
+       "047376633106746573746e730373766307634c7553744572054c6f43614c00000100010000000500040a000001"
+      ]
+     },
+     "return_code": 0,
+     "error": ""
+    },
+    {
+     "qname": "Cluster.local.",
+     "qtype": 6,
+     "do": false,
+     "upstream": [],
+     "response": {
+      "rcode": 0,
+      "aa": true,
+      "tc": false,
+      "answer": [
+       "07436c7573746572056c6f63616c0000060001000000050044026e7303646e7307436c7573746572056c6f63616c000a686f73746d617374657207436c7573746572056c6f63616c000000000300001c20000007080001518000000005"
+      ],
+      "ns": [],
+      "extra": []
+     },
+     "return_code": 0,
+     "error": ""
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,482 @@
+//! `k8s_external`: answers for Services' external IPs (LoadBalancer
+//! ingress and `externalIPs`) in an external zone, using the `kubernetes`
+//! plugin's API cache. A port of `plugin/k8s_external` and
+//! `plugin/kubernetes/external.go`.
+//!
+//! ```text
+//! k8s_external [ZONE...] {
+//!     apex APEX
+//!     ttl TTL
+//!     headless
+//!     fallthrough [ZONES...]
+//! }
+//! ```
+//!
+//! Zone transfers (AXFR) need `transfer`, which isn't ported yet.
+
+use std::collections::HashSet;
+use std::sync::{Arc, OnceLock};
+
+use kerndns_core::proto::op::ResponseCode;
+use kerndns_core::proto::rr::rdata::{A, AAAA, NS, SOA};
+use kerndns_core::proto::rr::{DNSClass, Name, RData, Record, RecordType};
+use kerndns_core::zones::{self, Fall, extract_address_from_reverse, is_subdomain};
+use kerndns_core::{
+    BlockConfig, Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request,
+    ResponseWriter, SetupError, async_trait, next_or_failure,
+};
+use kerndns_plugins::backend::{self, HostType, Service, ServiceBackend, State};
+
+use crate::parse::trim_zone;
+use crate::{Kubernetes, endpoint_hostname};
+
+/// The block's `kubernetes` instance, filled in when `kubernetes` is set up.
+#[derive(Clone, Default)]
+pub struct KubernetesSlot(Arc<OnceLock<Arc<Kubernetes>>>);
+
+impl KubernetesSlot {
+    pub fn set(&self, k: Arc<Kubernetes>) {
+        let _ = self.0.set(k);
+    }
+
+    pub fn get(&self) -> Option<&Arc<Kubernetes>> {
+        self.0.get()
+    }
+}
+
+/// The slot of this server block (created on first use).
+pub fn slot(cfg: &mut BlockConfig) -> KubernetesSlot {
+    if cfg.extensions.get::<KubernetesSlot>().is_none() {
+        cfg.extensions.insert(KubernetesSlot::default());
+    }
+    cfg.extensions.get::<KubernetesSlot>().cloned().expect("inserted above")
+}
+
+fn strip_underscore(s: &str) -> &str {
+    s.strip_prefix('_').unwrap_or(s)
+}
+
+impl Kubernetes {
+    /// `External`: services for a name in the external zone.
+    pub fn external(&self, st: &State, headless: bool) -> (Vec<Service>, ResponseCode) {
+        if st.qtype() == RecordType::PTR
+            && let Some(ip) = extract_address_from_reverse(st.name_ref())
+        {
+            let svcs = self.external_reverse(&ip.to_string());
+            return if svcs.is_empty() {
+                (svcs, ResponseCode::NXDomain)
+            } else {
+                (svcs, ResponseCode::NoError)
+            };
+        }
+        let base = trim_zone(st.name_ref(), &st.zone).unwrap_or_default();
+        let segs: Vec<&str> = base.split('.').filter(|s| !s.is_empty()).collect();
+        let Some(mut last) = segs.len().checked_sub(1) else {
+            return (Vec::new(), ResponseCode::ServFail);
+        };
+        let namespace = segs[last];
+        if !self.namespace_exposed(namespace) {
+            return (Vec::new(), ResponseCode::NXDomain);
+        }
+        let Some(l) = last.checked_sub(1) else {
+            return (Vec::new(), ResponseCode::NoError);
+        };
+        last = l;
+        let service = segs[last];
+        let (mut port, mut protocol, mut endpoint) = ("", "", "");
+        let rest = last; // labels left before the service
+        match rest {
+            0 => {}
+            1 => endpoint = strip_underscore(segs[0]),
+            2 => {
+                protocol = strip_underscore(segs[1]);
+                port = strip_underscore(segs[0]);
+            }
+            _ => return (Vec::new(), ResponseCode::NXDomain),
+        }
+        let Some(api) = self.api() else {
+            return (Vec::new(), ResponseCode::NXDomain);
+        };
+        let idx = crate::object::Service::key(service, namespace);
+        let zone_path = backend::path(&st.zone, "c");
+        let mut rcode = ResponseCode::NXDomain;
+        let mut services = Vec::new();
+        let mut endpoints = None;
+        let pp = |a_port: &str, b_port: &str, a_proto: &str, b_proto: &str| {
+            (a_port.is_empty() || a_port.eq_ignore_ascii_case(b_port))
+                && (a_proto.is_empty() || a_proto.eq_ignore_ascii_case(b_proto))
+        };
+        for svc in api.svc_index(&idx) {
+            if svc.namespace != namespace || svc.name != service {
+                continue;
+            }
+            if headless && svc.external_ips.is_empty() && (svc.headless() || !endpoint.is_empty()) {
+                let eps = endpoints.get_or_insert_with(|| api.ep_index(&idx));
+                for ep in eps.iter() {
+                    if crate::object::Service::key(&svc.name, &svc.namespace) != ep.index {
+                        continue;
+                    }
+                    for sub in &ep.subsets {
+                        for addr in &sub.addresses {
+                            let host = endpoint_hostname(addr, self.endpoint_name_mode);
+                            if !endpoint.is_empty() && !endpoint.eq_ignore_ascii_case(&host) {
+                                continue;
+                            }
+                            for p in &sub.ports {
+                                if !pp(port, &p.name, protocol, &p.protocol) {
+                                    continue;
+                                }
+                                rcode = ResponseCode::NoError;
+                                services.push(Service {
+                                    host: addr.ip.clone(),
+                                    port: p.port,
+                                    ttl: self.ttl,
+                                    key: format!("{zone_path}/{}/{}/{host}", svc.namespace, svc.name),
+                                    ..Default::default()
+                                });
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            for ip in &svc.external_ips {
+                for p in &svc.ports {
+                    if !pp(port, &p.name, protocol, &p.protocol) {
+                        continue;
+                    }
+                    rcode = ResponseCode::NoError;
+                    services.push(Service {
+                        host: ip.clone(),
+                        port: p.port,
+                        ttl: self.ttl,
+                        key: format!("{zone_path}/{}/{}", svc.namespace, svc.name),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+        if st.qtype() == RecordType::PTR {
+            return (Vec::new(), rcode);
+        }
+        (services, rcode)
+    }
+
+    fn external_reverse(&self, ip: &str) -> Vec<Service> {
+        let Some(api) = self.api() else { return Vec::new() };
+        api.svc_ext_index_reverse(ip)
+            .iter()
+            .filter(|s| self.namespaces.is_empty() || self.namespace_exposed(&s.namespace))
+            .map(|s| Service {
+                host: format!("{}.{}", s.name, s.namespace),
+                ttl: self.ttl,
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    fn external_serial(&self) -> u32 {
+        self.api().map(|a| a.modified() as u32).unwrap_or(0)
+    }
+}
+
+pub struct Setup;
+
+struct Config {
+    zones: Vec<String>,
+    fall: Fall,
+    apex: String,
+    ttl: u32,
+    headless: bool,
+}
+
+impl PluginFactory for Setup {
+    fn name(&self) -> &'static str {
+        "k8s_external"
+    }
+
+    fn setup(&self, c: &mut Controller<'_>) -> Result<(), SetupError> {
+        let mut cfg = Config {
+            zones: Vec::new(),
+            fall: Fall::default(),
+            apex: "dns".into(),
+            ttl: 5,
+            headless: false,
+        };
+        let keys = c.server_block_keys();
+        while c.next() {
+            let args = c.remaining_args();
+            cfg.zones = zones::origins_from_args_or_server_block(&args, &keys);
+            while c.next_block() {
+                let opt = c.val().to_string();
+                let a = c.remaining_args();
+                match opt.as_str() {
+                    "ttl" => {
+                        let Some(t) = a.first() else { return Err(c.arg_err()) };
+                        let t: i64 = t.parse().map_err(|e| SetupError::new("k8s_external", format!("{e}")))?;
+                        if !(0..=3600).contains(&t) {
+                            return Err(c.errf(format!("ttl must be in range [0, 3600]: {t}")));
+                        }
+                        cfg.ttl = t as u32;
+                    }
+                    "apex" => {
+                        let Some(x) = a.first() else { return Err(c.arg_err()) };
+                        cfg.apex = x.clone();
+                    }
+                    "headless" => cfg.headless = true,
+                    "fallthrough" => cfg.fall.set_zones_from_args(&a),
+                    other => {
+                        let msg = format!("unknown property '{other}'");
+                        return Err(c.errf(msg));
+                    }
+                }
+            }
+        }
+        let k = slot(c.config);
+        let k2 = k.clone();
+        c.on_startup(move || {
+            if k2.get().is_none() {
+                return Err("kubernetes plugin not loaded".into());
+            }
+            Ok(())
+        });
+        let cfg = Arc::new(cfg);
+        c.add_plugin(move |next| {
+            Arc::new(External {
+                cfg: cfg.clone(),
+                k: k.clone(),
+                next,
+            })
+        });
+        Ok(())
+    }
+}
+
+pub struct External {
+    cfg: Arc<Config>,
+    k: KubernetesSlot,
+    next: Next,
+}
+
+fn rr(owner: &str, ttl: u32, data: RData) -> Record {
+    let mut r = Record::from_rdata(Name::from_ascii(owner).unwrap_or_else(|_| Name::root()), ttl, data);
+    r.dns_class = DNSClass::IN;
+    r
+}
+
+impl External {
+    fn soa(&self, k: &Kubernetes, zone: &str) -> Record {
+        let c = &self.cfg;
+        let soa = SOA::new(
+            Name::from_ascii(backend::join(&["ns1", &c.apex, zone])).unwrap_or_default(),
+            Name::from_ascii(backend::join(&["hostmaster", &c.apex, zone])).unwrap_or_default(),
+            k.external_serial(),
+            7200,
+            1800,
+            86400,
+            c.ttl,
+        );
+        rr(zone, c.ttl, RData::SOA(soa))
+    }
+
+    fn addresses(&self, k: &Kubernetes, zone: &str, owner: &str) -> Vec<Record> {
+        k.ns_addrs_ext(true, self.cfg.headless, zone)
+            .into_iter()
+            .map(|(_, ip)| match ip {
+                std::net::IpAddr::V4(v4) => rr(owner, self.cfg.ttl, RData::A(A(v4))),
+                std::net::IpAddr::V6(v6) => rr(owner, self.cfg.ttl, RData::AAAA(AAAA(v6))),
+            })
+            .collect()
+    }
+}
+
+#[async_trait]
+#[allow(clippy::collapsible_match)] // dedup inserts read better outside the match guard
+impl Handler for External {
+    fn name(&self) -> &'static str {
+        "k8s_external"
+    }
+
+    async fn serve_dns(&self, ctx: &mut Context, w: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
+        let name = req.name();
+        let Some(zone) = zones::matches(&self.cfg.zones, &name).map(str::to_string) else {
+            return next_or_failure("k8s_external", &self.next, ctx, w, req).await;
+        };
+        let Some(k) = self.k.get().cloned() else {
+            return Err(PluginError::servfail("k8s_external", "kubernetes plugin not loaded"));
+        };
+        let st = State::new(req.clone(), zone.clone());
+        let qname = st.qname();
+        let c = &self.cfg;
+        let mut m = req.reply();
+        m.metadata.authoritative = true;
+
+        // the apex and the "dns" sub-apex
+        for z in &c.zones {
+            if name == *z {
+                match req.qtype() {
+                    RecordType::SOA => m.answers = vec![self.soa(&k, &zone)],
+                    RecordType::NS => {
+                        let ns_name = backend::join(&["ns1", &c.apex, &zone]);
+                        m.answers = vec![rr(
+                            &zone,
+                            c.ttl,
+                            RData::NS(NS(Name::from_ascii(&ns_name).unwrap_or_default())),
+                        )];
+                        m.additionals = self.addresses(&k, &zone, &backend::join(&["ns1", &c.apex, &qname]));
+                    }
+                    _ => m.authorities = vec![self.soa(&k, &zone)],
+                }
+                return write(w, m).await;
+            }
+            if is_subdomain(&format!("{}.{z}", c.apex), &name) {
+                let base = trim_zone(&name, &zone).unwrap_or_default();
+                let labels: Vec<&str> = base.split('.').filter(|l| !l.is_empty()).collect();
+                match labels.len() {
+                    2 if labels[0] == "ns1" => {
+                        m.answers = self
+                            .addresses(&k, &zone, &qname)
+                            .into_iter()
+                            .filter(|r| r.record_type() == req.qtype())
+                            .collect();
+                        if m.answers.is_empty() {
+                            m.authorities = vec![self.soa(&k, &zone)];
+                        }
+                    }
+                    1 => m.authorities = vec![self.soa(&k, &zone)],
+                    _ => {
+                        m.metadata.response_code = ResponseCode::NXDomain;
+                        m.authorities = vec![self.soa(&k, &zone)];
+                    }
+                }
+                return write(w, m).await;
+            }
+        }
+
+        let (svc, rcode) = k.external(&st, c.headless);
+        if svc.is_empty() {
+            if c.fall.through(&name) && rcode == ResponseCode::NXDomain {
+                return next_or_failure("k8s_external", &self.next, ctx, w, req).await;
+            }
+            m.metadata.response_code = rcode;
+            m.authorities = vec![self.soa(&k, &zone)];
+            return write(w, m).await;
+        }
+        let b: &dyn ServiceBackend = &*k;
+        match req.qtype() {
+            RecordType::A | RecordType::AAAA => {
+                let v6 = req.qtype() == RecordType::AAAA;
+                let mut dup = HashSet::new();
+                for s in &svc {
+                    match s.host_type() {
+                        HostType::Cname => {
+                            m.answers.push(s.new_cname(&qname, &s.host));
+                            let target = format!("{}.", s.host.trim_end_matches('.'));
+                            if let Some(resp) = b.lookup(ctx, &st, &target, req.qtype()).await {
+                                m.metadata.truncation |= resp.metadata.truncation;
+                                m.answers.extend(resp.answers);
+                            }
+                        }
+                        HostType::A(ip) if !v6 => {
+                            if dup.insert(s.host.clone()) {
+                                m.answers.push(rr(&qname, c.ttl, RData::A(A(ip))));
+                            }
+                        }
+                        HostType::Aaaa(ip) if v6 => {
+                            if dup.insert(s.host.clone()) {
+                                m.answers.push(rr(&qname, c.ttl, RData::AAAA(AAAA(ip))));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            RecordType::SRV => {
+                let (records, extra) = srv(b, ctx, &st, &svc, c.ttl).await;
+                m.answers = records;
+                m.additionals = extra;
+            }
+            RecordType::PTR => {
+                let mut dup = HashSet::new();
+                for s in &svc {
+                    if dup.insert(s.host.clone()) {
+                        let mut r = s.new_ptr(&qname, &backend::join(&[&s.host, &c.zones[0]]));
+                        r.ttl = c.ttl;
+                        m.answers.push(r);
+                    }
+                }
+            }
+            _ => m.authorities = vec![self.soa(&k, &zone)],
+        }
+        if m.answers.is_empty() {
+            m.authorities = vec![self.soa(&k, &zone)];
+        }
+        write(w, m).await
+    }
+}
+
+/// SRV for external services, like `External.srv`.
+async fn srv(
+    b: &dyn ServiceBackend,
+    ctx: &Context,
+    st: &State,
+    services: &[Service],
+    ttl: u32,
+) -> (Vec<Record>, Vec<Record>) {
+    let mut w: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    for s in services {
+        *w.entry(s.priority).or_insert(0) += if s.weight != 0 { s.weight } else { 100 };
+    }
+    let (mut records, mut extra) = (Vec::new(), Vec::new());
+    let mut dup: HashSet<(String, u16, String)> = HashSet::new();
+    let qname = st.qname();
+    for s in services {
+        if s.port == -1 {
+            continue;
+        }
+        let mut w1 = 100.0 / w[&s.priority] as f64;
+        w1 *= if s.weight == 0 { 100.0 } else { s.weight as f64 };
+        let weight = (w1.floor() as u16).max(1);
+        match s.host_type() {
+            HostType::Cname => {
+                let addr = format!("{}.", s.host.trim_end_matches('.'));
+                let r = s.new_srv(&qname, weight);
+                if dup.insert((addr.clone(), s.port as u16, String::new())) {
+                    records.push(r);
+                }
+                if dup.insert((addr.clone(), 0, addr.clone())) {
+                    for t in [RecordType::A, RecordType::AAAA] {
+                        if let Some(resp) = b.lookup(ctx, st, &addr, t).await {
+                            extra.extend(resp.answers);
+                        }
+                    }
+                }
+            }
+            ht @ (HostType::A(_) | HostType::Aaaa(_)) => {
+                let mut s2 = s.clone();
+                s2.host = backend::domain(&s.key);
+                let r = s2.new_srv(&qname, weight);
+                let target = format!("{}.", s2.host.trim_end_matches('.'));
+                if dup.insert((target.clone(), s.port as u16, String::new())) {
+                    records.push(r);
+                }
+                if dup.insert((target.clone(), 0, s.host.clone())) {
+                    extra.push(match ht {
+                        HostType::A(ip) => rr(&target, ttl, RData::A(A(ip))),
+                        HostType::Aaaa(ip) => rr(&target, ttl, RData::AAAA(AAAA(ip))),
+                        _ => unreachable!(),
+                    });
+                }
+            }
+            HostType::Txt => {}
+        }
+    }
+    (records, extra)
+}
+
+async fn write(w: &mut dyn ResponseWriter, m: kerndns_core::proto::op::Message) -> HandlerResult {
+    w.write_msg(m)
+        .await
+        .map_err(|e| PluginError::servfail("k8s_external", e.to_string()))?;
+    Ok(ResponseCode::NoError)
+}
