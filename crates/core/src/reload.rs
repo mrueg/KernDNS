@@ -16,6 +16,12 @@ pub fn reset() {
     *INTERVAL.lock().unwrap() = None;
 }
 
+/// Put back a setting saved with [`interval`] (loading a new
+/// configuration failed).
+pub fn restore(interval: Option<Duration>) {
+    *INTERVAL.lock().unwrap() = interval;
+}
+
 pub fn interval() -> Option<Duration> {
     *INTERVAL.lock().unwrap()
 }

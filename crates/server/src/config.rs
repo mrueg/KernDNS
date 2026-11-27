@@ -95,16 +95,35 @@ pub struct Plan {
 }
 
 /// Parse a Corefile and run every plugin's setup.
+///
+/// Setup registers readiness checks and the `reload` interval globally; if
+/// it fails, those of the running configuration are put back, so a failed
+/// reload leaves `ready` and `reload` as they were.
 pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> Result<Plan, LoadError> {
     let blocks = parse(corefile, path)?;
+    let saved = (kerndns_core::readiness::save(), kerndns_core::reload::interval());
     kerndns_core::readiness::reset();
     kerndns_core::reload::reset();
+    let plan = setup(&blocks, path, registry, opts);
+    if plan.is_err() {
+        kerndns_core::readiness::restore(saved.0);
+        kerndns_core::reload::restore(saved.1);
+    }
+    plan
+}
+
+fn setup(
+    blocks: &[kerndns_core::corefile::ServerBlock],
+    path: &str,
+    registry: &Registry,
+    opts: &Options,
+) -> Result<Plan, LoadError> {
     let corefile_dir = Path::new(path).parent().map(Path::to_path_buf).unwrap_or_default();
     let mut hooks = Hooks::default();
     let mut seen: HashSet<ZoneAddr> = HashSet::new();
     let mut configs: Vec<BlockConfig> = Vec::new();
 
-    for block in &blocks {
+    for block in blocks {
         let mut keys = Vec::new();
         for key in &block.keys {
             let addrs = ZoneAddr::parse(key, &opts.dns_port)
