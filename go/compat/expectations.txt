@@ -39,16 +39,16 @@ skip  TestFileNameHyphen                              does not start a server th
 pass  TestFileUpstream
 pass  TestFileUpstreamAdditional
 pass  TestFileUpstreamError
-xfail TestGRPCConnectionLimit                         Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestGRPCTLSWithLimits                           Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestGRPCWithLimits                              Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestGrpc                                        Could not get CoreDNS serving instance: grpc://:0: the grpc:// transport is not supported by KernDNS yet
+pass  TestGRPCConnectionLimit
+pass  TestGRPCTLSWithLimits
+pass  TestGRPCWithLimits
+pass  TestGrpc
 pass  TestHTTPS
-xfail TestHTTPS3                                      Could not get CoreDNS serving instance: https3://:0: the https3:// transport is not supported by KernDNS yet
-xfail TestHTTPS3WithLimits                            Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'https3' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestHTTPSConnectionLimit                        Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'https' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestHTTPSMaxStreamsKeyOrder                     Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'https' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestHTTPSWithLimits                             Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'https' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestHTTPS3
+pass  TestHTTPS3WithLimits
+pass  TestHTTPSConnectionLimit
+pass  TestHTTPSMaxStreamsKeyOrder
+pass  TestHTTPSWithLimits
 pass  TestHostsInlineLookup
 skip  TestImportOrdering                              does not start a server through the test helpers
 skip  TestImportTesting                               does not start a server through the test helpers
@@ -83,10 +83,10 @@ pass  TestMultisocket_WhoAmI
 pass  TestNoPlugins
 pass  TestProxyThreeWay
 pass  TestProxyToChaosServer
-xfail TestQUIC                                        Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
-xfail TestQUICProtocolError                           Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
-xfail TestQUICReloadDoesNotPanic                      Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
-xfail TestQUICStreamLimits                            Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'quic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestQUIC
+pass  TestQUICProtocolError
+skip  TestQUICReloadDoesNotPanic                      second half calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestQUICStreamLimits
 skip  TestReadme                                      does not start a server through the test helpers
 skip  TestReload                                      second half calls caddy.Restart, which starts an in-process CoreDNS
 skip  TestReloadConcurrentRestartAndStop              calls caddy.Restart, which starts an in-process CoreDNS
