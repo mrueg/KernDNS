@@ -2,7 +2,9 @@
 //! pass through it. Port of `plugin/metrics`.
 //!
 //! ```text
-//! prometheus [ADDRESS]
+//! prometheus [ADDRESS] {
+//!     runtime_metrics
+//! }
 //! ```
 
 use std::collections::HashMap;
@@ -50,9 +52,24 @@ impl PluginFactory for Setup {
                 }
                 _ => return Err(c.arg_err()),
             }
-            if c.next_block() {
-                let msg = format!("unknown property '{}'", c.val());
-                return Err(c.errf(msg));
+            while c.next_block() {
+                match c.val() {
+                    // Go runtime metrics: there is no Go runtime to report
+                    // on, so accept the option like CoreDNS and say so
+                    "runtime_metrics" => {
+                        if !c.remaining_args().is_empty() {
+                            return Err(c.arg_err());
+                        }
+                        kerndns_core::warning!(
+                            plugin = "prometheus",
+                            "runtime_metrics has no effect: KernDNS has no Go runtime to report on"
+                        );
+                    }
+                    other => {
+                        let msg = format!("unknown property '{other}'");
+                        return Err(c.errf(msg));
+                    }
+                }
             }
         }
 
@@ -179,5 +196,9 @@ mod tests {
         assert!(setup_ok(&Setup, "prometheus localhost:9253"));
         assert!(setup_err(&Setup, "prometheus a b").contains("Wrong argument count"));
         assert!(setup_err(&Setup, "prometheus\nprometheus").contains("only be used once"));
+        // CoreDNS 1.15: Go runtime metrics, accepted (no effect)
+        assert!(setup_ok(&Setup, "prometheus {\n runtime_metrics\n}"));
+        assert!(setup_err(&Setup, "prometheus {\n runtime_metrics x\n}").contains("Wrong argument count"));
+        assert!(setup_err(&Setup, "prometheus {\n bogus\n}").contains("unknown property"));
     }
 }
