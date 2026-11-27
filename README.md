@@ -45,7 +45,7 @@ Milestones **M0**, **M1** and **M2** are done.
 | Server: multi-socket UDP (`SO_REUSEPORT`), TCP, DoT (`tls://`), DoH (`https://`, HTTP/1.1 and HTTP/2), DoH3 (`https3://`, HTTP/3), DoQ (`quic://`, RFC 9250) and gRPC (`grpc://`, CoreDNS's `DnsService`), with the `https`, `https3`, `quic` and `grpc_server` connection and stream limits, CoreDNS routing and error semantics, TSIG signing of every response including multi-message transfers, hot reload without dropping listeners | done |
 | Plugins | `acl`, `any`, `auto`, `autopath`, `bind`, `bufsize`, `cache`, `cancel`, `chaos`, `debug`, `dns64`, `dnssec`, `dnstap`, `dynupdate`, `erratic`, `errors`, `file`, `forward` (UDP/TCP/DoT), `geoip`, `grpc`, `grpc_server`, `header`, `health`, `hosts`, `https`, `https3`, `k8s_external`, `kubernetes`, `loadbalance`, `local`, `log`, `loop`, `metadata`, `minimal`, `multisocket`, `nsid`, `on`, `pprof`, `prometheus`, `proxyproto`, `quic`, `ready`, `reload`, `rewrite`, `root`, `secondary`, `shed`, `sign`, `siit`, `template`, `timeouts`, `tls`, `trace`, `transfer`, `tsig`, `view`, `whoami` |
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
-| CoreDNS integration tests against KernDNS | 93 pass, 0 expected failures, 25 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 (`TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself) |
+| CoreDNS integration tests against KernDNS | 106 pass, 1 expected failure, 11 skipped (Go internals, checks of the Go source, a shared in-process metrics registry), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 (`TestDynUpdateKeaLifecycle` skips without Kea; `TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself) |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin and level 3 common setups, see below |
 | `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
@@ -356,10 +356,13 @@ runs in its own process, and the results are compared with
 
 - **pass**: must keep passing.
 - **xfail**: fails today, with the reason; the run fails when one starts passing, so it gets promoted.
-- **skip**: can't apply to KernDNS (tests Go internals or starts an in-process CoreDNS), with the reason.
+- **skip**: can't apply to KernDNS (tests Go internals or CoreDNS's Go source), with the reason.
 
 A test only counts as passing if it actually started `kerndns`. Tests that
-pass without ever starting the server are classified as `skip`.
+pass without ever starting the server are classified as `skip`. A test's
+`Instance.Restart` reloads the running `kerndns` in place (`-control`), and
+the tests whose plugins live in the Go test binary get them through a Go
+bridge built from [`go/bridge/testplugins`](go/bridge/testplugins/).
 
 ### Fuzzing
 

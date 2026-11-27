@@ -1,7 +1,9 @@
 // Replacement for github.com/coredns/coredns/test/server.go, swapped in with
 // `go test -overlay`. The helpers keep their signatures, but by default the
 // server they start is the KernDNS binary ($KERNDNS_BIN) instead of an
-// in-process CoreDNS. Set KERNDNS_COMPAT_TARGET=coredns to run the original
+// in-process CoreDNS: Input reports the "kerndns-compat" server type (see
+// kerndns_compat.go), so caddy.Start and Instance.Restart with it start or
+// reload KernDNS. Set KERNDNS_COMPAT_TARGET=coredns to run the original
 // in-process CoreDNS, which checks the harness itself.
 
 package test
@@ -18,16 +20,17 @@ import (
 
 var mu sync.Mutex
 
+// targetCoreDNS is true when the tests run against in-process CoreDNS.
+var targetCoreDNS = os.Getenv("KERNDNS_COMPAT_TARGET") == "coredns"
+
 // CoreDNSServer returns a test server. It just takes a normal Corefile as input.
 func CoreDNSServer(corefile string) (*caddy.Instance, error) {
 	mu.Lock()
 	defer mu.Unlock()
-	if os.Getenv("KERNDNS_COMPAT_TARGET") == "coredns" {
-		caddy.Quiet = true
-		dnsserver.Quiet = true
-		return caddy.Start(NewInput(corefile))
-	}
-	return kerndnsStart(corefile)
+	caddy.Quiet = true
+	dnsserver.Quiet = true
+
+	return caddy.Start(NewInput(corefile))
 }
 
 // CoreDNSServerStop stops a server.
@@ -73,11 +76,23 @@ func NewInput(corefile string) *Input {
 	return &Input{corefile: []byte(corefile)}
 }
 
-// Body implements the Input interface.
-func (i *Input) Body() []byte { return i.corefile }
+// Body implements the Input interface. For KernDNS it is empty, as caddy
+// parses the body with its own Corefile parser before handing it to the
+// server type; KernDNS gets i.corefile and parses it itself.
+func (i *Input) Body() []byte {
+	if targetCoreDNS {
+		return i.corefile
+	}
+	return nil
+}
 
 // Path implements the Input interface.
 func (i *Input) Path() string { return "Corefile" }
 
 // ServerType implements the Input interface.
-func (i *Input) ServerType() string { return "dns" }
+func (i *Input) ServerType() string {
+	if targetCoreDNS {
+		return "dns"
+	}
+	return kerndnsServerType
+}
