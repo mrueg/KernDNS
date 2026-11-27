@@ -1,0 +1,385 @@
+//! `transfer`: serves zone transfers (AXFR, IXFR with AXFR fallback) out of
+//! zone sources such as `file`, and sends NOTIFYs when they change. Port of
+//! `plugin/transfer`.
+//!
+//! ```text
+//! transfer [ZONE...] {
+//!     to ADDRESS...
+//!     source ADDRESS
+//! }
+//! ```
+
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
+use std::time::Duration;
+
+use kerndns_core::proto::op::{Message, MessageType, OpCode, Query, ResponseCode};
+use kerndns_core::proto::rr::{Name, RData, Record, RecordType};
+use kerndns_core::proto::serialize::binary::{BinEncodable, BinEncoder};
+use kerndns_core::transfer::{Notifier, TransferError, TransferRegistry};
+use kerndns_core::zones;
+use kerndns_core::{
+    Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
+    async_trait, next_or_failure,
+};
+
+use crate::forward::proxy::rand_id;
+
+/// Messages stay below this many bytes of (uncompressed) records.
+const BATCH_BYTES: usize = 63000;
+/// Encoded messages must stay below the TCP limit with room for a TSIG.
+const MAX_ENCODED: usize = 64000;
+
+#[derive(Debug, Clone)]
+struct Xfr {
+    zones: Vec<String>,
+    /// `*` or `ip:port`.
+    to: Vec<String>,
+    source: Option<IpAddr>,
+}
+
+impl Xfr {
+    fn allowed(&self, ip: IpAddr) -> bool {
+        self.to.iter().any(|t| {
+            t == "*"
+                || t.parse::<SocketAddr>()
+                    .is_ok_and(|sa| sa.ip().to_canonical() == ip.to_canonical())
+        })
+    }
+}
+
+/// The longest zone match among the stanzas (ties broken by name).
+fn longest_match<'a>(xfrs: &'a [Xfr], name: &str) -> Option<&'a Xfr> {
+    let mut best: Option<(&str, &Xfr)> = None;
+    for x in xfrs {
+        if let Some(z) = zones::matches(&x.zones, name) {
+            let better = match best {
+                None => true,
+                Some((bz, _)) => z.len() > bz.len() || (z.len() == bz.len() && z > bz),
+            };
+            if better {
+                best = Some((z, x));
+            }
+        }
+    }
+    best.map(|(_, x)| x)
+}
+
+/// `ip`, `ip:port`, `[v6]:port` → `ip:port` (port 53 by default).
+fn host_port(s: &str) -> Result<String, String> {
+    if let Ok(sa) = s.parse::<SocketAddr>() {
+        return Ok(sa.to_string());
+    }
+    let ip: IpAddr = s
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse()
+        .map_err(|_| format!("not an IP address: {s:?}"))?;
+    Ok(SocketAddr::new(ip, 53).to_string())
+}
+
+pub struct Setup;
+
+impl PluginFactory for Setup {
+    fn name(&self) -> &'static str {
+        "transfer"
+    }
+
+    fn setup(&self, c: &mut Controller<'_>) -> Result<(), SetupError> {
+        let keys = c.server_block_keys();
+        let mut xfrs = Vec::new();
+        while c.next() {
+            let args = c.remaining_args();
+            let mut x = Xfr {
+                zones: zones::origins_from_args_or_server_block(&args, &keys),
+                to: Vec::new(),
+                source: None,
+            };
+            while c.next_block() {
+                match c.val() {
+                    "to" => {
+                        let a = c.remaining_args();
+                        if a.is_empty() {
+                            return Err(c.arg_err());
+                        }
+                        for h in a {
+                            if h == "*" {
+                                x.to.push(h);
+                            } else {
+                                x.to.push(host_port(&h).map_err(|e| SetupError::new("transfer", e))?);
+                            }
+                        }
+                    }
+                    "source" => {
+                        let a = c.remaining_args();
+                        if a.len() != 1 {
+                            return Err(c.arg_err());
+                        }
+                        if x.source.is_some() {
+                            return Err(c.errf("source already specified"));
+                        }
+                        x.source = Some(a[0].parse().map_err(|_| {
+                            let msg = format!("invalid source address {:?}", a[0]);
+                            c.errf(msg)
+                        })?);
+                    }
+                    other => {
+                        let msg = format!("unknown property {other:?}");
+                        return Err(c.errf(msg));
+                    }
+                }
+            }
+            if x.to.is_empty() {
+                return Err(c.errf("'to' is required"));
+            }
+            xfrs.push(x);
+        }
+        let core = Arc::new(Core {
+            xfrs,
+            registry: TransferRegistry::of(c.config),
+        });
+        core.registry.set_notifier(core.clone());
+        c.add_plugin(move |next| {
+            Arc::new(Transfer {
+                core: core.clone(),
+                next,
+            })
+        });
+        Ok(())
+    }
+}
+
+struct Core {
+    xfrs: Vec<Xfr>,
+    registry: TransferRegistry,
+}
+
+#[kerndns_core::async_trait]
+impl Notifier for Core {
+    /// Send a NOTIFY for `zone` to every `to` address (3 tries each).
+    async fn notify(&self, zone: &str) {
+        let Some(x) = longest_match(&self.xfrs, zone).cloned() else {
+            return;
+        };
+        for to in x.to.iter().filter(|t| *t != "*") {
+            if let Err(e) = send_notify(zone, to, x.source).await {
+                kerndns_core::warning!(plugin = "transfer", "{e}");
+            }
+        }
+        kerndns_core::debug!(plugin = "transfer", "Sent notifies for zone {zone:?} to {:?}", x.to);
+    }
+}
+
+async fn send_notify(zone: &str, to: &str, source: Option<IpAddr>) -> Result<(), String> {
+    let mut m = Message::new(rand_id(), MessageType::Query, OpCode::Notify);
+    m.metadata.authoritative = true;
+    m.add_query(Query::query(
+        Name::from_ascii(zone).map_err(|e| e.to_string())?,
+        RecordType::SOA,
+    ));
+    let wire = m.to_vec().map_err(|e| e.to_string())?;
+    let dst: SocketAddr = to.parse().map_err(|e| format!("{to}: {e}"))?;
+    let bind = match (source, dst) {
+        (Some(ip), _) => SocketAddr::new(ip, 0),
+        (None, SocketAddr::V4(_)) => "0.0.0.0:0".parse().unwrap(),
+        (None, SocketAddr::V6(_)) => "[::]:0".parse().unwrap(),
+    };
+    let mut last = String::from("no answer");
+    for _ in 0..3 {
+        let sock = tokio::net::UdpSocket::bind(bind).await.map_err(|e| e.to_string())?;
+        if let Err(e) = sock.send_to(&wire, dst).await {
+            last = e.to_string();
+            continue;
+        }
+        let mut buf = [0u8; 4096];
+        match tokio::time::timeout(Duration::from_secs(2), sock.recv(&mut buf)).await {
+            Ok(Ok(n)) => match Message::from_vec(&buf[..n]) {
+                Ok(r) if r.metadata.response_code == ResponseCode::NoError => return Ok(()),
+                Ok(r) => {
+                    last = format!(
+                        "rcode was {:?}",
+                        kerndns_core::metrics::rcode_string(r.metadata.response_code)
+                    )
+                }
+                Err(e) => last = e.to_string(),
+            },
+            Ok(Err(e)) => last = e.to_string(),
+            Err(_) => last = "i/o timeout".into(),
+        }
+    }
+    Err(format!("notify for zone {zone:?} was not accepted by {to:?}: {last}"))
+}
+
+fn record_len(r: &Record) -> usize {
+    let mut buf = Vec::with_capacity(64);
+    let mut enc = BinEncoder::new(&mut buf);
+    let _ = r.emit(&mut enc);
+    buf.len()
+}
+
+pub struct Transfer {
+    core: Arc<Core>,
+    next: Next,
+}
+
+#[async_trait]
+impl Handler for Transfer {
+    fn name(&self) -> &'static str {
+        "transfer"
+    }
+
+    async fn serve_dns(&self, ctx: &mut Context, w: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
+        let qtype = req.qtype();
+        if qtype != RecordType::AXFR && qtype != RecordType::IXFR {
+            return next_or_failure("transfer", &self.next, ctx, w, req).await;
+        }
+        if req.proto() != "tcp" {
+            return Ok(ResponseCode::Refused);
+        }
+        let name = req.name();
+        let Some(x) = longest_match(&self.core.xfrs, &name) else {
+            return next_or_failure("transfer", &self.next, ctx, w, req).await;
+        };
+        if !x.allowed(req.ip()) {
+            let m = req.error_reply(ResponseCode::Refused);
+            w.write_msg(m)
+                .await
+                .map_err(|e| PluginError::servfail("transfer", e.to_string()))?;
+            return Ok(ResponseCode::NoError);
+        }
+        let mut serial = 0;
+        if qtype == RecordType::IXFR {
+            // the client's current SOA is in the authority section
+            match req.msg.authorities.as_slice() {
+                [r] => match &r.data {
+                    RData::SOA(soa) => serial = soa.serial,
+                    _ => return Ok(ResponseCode::ServFail),
+                },
+                _ => return Ok(ResponseCode::ServFail),
+            }
+        }
+
+        let mut batches = None;
+        for src in self.core.registry.sources() {
+            match src.transfer(&name, serial) {
+                Err(TransferError::NotAuthoritative) => continue,
+                Err(TransferError::Other(e)) => return Err(PluginError::servfail("transfer", e)),
+                Ok(b) => {
+                    batches = Some(b);
+                    break;
+                }
+            }
+        }
+        let Some(batches) = batches else {
+            return next_or_failure("transfer", &self.next, ctx, w, req).await;
+        };
+
+        let mut soa: Option<Record> = None;
+        let mut out: Vec<Vec<Record>> = Vec::new();
+        let mut cur: Vec<Record> = Vec::new();
+        let mut size = 0usize;
+        let mut total = 0usize;
+        for records in batches {
+            if records.is_empty() {
+                continue;
+            }
+            if soa.is_none() && records[0].record_type() == RecordType::SOA {
+                soa = Some(records[0].clone());
+            }
+            for rr in records {
+                let len = record_len(&rr);
+                if !cur.is_empty() && size + len > BATCH_BYTES {
+                    total += cur.len();
+                    out.push(std::mem::take(&mut cur));
+                    size = 0;
+                }
+                cur.push(rr);
+                size += len;
+            }
+        }
+        let serial_of = |r: &Option<Record>| match r.as_ref().map(|r| &r.data) {
+            Some(RData::SOA(s)) => s.serial,
+            _ => 0,
+        };
+        if out.is_empty() && cur.len() == 1 && soa.is_some() {
+            // IXFR for an up to date zone: just the SOA
+            let mut m = req.reply();
+            m.answers = vec![soa.clone().unwrap()];
+            w.write_msg(m)
+                .await
+                .map_err(|e| PluginError::servfail("transfer", e.to_string()))?;
+            kerndns_core::info!(
+                plugin = "transfer",
+                "Outgoing noop, incremental transfer for up to date zone {:?} to {} for {} SOA serial",
+                req.qname().to_ascii(),
+                req.ip(),
+                serial_of(&soa)
+            );
+            return Ok(ResponseCode::NoError);
+        }
+        if !cur.is_empty() {
+            total += cur.len();
+            out.push(cur);
+        }
+        // the size estimate is per record; split any message whose actual
+        // encoding is too big for TCP (64K, minus room for a TSIG)
+        let mut queue: std::collections::VecDeque<Vec<Record>> = out.into();
+        while let Some(batch) = queue.pop_front() {
+            let mut m = req.reply();
+            m.metadata.authoritative = true;
+            m.answers = batch;
+            let len = kerndns_core::wire::to_wire(&m).map(|v| v.len()).unwrap_or(usize::MAX);
+            if len > MAX_ENCODED && m.answers.len() > 1 {
+                let second = m.answers.split_off(m.answers.len() / 2);
+                queue.push_front(second);
+                queue.push_front(std::mem::take(&mut m.answers));
+                continue;
+            }
+            w.write_msg(m)
+                .await
+                .map_err(|e| PluginError::servfail("transfer", e.to_string()))?;
+        }
+        kerndns_core::info!(
+            plugin = "transfer",
+            "Outgoing transfer of {total} records of zone {:?} to {} for {} SOA serial",
+            req.qname().to_ascii(),
+            req.ip(),
+            serial_of(&soa)
+        );
+        Ok(ResponseCode::NoError)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::*;
+
+    #[test]
+    fn setup() {
+        assert!(setup_ok(&Setup, "transfer {\n to * 10.0.0.1 [::1]:5300\n}"));
+        assert!(setup_err(&Setup, "transfer").contains("'to' is required"));
+        assert!(setup_err(&Setup, "transfer {\n to example.org\n}").contains("not an IP address"));
+        assert!(setup_err(&Setup, "transfer {\n to *\n bogus\n}").contains("unknown property"));
+    }
+
+    #[test]
+    fn matching_and_acl() {
+        let xs = vec![
+            Xfr {
+                zones: vec!["example.org.".into()],
+                to: vec!["10.0.0.1:53".into()],
+                source: None,
+            },
+            Xfr {
+                zones: vec!["sub.example.org.".into()],
+                to: vec!["*".into()],
+                source: None,
+            },
+        ];
+        assert_eq!(longest_match(&xs, "a.sub.example.org.").unwrap().to, vec!["*"]);
+        let x = longest_match(&xs, "example.org.").unwrap();
+        assert!(x.allowed("10.0.0.1".parse().unwrap()));
+        assert!(!x.allowed("10.0.0.2".parse().unwrap()));
+    }
+}
