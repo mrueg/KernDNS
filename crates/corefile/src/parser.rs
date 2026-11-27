@@ -29,14 +29,6 @@ impl ParseError {
             msg: msg.into(),
         }
     }
-
-    fn eof(file: &str, msg: impl Into<String>) -> Self {
-        Self {
-            file: file.to_string(),
-            line: 0,
-            msg: msg.into(),
-        }
-    }
 }
 
 /// One server block: `keys { directives }`.
@@ -81,7 +73,7 @@ pub fn parse(input: &str, file: &str) -> Result<Vec<ServerBlock>, ParseError> {
     let tokens = tokenize(input, file);
     let tokens = ctx.extract_snippets(tokens)?;
     let tokens = ctx.expand(tokens, 0)?;
-    parse_blocks(&tokens, file)
+    parse_blocks(&tokens)
 }
 
 /// Parse a Corefile from disk.
@@ -263,7 +255,7 @@ fn block_body(tokens: &[Token], open: usize) -> Result<(&[Token], usize), ParseE
     Err(ParseError::at(&tokens[open], "Unexpected EOF: missing closing '}'"))
 }
 
-fn parse_blocks(tokens: &[Token], file: &str) -> Result<Vec<ServerBlock>, ParseError> {
+fn parse_blocks(tokens: &[Token]) -> Result<Vec<ServerBlock>, ParseError> {
     let mut blocks = Vec::new();
     let mut i = 0;
     while i < tokens.len() {
@@ -313,9 +305,8 @@ fn parse_blocks(tokens: &[Token], file: &str) -> Result<Vec<ServerBlock>, ParseE
             directives: parse_directives(body)?,
         });
     }
-    if blocks.is_empty() {
-        return Err(ParseError::eof(file, "no server blocks found"));
-    }
+    // like caddy, no server blocks (an empty Corefile, or only snippets) is
+    // not an error: the server type then loads its default Corefile
     Ok(blocks)
 }
 
