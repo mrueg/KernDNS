@@ -382,6 +382,11 @@ impl Zone {
         self.file.read().unwrap().clone()
     }
 
+    /// Change the file reloads read from, like `Zone.SetFile`.
+    pub fn set_file(&self, p: PathBuf) {
+        *self.file.write().unwrap() = p;
+    }
+
     pub fn set_mtime(&self, t: Option<SystemTime>) {
         *self.mtime.lock().unwrap() = t;
     }

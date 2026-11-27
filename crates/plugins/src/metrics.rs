@@ -85,7 +85,10 @@ impl PluginFactory for Setup {
             }
         });
 
-        let zones = Arc::new(c.server_block_keys());
+        let zones = ZoneNames::of(c.config);
+        for k in c.server_block_keys() {
+            zones.add(&k);
+        }
         c.add_plugin(move |next| {
             Arc::new(Metrics {
                 next,
@@ -96,9 +99,44 @@ impl PluginFactory for Setup {
     }
 }
 
+/// The zones a block's `prometheus` labels requests with: the server block
+/// keys plus what other plugins add at run time (`Metrics.AddZone` and
+/// `RemoveZone`, used by `auto`).
+#[derive(Clone, Default)]
+pub struct ZoneNames(Arc<arc_swap::ArcSwap<Vec<String>>>);
+
+impl ZoneNames {
+    /// The zone names of this block (created on first use).
+    pub fn of(cfg: &mut kerndns_core::BlockConfig) -> ZoneNames {
+        if cfg.extensions.get::<ZoneNames>().is_none() {
+            cfg.extensions.insert(ZoneNames::default());
+        }
+        cfg.extensions.get::<ZoneNames>().cloned().expect("inserted above")
+    }
+
+    pub fn add(&self, zone: &str) {
+        self.0.rcu(|z| {
+            let mut z = (**z).clone();
+            if !z.iter().any(|n| n == zone) {
+                z.push(zone.to_string());
+            }
+            z
+        });
+    }
+
+    pub fn remove(&self, zone: &str) {
+        self.0
+            .rcu(|z| z.iter().filter(|n| *n != zone).cloned().collect::<Vec<_>>());
+    }
+
+    pub fn names(&self) -> Arc<Vec<String>> {
+        self.0.load_full()
+    }
+}
+
 pub struct Metrics {
     next: Next,
-    zones: Arc<Vec<String>>,
+    zones: ZoneNames,
 }
 
 #[async_trait]
@@ -109,7 +147,9 @@ impl Handler for Metrics {
 
     async fn serve_dns(&self, ctx: &mut Context, w: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
         let start = Instant::now();
-        let zone = zones::matches(&self.zones, &req.name()).unwrap_or(".").to_string();
+        let zone = zones::matches(&self.zones.0.load(), &req.name())
+            .unwrap_or(".")
+            .to_string();
         let mut rec = Recorder::rcode_only(w);
         let res = next_or_failure("prometheus", &self.next, ctx, &mut rec, req).await;
         let status = result_rcode(&res);
