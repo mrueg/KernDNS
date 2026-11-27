@@ -17,6 +17,8 @@
 //!               go/compat/expectations-kind.txt (CI job `kind`).
 //! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_*cases.json by
 //!               running CoreDNS's kubernetes and k8s_external test suites in Go.
+//! plugin-cases  Regenerate crates/server/testdata/plugin_cases/*.json: the
+//!               table tests of CoreDNS plugins, extracted by go/plugincases.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -41,6 +43,7 @@ const USAGE: &str =
        cargo xtask loadgen -m doq|doh3|grpc -p PORT -d QUERYFILE [-s IP] [-c CLIENTS] [-T THREADS] [-q OUTSTANDING] [-l SECONDS] [-Q QPS] [-t TIMEOUT] [--ca PEM] [--tls]
        cargo xtask kind-test --ci-dir PATH [--target kerndns|coredns] [--run REGEX] [--update]
        cargo xtask k8s-cases
+       cargo xtask plugin-cases [--plugins file,hosts,...]
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
        cargo xtask etcd-difftest [--show N] [--bridge]
        cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS] [--coredns PATH]
@@ -61,6 +64,7 @@ fn main() -> Result<()> {
         Some("loadgen") => loadgen::run(&args[1..]),
         Some("kind-test") => kind::run(&args[1..]),
         Some("k8s-cases") => k8s_cases(),
+        Some("plugin-cases") => plugin_cases(&args[1..]),
         Some("k8s-difftest") => difftest::k8s(&args[1..]),
         Some("etcd-difftest") => difftest::etcd(&args[1..]),
         Some("k8s-bench") => bench::k8s(&args[1..]),
@@ -565,6 +569,37 @@ fn k8s_cases() -> Result<()> {
 /// Go bridge holding copies of those plugins (go/bridge/testplugins).
 const TEST_PLUGIN_TESTS: &[&str] = &["TestReloadUnreadyPlugin", "TestReloadTwoServerBlocksUnreadyPlugin"];
 const TEST_PLUGINS: &str = "github.com/kerndns/kerndns/go/bridge/testplugins/unready";
+
+/// Plugins whose table tests `plugin-cases` extracts (one fixture each in
+/// crates/server/testdata/plugin_cases).
+const PLUGIN_CASES: &str = "file,hosts";
+
+/// Extract the table tests of CoreDNS's plugins into JSON fixtures for
+/// crates/server/tests/plugin_cases (see go/plugincases).
+fn plugin_cases(args: &[String]) -> Result<()> {
+    let mut plugins = PLUGIN_CASES.to_string();
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--plugins" => plugins = it.next().context("--plugins needs a list")?.clone(),
+            other => bail!("unknown argument {other}\n{USAGE}"),
+        }
+    }
+    let root = root();
+    let st = Command::new("go")
+        .current_dir(root.join("go/plugincases"))
+        .args(["run", ".", "-coredns"])
+        .arg(root.join("third_party/coredns"))
+        .arg("-out")
+        .arg(root.join("crates/server/testdata/plugin_cases"))
+        .args(["-plugins", &plugins])
+        .status()
+        .context("running go/plugincases (is Go installed?)")?;
+    if !st.success() {
+        bail!("extracting the plugin table tests failed");
+    }
+    Ok(())
+}
 
 /// Plugins in the bridge `compat-test --bridge` and the benchmarks build.
 const DEFAULT_BRIDGE_PLUGINS: &str = "etcd,whoami";

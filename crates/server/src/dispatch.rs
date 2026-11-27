@@ -29,6 +29,9 @@ pub struct Answer {
     pub bufsize: Option<u16>,
     /// The request's OPT record as a plugin rewrote it (`rewrite edns0`).
     pub edns: Option<Box<Edns>>,
+    /// What the plugin chain did, if it ran: the rcode it returned
+    /// (`None` after a panic) and whether it wrote a response itself.
+    pub chain: Option<(Option<ResponseCode>, bool)>,
 }
 
 impl From<Vec<Message>> for Answer {
@@ -39,6 +42,7 @@ impl From<Vec<Message>> for Answer {
             on_sent: Vec::new(),
             bufsize: None,
             edns: None,
+            chain: None,
         }
     }
 }
@@ -358,19 +362,22 @@ impl Inner {
         };
 
         let mut msgs = w.msgs;
-        match res {
+        let wrote = !msgs.is_empty();
+        let chain_rc = match res {
             None => {
                 if msgs.is_empty() {
                     msgs.push(error_reply(req, ResponseCode::ServFail));
                 }
+                None
             }
             Some(r) => {
                 let rc = result_rcode(&r);
                 if !client_write(rc) && msgs.is_empty() {
                     msgs.push(error_reply(req, rc));
                 }
+                Some(rc)
             }
-        }
+        };
         let sreq = effective_request(req, ctx.edns.as_deref(), ctx.bufsize);
         for m in &mut msgs {
             scrub(&sreq, m);
@@ -381,6 +388,7 @@ impl Inner {
             on_sent: ctx.on_sent,
             bufsize: ctx.bufsize,
             edns: ctx.edns,
+            chain: Some((chain_rc, wrote)),
         }
     }
 

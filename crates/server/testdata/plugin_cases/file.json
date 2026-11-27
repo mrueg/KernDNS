@@ -1,0 +1,2573 @@
+{
+ "plugin": "file",
+ "strings": {
+  "TestLookupApexWildcard/name": "example.org.",
+  "TestLookupEmptyNonTerminalWildcard/name": "example.org.",
+  "TestLookupMultiWildcard/name": "example.org.",
+  "TestLookupOwnerNameWithDecimalEscape/origin": "campus.edu.",
+  "TestLookupRefusedUpstream/origin": "example.org.",
+  "TestLookupWildcardRespectsCloserEmptyNonTerminal/name": "example.org.",
+  "TestParseLaterSOAOrigin/zone": "@ 500 IN SOA ns.example. hostmaster.example. 3 3600 600 86400 300\nchild 500 IN SOA ns.example. hostmaster.example. 4 3600 600 86400 300\n",
+  "TestSVCBTargetNormalization/dbMixedCase": "\n$TTL 30M\n$ORIGIN example.com.\n@\tIN SOA ns.example.com. admin.example.com. ( 2024010100 14400 3600 604800 14400 )\n\tIN NS  ns.example.com.\nns\tIN A   192.0.2.1\nsvc\tIN A   192.0.2.10\n_foo\tIN SVCB 1 SVC.Example.COM. alpn=h2\n",
+  "apexWildcard": "; example.org test file with wildcard at apex\n$TTL 3600\nexample.org.\t\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2015082541 7200 3600 1209600 3600\nexample.org.\t\tIN\tNS\tb.iana-servers.net.\n*.example.org.          IN      A       127.0.0.53\nfoo.example.org.        IN      A       127.0.0.54\n",
+  "atoom": "atoom.net.",
+  "closerENTWildcard": "; example.org test file with a wildcard and a deeper empty non-terminal\n$TTL 3600\nexample.org.             IN     SOA     sns.dns.icann.org. noc.dns.icann.org. 2015082541 7200 3600 1209600 3600\nexample.org.             IN     NS      b.iana-servers.net.\n*.example.org.           IN     A       127.0.0.53\nreal.deeper.example.org. IN     A       127.0.0.54\n",
+  "dbAdditionalExample": "\n$TTL 30M\n$ORIGIN example.org.\n@\tIN SOA\tns.example.org. admin.example.org. (\n\t\t\t2024010100 ; serial\n\t\t\t14400      ; refresh (4 hours)\n\t\t\t3600       ; retry (1 hour)\n\t\t\t604800     ; expire (1 week)\n\t\t\t14400      ; minimum (4 hours)\n\t\t\t)\n\tIN NS\tns.example.org.\n\nns\t\tIN A\t192.0.2.1\n\n; The target shared by the records below.\nhost\t\tIN A\t192.0.2.10\n\t\tIN AAAA\t2001:db8::10\n\n; A second, distinct target.\nother\t\tIN A\t192.0.2.20\n\t\tIN AAAA\t2001:db8::20\n\n; Two MX records differing only in preference, pointing at one target.\nmx\t\tIN MX\t10 host.example.org.\n\t\tIN MX\t20 host.example.org.\n\n; Two SRV records pointing at one target.\nsrv\t\tIN SRV\t10 50 8080 host.example.org.\n\t\tIN SRV\t20 50 8080 host.example.org.\n\n; The same target, spelled differently. SRV targets are not normalized on insert.\nmixed\t\tIN SRV\t10 50 8080 host.example.org.\n\t\tIN SRV\t20 50 8080 HOST.EXAMPLE.ORG.\n\n; Two MX records with distinct targets.\ntwo\t\tIN MX\t10 host.example.org.\n\t\tIN MX\t20 other.example.org.\n\n; A CNAME resolving to an SRV: the ordinary-CNAME chase must still add glue.\ncname-srv\tIN CNAME\tsrv.example.org.\n\n; A wildcard CNAME resolving to an SRV.\n*.wild\t\tIN CNAME\tsrv.example.org.\n\n; A DNAME whose subtree holds an SRV: the DNAME chase must add glue too.\ndname\t\tIN DNAME\tdsub.example.org.\nsrv.dsub\tIN SRV\t10 50 8080 host.example.org.\n",
+  "dbAliasDelegation": "\n$TTL 300\n$ORIGIN example.org.\n@\tIN SOA\tns.example.org. admin.example.org. 1 3600 600 86400 300\n\tIN NS\tns.example.org.\nns\tIN A\t192.0.2.1\n\nalias\tIN CNAME\thost.child.example.org.\nchain\tIN CNAME\talias.example.org.\n*.wild\tIN CNAME\thost.child.example.org.\nchild\tIN NS\tns.child.example.org.\nns.child\tIN A\t192.0.2.2\n\t\tIN AAAA\t2001:db8::2\n\nmapped\tIN DNAME\texample.org.\nhost\tIN NS\tns.host.example.org.\nns.host\tIN A\t192.0.2.3\n\tIN AAAA\t2001:db8::3\n",
+  "dbAtoomNetSigned": "\n; File written on Tue Dec 13 04:13:01 2016\n; dnssec_signzone version 9.10.3-P4-Debian\natoom.net.\t\t1800\tIN SOA\tlinode.atoom.net. miek.miek.nl. (\n\t\t\t\t\t1481602381 ; serial\n\t\t\t\t\t14400      ; refresh (4 hours)\n\t\t\t\t\t3600       ; retry (1 hour)\n\t\t\t\t\t604800     ; expire (1 week)\n\t\t\t\t\t14400      ; minimum (4 hours)\n\t\t\t\t\t)\n\t\t\t1800\tRRSIG\tSOA 8 2 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tGZ30uFuGATKzwHXgpEwK70qjdXSAqmbB5d4z\n\t\t\t\t\te7WTibvJDPLa1ptZBI7Zuod2KMOkT1ocSvhL\n\t\t\t\t\tU7makhdv0BQx+5RSaP25mAmPIzfU7/T7R+DJ\n\t\t\t\t\t5q1GLlDSvOprfyMUlwOgZKZinesSdUa9gRmu\n\t\t\t\t\t8E+XnPNJ/jcTrGzzaDjn1/irrM0= )\n\t\t\t1800\tNS\tomval.tednet.nl.\n\t\t\t1800\tNS\tlinode.atoom.net.\n\t\t\t1800\tNS\tns-ext.nlnetlabs.nl.\n\t\t\t1800\tRRSIG\tNS 8 2 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tD8Sd9JpXIOxOrUF5Hi1ASutyQwP7JNu8XZxA\n\t\t\t\t\trse86A6L01O8H8sCNib2VEoJjHuZ/dDEogng\n\t\t\t\t\tOgmfqeFy04cpSX19GAk3bkx8Lr6aEat3nqIC\n\t\t\t\t\tXA/xsCCfXy0NKZpI05zntHPbbP5tF/NvpE7n\n\t\t\t\t\t0+oLtlHSPEg1ZnEgwNoLe+G1jlw= )\n\t\t\t1800\tA\t176.58.119.54\n\t\t\t1800\tRRSIG\tA 8 2 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tmrjiUFNCqDgCW8TuhjzcMh0V841uC224QvwH\n\t\t\t\t\t0+OvYhcve9twbX3Y12PSFmz77Xz3Jg9WAj4I\n\t\t\t\t\tqhh3iHUac4dzUXyC702DT62yMF/9CMUO0+Ee\n\t\t\t\t\tb6wRtvPHr2Tt0i/xV/BTbArInIvurXJrvKvo\n\t\t\t\t\tLsZHOfsg7dZs6Mvdpe/CgwRExpk= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fe79:234c\n\t\t\t1800\tRRSIG\tAAAA 8 2 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tEkMxX2vUaP4h0qbWlHaT4yNhm8MrPMZTn/3R\n\t\t\t\t\tzNw+i3oF2cLMWKh6GCfuIX/x5ID706o8kfum\n\t\t\t\t\tbxTYwuTe1LJ+GoZHWEiH8VCa1laTlh8l3qSi\n\t\t\t\t\tPZKU8339rr5cCYluk6p9PbAuRkYYOEruNg42\n\t\t\t\t\twPOx46dsAlvp2XpOaOeJtU64QGQ= )\n\t\t\t14400\tNSEC\tdeb.atoom.net. A NS SOA AAAA RRSIG NSEC DNSKEY\n\t\t\t14400\tRRSIG\tNSEC 8 2 14400 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tP7Stx7lqRKl8tbTAAaJ0W6UhgJwZz3cjpM8z\n\t\t\t\t\teplbhXEVohKtyJ9xgptKt1vreH6lkhzciar5\n\t\t\t\t\tEB9Nj0VOmcthiht/+As8aEKmf8UlcJ2EbLII\n\t\t\t\t\tNT7NUaasxsrLE2rjjX5mEtzOZ1uQAGiU8Hnk\n\t\t\t\t\tXdGweTgIVFuiCcMCgaKpC2TRrMw= )\n\t\t\t1800\tDNSKEY\t256 3 8 (\n\t\t\t\t\tAwEAAeDZTH9YT9qLMPlq4VrxX7H3GbWcqCrC\n\t\t\t\t\ttXc9RT/hf96GN+ttnnEQVaJY8Gbly3IZpYQW\n\t\t\t\t\tMwaCi0t30UULXE3s9FUQtl4AMbplyiz9EF8L\n\t\t\t\t\t/XoBS1yhGm5WV5u608ihoPaRkYNyVV3egb5Y\n\t\t\t\t\thA5EXWy2vfsa1XWPpxvSAhlqM0YENtP3\n\t\t\t\t\t) ; ZSK; alg = RSASHA256; key id = 53289\n\t\t\t1800\tDNSKEY\t257 3 8 (\n\t\t\t\t\tAwEAAepN7Vo8enDCruVduVlGxTDIv7QG0wJQ\n\t\t\t\t\tfTL1hMy4k0Yf/7dXzrn5bZT4ytBvH1hoBImH\n\t\t\t\t\tmtTrQo6DQlBBVXDJXTyQjQozaHpN1HhTJJTz\n\t\t\t\t\tIXl8UrdbkLWvz6QSeJPmBBYQRAqylUA2KE29\n\t\t\t\t\tnxyiNboheDLiIWyQ7Q/Op7lYaKMdb555kQAs\n\t\t\t\t\tb/XT4Tb3/3BhAjcofNofNBjDjPq2i8pAo8HU\n\t\t\t\t\t5mW5/Pl+ZT/S0aqQPnCkHk/iofSRu3ZdBzkH\n\t\t\t\t\t54eoC+BdyXb7gTbPGRr+1gMbf/rzhRiZ4vnX\n\t\t\t\t\tNoEzGAXmorKzJHANNb6KQ/932V9UDHm9wbln\n\t\t\t\t\t6y3s7IBvsMX5KF8vo81Stkc=\n\t\t\t\t\t) ; KSK; alg = RSASHA256; key id = 19114\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20170112031301 20161213031301 19114 atoom.net.\n\t\t\t\t\tIEjViubKdef8RWB5bcnirqVcqDk16irkywJZ\n\t\t\t\t\tsBjMyNs03/a+sl0UHEGAB7qCC+Rn+RDaM5It\n\t\t\t\t\tWF+Gha6BwRIN9NuSg3BwB2h1nJtHw61pMVU9\n\t\t\t\t\t2j9Q3pq7X1xoTBAcwY95t5a1xlw0iTCaLu1L\n\t\t\t\t\tIu/PbVp1gj1o8BF/PiYilvZJGUjaTgsi+YNi\n\t\t\t\t\t2kiWpp6afO78/W4nfVx+lQBmpyfX1lwL5PEC\n\t\t\t\t\t9f5PMbzRmOapvUBc2XdddGywLdmlNsLHimGV\n\t\t\t\t\tt7kkHZHOWQR1TvvMbU3dsC0bFCrBVGDhEuxC\n\t\t\t\t\thATR+X5YV0AyDSyrew7fOGJKrapwMWS3yRLr\n\t\t\t\t\tFAt0Vcxno5lwQImbCQ== )\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tsSxdgPT+gFZPN0ot6lZRGqOwvONUEsg0uEbf\n\t\t\t\t\tkh19JlWHu/qvq5HOOK2VOW/UnswpVmtpFk0W\n\t\t\t\t\tz/jiCNHifjpCCVn5tfCMZDLGekmPOjdobw24\n\t\t\t\t\tswBuGjnn0NHvxHoN6S+mb+AR6V/dLjquNUda\n\t\t\t\t\tyzBc2Ua+XtQ7SCLKIvEhcNg9H3o= )\ndeb.atoom.net.\t\t1800\tIN A\t176.58.119.54\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tZW7jm/VDa/I9DxWlE7Cm+HHymiVv4Wk5UGYI\n\t\t\t\t\tUf/g0EfxLCBR6SwL5QKuV1z7xoWKaiNqqrmc\n\t\t\t\t\tgg35xgskKyS8QHgCCODhDzcIKe+MSsBXbY04\n\t\t\t\t\tAtrC5dV3JJQoA65Ng/48hwcyghAjXKrA2Yyq\n\t\t\t\t\tGXf2DSvWeIV9Jmk0CsOELP24dpk= )\n\t\t\t1800\tTXT\t\"v=spf1 a ip6:2a01:7e00::f03c:91ff:fe79:234c ~all\"\n\t\t\t1800\tRRSIG\tTXT 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tfpvVJ+Z6tzSd9yETn/PhLSCRISwRD1c3ET80\n\t\t\t\t\t8twnx3XfAPQfV2R8dw7pz8Vw4TSxvf19bAZc\n\t\t\t\t\tPWRjW682gb7gAxoJshCXBYabMfqExrBc9V1S\n\t\t\t\t\tezwm3D93xNMyegxzHx2b/H8qp3ZWdsMLTvvN\n\t\t\t\t\tAzu7P4iyO+WRWT0R7bJGrdTwRz8= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fe79:234c\n\t\t\t1800\tRRSIG\tAAAA 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\taaPF6NqXfWamzi+xUDVeYa7StJUVM1tDsL34\n\t\t\t\t\tw5uozFRZ0f4K/Z88Kk5CgztxmtpNNKGdLWa0\n\t\t\t\t\tiryUJsbVWAbSQfrZNkNckBtczMNxGgjqn97A\n\t\t\t\t\t2//F6ajH/qrR3dWcCm+VJMgu3UPqAxLiCaYO\n\t\t\t\t\tGQUx6Y8JA1VIM/RJAM6BhgNxjD0= )\n\t\t\t14400\tNSEC\tlafhart.atoom.net. A TXT AAAA RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\t1Llad64NDWcz8CyBu2TsyANrJ9Tpfm5257sY\n\t\t\t\t\tFPYF579p3c9Imwp9kYEO1zMEKgNoXBN/sQnd\n\t\t\t\t\tYCugq3r2GAI6bfJj8sV5bt6GKuZcGHMESug4\n\t\t\t\t\tuh2gU0NDcCA4GPdBYGdusePwV0RNpcRnVCFA\n\t\t\t\t\tfsACp+22j3uwRUbCh0re0ufbAs4= )\nlafhart.atoom.net.\t1800\tIN A\t178.79.160.171\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tfruP6cvMVICXEV8NcheS73NWLCEKlO1FgW6B\n\t\t\t\t\t35D2GhtfYZe+M23V5YBRtlVCCrAdS0etdCOf\n\t\t\t\t\txH9yt3u2kVvDXuMRiQr1zJPRDEq3cScYumpd\n\t\t\t\t\tbOO8cjHiCic5lEcRVWNNHXyGtpqTvrp9CxOu\n\t\t\t\t\tIQw1WgAlZyKj43zGg3WZi6OTKLg= )\n\t\t\t14400\tNSEC\tlinode.atoom.net. A RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\t2AUWXbScL0jIJ7G6UsJAlUs+bgSprZ1zY6v/\n\t\t\t\t\tiVB5BAYwZD6pPky7LZdzvPEHh0aNLGIFbbU8\n\t\t\t\t\tSDJI7u/e4RUTlE+8yyjl6obZNfNKyJFqE5xN\n\t\t\t\t\t1BJ8sjFrVn6KaHIDKEOZunNb1MlMfCRkLg9O\n\t\t\t\t\t94zg04XEgVUfaYCPxvLs3fCEgzw= )\nvoordeur.atoom.net.\t1800\tIN A\t77.249.87.46\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tSzJz0NaKLRA/lW4CxgMHgeuQLp5QqFEjQv3I\n\t\t\t\t\tzfPtY4joQsZn8RN8RLECcpcPKjbC8Dj6mxIJ\n\t\t\t\t\tdd2vwhsCVlZKMNcZUOfpB7eGx1TR9HnzMkY9\n\t\t\t\t\tOdTt30a9+tktagrJEoy31vAhj1hJqLbSgvOa\n\t\t\t\t\tpRr1P4ZpQ53/qH8JX/LOmqfWTdg= )\n\t\t\t14400\tNSEC\twww.atoom.net. A RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tCETJhUJy1rKjVj9wsW1549gth+/Z37//BI6S\n\t\t\t\t\tnxJ+2Oq63jEjlbznmyo5hvFW54DbVUod+cLo\n\t\t\t\t\tN9PdlNQDr1XsRBgWhkKW37RkuoRVEPwqRykv\n\t\t\t\t\txzn9i7CgYKAAHFyWMGihBLkV9ByPp8GDR8Zr\n\t\t\t\t\tDEkrG3ErDlBcwi3FqGZFsSOW2xg= )\nwww.atoom.net.\t\t1800\tIN CNAME deb.atoom.net.\n\t\t\t1800\tRRSIG\tCNAME 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\t1lhG6iTtbeesBCVOrA8a7+V2gogCuXzKgSi8\n\t\t\t\t\t6K0Pzq2CwqTScdNcZvcDOIbLq45Am5p09PIj\n\t\t\t\t\tlXnd2fw6WAxphwvRhmwCve3uTZMUt5STw7oi\n\t\t\t\t\t0rED7GMuFUSC/BX0XVly7NET3ECa1vaK6RhO\n\t\t\t\t\thDSsKPWFI7to4d1z6tQ9j9Kvm4Y= )\n\t\t\t14400\tNSEC\tatoom.net. CNAME RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tCC4yCYP1q75/gTmPz+mVM6Lam2foPP5oTccY\n\t\t\t\t\tRtROuTkgbt8DtAoPe304vmNazWBlGidnWJeD\n\t\t\t\t\tYyAAe3znIHP0CgrxjD/hRL9FUzMnVrvB3mnx\n\t\t\t\t\t4W13wP1rE97RqJxV1kk22Wl3uCkVGy7LCjb0\n\t\t\t\t\tJLFvzCe2fuMe7YcTzI+t1rioTP0= )\nlinode.atoom.net.\t1800\tIN A\t176.58.119.54\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tZ4Ka4OLDha4eQNWs3GtUd1Cumr48RUnH523I\n\t\t\t\t\tnZzGXtpQNou70qsm5Jt8n/HmsZ4L5DoxomRz\n\t\t\t\t\trgZTGnrqj43+A16UUGfVEk6SfUUHOgxgspQW\n\t\t\t\t\tzoaqk5/5mQO1ROsLKY8RqaRqzvbToHvqeZEh\n\t\t\t\t\tVkTPVA02JK9UFlKqoyxj72CLvkI= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fe79:234c\n\t\t\t1800\tRRSIG\tAAAA 8 3 1800 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tl+9Qce/EQyKrTJVKLv7iatjuCO285ckd5Oie\n\t\t\t\t\tP2LzWVsL4tW04oHzieKZwIuNBRE+px8g5qrT\n\t\t\t\t\tLIK2TikCGL1xHAd7CT7gbCtDcZ7jHmSTmMTJ\n\t\t\t\t\t405nOV3G3xWelreLI5Fn5ck8noEsF64kiw1y\n\t\t\t\t\tXfkyQn2B914zFH/okG2fzJ1qolQ= )\n\t\t\t14400\tNSEC\tvoordeur.atoom.net. A AAAA RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20170112031301 20161213031301 53289 atoom.net.\n\t\t\t\t\tOwzmz7QrVL2Gw2njEsUVEknMl2amx1HG9X3K\n\t\t\t\t\ttO+Ihyy4tApiUFxUjAu3P/30QdqbB85h7s//\n\t\t\t\t\tipwX/AmQJNoxTScR3nHt9qDqJ044DPmiuh0l\n\t\t\t\t\tNuIjguyZRANApmKCTA6AoxXIUqToIIjfVzi/\n\t\t\t\t\tPxXE6T3YIPlK7Bxgv1lcCBJ1fmE= )",
+  "dbDnssexNLSigned": "\n; File written on Tue Mar 29 21:02:24 2016\n; dnssec_signzone version 9.10.3-P4-Ubuntu\ndnssex.nl.\t\t1800\tIN SOA\tlinode.atoom.net. miek.miek.nl. (\n\t\t\t\t\t1459281744 ; serial\n\t\t\t\t\t14400      ; refresh (4 hours)\n\t\t\t\t\t3600       ; retry (1 hour)\n\t\t\t\t\t604800     ; expire (1 week)\n\t\t\t\t\t14400      ; minimum (4 hours)\n\t\t\t\t\t)\n\t\t\t1800\tRRSIG\tSOA 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tCA/Y3m9hCOiKC/8ieSOv8SeP964BUdG/8MC3\n\t\t\t\t\tWtKljUosK9Z9bBGrVizDjjqgq++lyH8BZJcT\n\t\t\t\t\taabAsERs4xj5PRtcxicwQXZACX5VYjXHQeZm\n\t\t\t\t\tCyytFU5wq2gcXSmvUH86zZzftx3RGPvn1aOo\n\t\t\t\t\tTlcvoC3iF8fYUCpROlUS0YR8Cdw= )\n\t\t\t1800\tNS\tomval.tednet.nl.\n\t\t\t1800\tNS\tlinode.atoom.net.\n\t\t\t1800\tNS\tns-ext.nlnetlabs.nl.\n\t\t\t1800\tRRSIG\tNS 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tdLIeEvP86jj5nd3orv9bH7hTvkblF4Na0sbl\n\t\t\t\t\tk6fJA6ha+FPN1d6Pig3NNEEVQ/+wlOp/JTs2\n\t\t\t\t\tv07L7roEEUCbBprI8gMSld2gFDwNLW3DAB4M\n\t\t\t\t\tWD/oayYdAnumekcLzhgvWixTABjWAGRTGQsP\n\t\t\t\t\tsVDFXsGMf9TGGC9FEomgkCVeNC0= )\n\t\t\t1800\tA\t139.162.196.78\n\t\t\t1800\tRRSIG\tA 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tLKJKLzPiSEDWOLAag2YpfD5EJCuDcEAJu+FZ\n\t\t\t\t\tXy+4VyOv9YvRHCTL4vbrevOo5+XymY2RxU1q\n\t\t\t\t\tj+6leR/Fe7nlreSj2wzAAk2bIYn4m6r7hqeO\n\t\t\t\t\taKZsUFfpX8cNcFtGEywfHndCPELbRxFeEziP\n\t\t\t\t\tutqHFLPNMX5nYCpS28w4oJ5sAnM= )\n\t\t\t1800\tTXT\t\"Doing It Safe Is Better\"\n\t\t\t1800\tRRSIG\tTXT 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tf6S+DUfJK1UYdOb3AHgUXzFTTtu+yLp/Fv7S\n\t\t\t\t\tHv0CAGhXAVw+nBbK719igFvBtObS33WKwzxD\n\t\t\t\t\t1pQNMaJcS6zeevtD+4PKB1KDC4fyJffeEZT6\n\t\t\t\t\tE30jGR8Y29/xA+Fa4lqDNnj9zP3b8TiABCle\n\t\t\t\t\tascY5abkgWCALLocFAzFJQ/27YQ= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735\n\t\t\t1800\tRRSIG\tAAAA 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tPWcPSawEUBAfCuv0liEOQ8RYe7tfNW4rubIJ\n\t\t\t\t\tLE+dbrub1DUer3cWrDoCYFtOufvcbkYJQ2CQ\n\t\t\t\t\tAGjJmAQ5J2aqYDOPMrKa615V0KT3ifbZJcGC\n\t\t\t\t\tgkIic4U/EXjaQpRoLdDzR9MyVXOmbA6sKYzj\n\t\t\t\t\tju1cNkLqM8D7Uunjl4pIr6rdSFo= )\n\t\t\t14400\tNSEC\t*.dnssex.nl. A NS SOA TXT AAAA RRSIG NSEC DNSKEY\n\t\t\t14400\tRRSIG\tNSEC 8 2 14400 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\toIvM6JZIlNc1aNKGTxv58ApSnDr1nDPPgnD9\n\t\t\t\t\t9oJZRIn7eb5WnpeDz2H3z5+x6Bhlp5hJJaUp\n\t\t\t\t\tKJ3Ss6Jg/IDnrmIvKmgq6L6gHj1Y1IiHmmU8\n\t\t\t\t\tVeZTRzdTsDx/27OsN23roIvsytjveNSEMfIm\n\t\t\t\t\tiLZ23x5kg1kBdJ9p3xjYHm5lR+8= )\n\t\t\t1800\tDNSKEY\t256 3 8 (\n\t\t\t\t\tAwEAAazSO6uvLPEVknDA8yxjFe8nnAMU7txp\n\t\t\t\t\twb19k55hQ81WV3G4bpBM1NdN6sbYHrkXaTNx\n\t\t\t\t\t2bQWAkvX6pz0XFx3z/MPhW+vkakIWFYpyQ7R\n\t\t\t\t\tAT5LIJfToVfiCDiyhhF0zVobKBInO9eoGjd9\n\t\t\t\t\tBAW3TUt+LmNAO/Ak5D5BX7R3CuA7v9k7\n\t\t\t\t\t) ; ZSK; alg = RSASHA256; key id = 14460\n\t\t\t1800\tDNSKEY\t257 3 8 (\n\t\t\t\t\tAwEAAbyeaV9zg0IqdtgYoqK5jJ239anzwG2i\n\t\t\t\t\tgvH1DxSazLyaoNvEkCIvPgMLW/JWfy7Z1mQp\n\t\t\t\t\tSMy9DtzL5pzRyQgw7kIeXLbi6jufUFd9pxN+\n\t\t\t\t\txnzKLf9mY5AcnGToTrbSL+jnMT67wG+c34+Q\n\t\t\t\t\tPeVfucHNUePBxsbz2+4xbXiViSQyCQGv\n\t\t\t\t\t) ; KSK; alg = RSASHA256; key id = 18772\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tcFSFtJE+DBGNxb52AweFaVHBe5Ue5MDpqNdC\n\t\t\t\t\tTIneUnEhP2m+vK4zJ/TraK0WdQFpsX63pod8\n\t\t\t\t\tPZ9y03vHUfewivyonCCBD3DcNdoU9subhN22\n\t\t\t\t\ttez9Ct8Z5/9E4RAz7orXal4M1VUEhRcXSEH8\n\t\t\t\t\tSJW20mfVsqJAiKqqNeGB/pAj23I= )\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 18772 dnssex.nl.\n\t\t\t\t\toiiwo/7NYacePqohEp50261elhm6Dieh4j2S\n\t\t\t\t\tVZGAHU5gqLIQeW9CxKJKtSCkBVgUo4cvO4Rn\n\t\t\t\t\t2tzArAuclDvBrMXRIoct8u7f96moeFE+x5FI\n\t\t\t\t\tDYqICiV6k449ljj9o4t/5G7q2CRsEfxZKpTI\n\t\t\t\t\tA/L0+uDk0RwVVzL45+TnilcsmZs= )\n*.dnssex.nl.\t\t1800\tIN TXT\t\"Doing It Safe Is Better\"\n\t\t\t1800\tRRSIG\tTXT 8 2 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tFUZSTyvZfeuuOpCmNzVKOfITRHJ6/ygjmnnb\n\t\t\t\t\tXGBxVUyQjoLuYXwD5XqZWGw4iKH6QeSDfGCx\n\t\t\t\t\t4MPqA4qQmW7Wwth7mat9yMfA4+p2sO84bysl\n\t\t\t\t\t7/BG9+W2G+q1uQiM9bX9V42P2X/XuW5Y/t9Y\n\t\t\t\t\t8u1sljQ7D8WwS6naH/vbaJxnDBw= )\n\t\t\t14400\tNSEC\ta.dnssex.nl. TXT RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 2 14400 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tos6INm6q2eXknD5z8TpfbK00uxVbQefMvHcR\n\t\t\t\t\t/RNX/kh0xXvzAaaDOV+Ge/Ko+2dXnKP+J1LY\n\t\t\t\t\tG9ffXNpdbaQy5ygzH5F041GJst4566GdG/jt\n\t\t\t\t\t7Z7vLHYxEBTpZfxo+PLsXQXH3VTemZyuWyDf\n\t\t\t\t\tqJzafXJVH1F0nDrcXmMlR6jlBHA= )\nwww.dnssex.nl.\t\t1800\tIN CNAME a.dnssex.nl.\n\t\t\t1800\tRRSIG\tCNAME 8 3 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tOmv42q/uVvdNsWQoSrQ6m6w6U7r7Abga7uF4\n\t\t\t\t\t25b3gZlse0C+WyMyGFMGUbapQm7azvBpreeo\n\t\t\t\t\tuKJHjzd+ufoG+Oul6vU9vyoj+ejgHzGLGbJQ\n\t\t\t\t\tHftfP+UqP5SWvAaipP/LULTWKPuiBcLDLiBI\n\t\t\t\t\tPGTfsq0DB6R+qCDTV0fNnkgxEBQ= )\n\t\t\t14400\tNSEC\tdnssex.nl. CNAME RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tTBN3ddfZW+kC84/g3QlNNJMeLZoyCalPQylt\n\t\t\t\t\tKXXLPGuxfGpl3RYRY8KaHbP+5a8MnHjqjuMB\n\t\t\t\t\tLofb7yKMFxpSzMh8E36vnOqry1mvkSakNj9y\n\t\t\t\t\t9jM8PwDjcpYUwn/ql76MsmNgEV5CLeQ7lyH4\n\t\t\t\t\tAOrL79yOSQVI3JHJIjKSiz88iSw= )\na.dnssex.nl.\t\t1800\tIN A\t139.162.196.78\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tOXHpFj9nSpKi5yA/ULH7MOpGAWfyJ2yC/2xa\n\t\t\t\t\tPw0fqSY4QvcRt+V3adcFA4H9+P1b32GpxEjB\n\t\t\t\t\tlXmCJID+H4lYkhUR4r4IOZBVtKG2SJEBZXip\n\t\t\t\t\tpH00UkOIBiXxbGzfX8VL04v2G/YxUgLW57kA\n\t\t\t\t\taknaeTOkJsO20Y+8wmR9EtzaRFI= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735\n\t\t\t1800\tRRSIG\tAAAA 8 3 1800 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tjrepc/VnRzJypnrG0WDEqaAr3HMjWrPxJNX0\n\t\t\t\t\t86gbFjZG07QxBmrA1rj0jM9YEWTjjyWb2tT7\n\t\t\t\t\tlQhzKDYX/0XdOVUeeOM4FoSks80V+pWR8fvj\n\t\t\t\t\tAZ5HmX69g36tLosMDKNR4lXcrpv89QovG4Hr\n\t\t\t\t\t/r58fxEKEFJqrLDjMo6aOrg+uKA= )\n\t\t\t14400\tNSEC\twww.dnssex.nl. A AAAA RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20160428190224 20160329190224 14460 dnssex.nl.\n\t\t\t\t\tS+UM62wXRNNFN3QDWK5YFWUbHBXC4aqaqinZ\n\t\t\t\t\tA2ZDeC+IQgyw7vazPz7cLI5T0YXXks0HTMlr\n\t\t\t\t\tsoEjKnnRZsqSO9EuUavPNE1hh11Jjm0fB+5+\n\t\t\t\t\t+Uro0EmA5Dhgc0Z2VpbXVQEhNDf/pI1gem15\n\t\t\t\t\tRffN2tBYNykZn4Has2ySgRaaRYQ= )",
+  "dbEscapeOwner": "campus.edu.              500 IN SOA ns1.outside.edu. root.campus.edu. 8 6048 4000 2419200 6048\ncampus.edu.              500 IN NS  ns1.outside.edu.\nhas\\046dot.campus.edu.   500 IN A   192.0.2.2\n",
+  "dbExampleOrgOutOfZone": "$ORIGIN example.org.\n@\t3600 IN SOA sns.dns.icann.org. noc.dns.icann.org. ( 2017042745 7200 3600 1209600 3600 )\n\t3600 IN NS  a.iana-servers.net.\nwww\t3600 IN CNAME www.example.net.\n",
+  "dbMalformedSOA": "\n$TTL         1M\n$ORIGIN      example.org.\n\n@            IN  SOA    ns1.example.com. admin.example.com.  (\n                               abc ; Serial - invalid\n                               1200       ; Refresh\n                               144        ; Retry\n                               1814400    ; Expire\n                               2h )       ; Minimum\n@            IN  NS     ns1.example.com.\n\nwww          IN  A      192.168.0.14\n",
+  "dbMiekENTNL": "; File written on Sat Apr  2 16:43:11 2016\n; dnssec_signzone version 9.10.3-P4-Ubuntu\nmiek.nl.\t\t1800\tIN SOA\tlinode.atoom.net. miek.miek.nl. (\n\t\t\t\t\t1282630057 ; serial\n\t\t\t\t\t14400      ; refresh (4 hours)\n\t\t\t\t\t3600       ; retry (1 hour)\n\t\t\t\t\t604800     ; expire (1 week)\n\t\t\t\t\t14400      ; minimum (4 hours)\n\t\t\t\t\t)\n\t\t\t1800\tRRSIG\tSOA 8 2 1800 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tKegoBxA3Tbrhlc4cEdkRiteIkOfsqD4oCLLM\n\t\t\t\t\tISJ5bChWy00LGHUlAnHVu5Ti96hUjVNmGSxa\n\t\t\t\t\txtGSuAAMFCr52W8pAB8LBIlu9B6QZUPHMccr\n\t\t\t\t\tSuzxAX3ioawk2uTjm+k8AGPT4RoQdXemGLAp\n\t\t\t\t\tzJTASolTVmeMTh5J0sZTZJrtvZ0= )\n\t\t\t1800\tNS\tlinode.atoom.net.\n\t\t\t1800\tRRSIG\tNS 8 2 1800 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tm0cOHL6Rre/0jZPXe+0IUjs/8AFASRCvDbSx\n\t\t\t\t\tZQsRDSlZgS6RoMP3OC77cnrKDVlfZ2Vhq3Ce\n\t\t\t\t\tnYPoGe0/atB92XXsilmstx4HTSU64gsV9iLN\n\t\t\t\t\tXkzk36617t7zGOl/qumqfaUXeA9tihItzEim\n\t\t\t\t\t6SGnufVZI4o8xeyaVCNDDuN0bvY= )\n\t\t\t14400\tNSEC\ta.miek.nl. NS SOA RRSIG NSEC DNSKEY\n\t\t\t14400\tRRSIG\tNSEC 8 2 14400 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tBCWVgwxWrs4tBjS9QXKkftCUbiLi40NyH1yA\n\t\t\t\t\tnbFy1wCKQ2jDH00810+ia4b66QrjlAKgxE9z\n\t\t\t\t\t9U7MKSMV86sNkyAtlCi+2OnjtWF6sxPdJO7k\n\t\t\t\t\tCHeg46XBjrQuiJRY8CneQX56+IEPdufLeqPR\n\t\t\t\t\tl+ocBQ2UkGhXmQdWp3CFDn2/eqU= )\n\t\t\t1800\tDNSKEY\t256 3 8 (\n\t\t\t\t\tAwEAAcNEU67LJI5GEgF9QLNqLO1SMq1EdoQ6\n\t\t\t\t\tE9f85ha0k0ewQGCblyW2836GiVsm6k8Kr5EC\n\t\t\t\t\tIoMJ6fZWf3CQSQ9ycWfTyOHfmI3eQ/1Covhb\n\t\t\t\t\t2y4bAmL/07PhrL7ozWBW3wBfM335Ft9xjtXH\n\t\t\t\t\tPy7ztCbV9qZ4TVDTW/Iyg0PiwgoXVesz\n\t\t\t\t\t) ; ZSK; alg = RSASHA256; key id = 12051\n\t\t\t1800\tDNSKEY\t257 3 8 (\n\t\t\t\t\tAwEAAcWdjBl4W4wh/hPxMDcBytmNCvEngIgB\n\t\t\t\t\t9Ut3C2+QI0oVz78/WK9KPoQF7B74JQ/mjO4f\n\t\t\t\t\tvIncBmPp6mFNxs9/WQX0IXf7oKviEVOXLjct\n\t\t\t\t\tR4D1KQLX0wprvtUIsQFIGdXaO6suTT5eDbSd\n\t\t\t\t\t6tTwu5xIkGkDmQhhH8OQydoEuCwV245ZwF/8\n\t\t\t\t\tAIsqBYDNQtQ6zhd6jDC+uZJXg/9LuPOxFHbi\n\t\t\t\t\tMTjp6j3CCW0kHbfM/YHZErWWtjPj3U3Z7knQ\n\t\t\t\t\tSIm5PO5FRKBEYDdr5UxWJ/1/20SrzI3iztvP\n\t\t\t\t\twHDsA2rdHm/4YRzq7CvG4N0t9ac/T0a0Sxba\n\t\t\t\t\t/BUX2UVPWaIVBdTRBtgHi0s=\n\t\t\t\t\t) ; KSK; alg = RSASHA256; key id = 33694\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tYNpi1jRDQKpnsQEjIjxqy+kJGaYnV16e8Iug\n\t\t\t\t\t40c82y4pee7kIojFUllSKP44qiJpCArxF557\n\t\t\t\t\ttfjfwBd6c4hkqCScGPZXJ06LMyG4u//rhVMh\n\t\t\t\t\t4hyKcxzQFKxmrFlj3oQGksCI8lxGX6RxiZuR\n\t\t\t\t\tqv2ol2lUWrqetpAL+Zzwt71884E= )\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20160502144311 20160402144311 33694 miek.nl.\n\t\t\t\t\tjKpLDEeyadgM0wDgzEk6sBBdWr2/aCrkAOU/\n\t\t\t\t\tw6dYIafN98f21oIYQfscV1gc7CTsA0vwzzUu\n\t\t\t\t\tx0QgwxoNLMvSxxjOiW/2MzF8eozczImeCWbl\n\t\t\t\t\tad/pVCYH6Jn5UBrZ5RCWMVcs2RP5KDXWeXKs\n\t\t\t\t\tjEN/0EmQg5qNd4zqtlPIQinA9I1HquJAnS56\n\t\t\t\t\tpFvYyGIbZmGEbhR18sXVBeTWYr+zOMHn2quX\n\t\t\t\t\t0kkrx2udz+sPg7i4yRsLdhw138gPRy1qvbaC\n\t\t\t\t\t8ELs1xo1mC9pTlDOhz24Q3iXpVAU1lXLYOh9\n\t\t\t\t\tnUP1/4UvZEYXHBUQk/XPRciojniWjAF825x3\n\t\t\t\t\tQoSivMHblBwRdAKJSg== )\na.miek.nl.\t\t1800\tIN A\t127.0.0.1\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tlUOYdSxScjyYz+Ebc+nb6iTNgCohqj7K+Dat\n\t\t\t\t\t97KE7haV2nP3LxdYuDCJYZpeyhsXDLHd4bFI\n\t\t\t\t\tbInYPwJiC6DUCxPCuCWy0KYlZOWW8KCLX3Ia\n\t\t\t\t\tBOPQbvIwLsJhnX+/tyMD9mXortoqATO79/6p\n\t\t\t\t\tnNxvFeM8pFDwaih17fXMuFR/BsI= )\n\t\t\t14400\tNSEC\ta.b.c.miek.nl. A RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\td5XZEy6SUp+TPRJQED+0R65zf2Yeo/1dlEA2\n\t\t\t\t\tjYYvkXGSHXke4sg9nH8U3nr1rLcuqA1DsQgH\n\t\t\t\t\tuMIjdENvXuZ+WCSwvIbhC+JEI6AyQ6Gfaf/D\n\t\t\t\t\tI3mfu60C730IRByTrKM5C2rt11lwRQlbdaUY\n\t\t\t\t\th23/nn/q98ZKUlzqhAfkLI9pQPc= )\na.b.c.miek.nl.\t\t1800\tIN A\t127.0.0.1\n\t\t\t1800\tRRSIG\tA 8 5 1800 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tFwgU5+fFD4hEebco3gvKQt3PXfY+dcOJr8dl\n\t\t\t\t\tKy4WLsONIdhP+4e9oprPisSLxImErY21BcrW\n\t\t\t\t\txzu1IZrYDsS8XBVV44lBx5WXEKvAOrUcut/S\n\t\t\t\t\tOWhFZW7ncdIQCp32ZBIatiLRJEqXUjx+guHs\n\t\t\t\t\tnoFLiHix35wJWsRKwjGLIhH1fbs= )\n\t\t\t14400\tNSEC\tmiek.nl. A RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 5 14400 (\n\t\t\t\t\t20160502144311 20160402144311 12051 miek.nl.\n\t\t\t\t\tlXgOqm9/jRRYvaG5jC1CDvTtGYxMroTzf4t4\n\t\t\t\t\tjeYGb60+qI0q9sHQKfAJvoQ5o8o1qfR7OuiF\n\t\t\t\t\tf544ipYT9eTcJRyGAOoJ37yMie7ZIoVJ91tB\n\t\t\t\t\tr8YdzZ9Q6x3v1cbwTaQiacwhPZhGYOw63qIs\n\t\t\t\t\tq5IQErIPos2sNk+y9D8BEce2DO4= )",
+  "dbMiekNL": "\n$TTL    30M\n$ORIGIN miek.nl.\n@       IN      SOA     linode.atoom.net. miek.miek.nl. (\n                             1282630057 ; Serial\n                             4H         ; Refresh\n                             1H         ; Retry\n                             7D         ; Expire\n                             4H )       ; Negative Cache TTL\n                IN      NS      linode.atoom.net.\n                IN      NS      ns-ext.nlnetlabs.nl.\n                IN      NS      omval.tednet.nl.\n                IN      NS      ext.ns.whyscream.net.\n\n                IN      MX      1  aspmx.l.google.com.\n                IN      MX      5  alt1.aspmx.l.google.com.\n                IN      MX      5  alt2.aspmx.l.google.com.\n                IN      MX      10 aspmx2.googlemail.com.\n                IN      MX      10 aspmx3.googlemail.com.\n\n\t\tIN      A       139.162.196.78\n\t\tIN      AAAA    2a01:7e00::f03c:91ff:fef1:6735\n\na               IN      A       139.162.196.78\n                IN      AAAA    2a01:7e00::f03c:91ff:fef1:6735\nwww             IN      CNAME   a\narchive         IN      CNAME   a\n*.x             IN      CNAME   www\nb.x             IN      CNAME   a\n*.y             IN      A       139.162.196.78\ndname           IN      DNAME   x\n\nsrv\t\tIN\tSRV     10 10 8080 a.miek.nl.\nmx\t\tIN\tMX      10 a.miek.nl.\n\ntxt     IN\tTXT     \"v=spf1 a mx ~all\"\ncaa     IN  CAA    0 issue letsencrypt.org\n*.nodata    IN   A      139.162.196.79\next-cname   IN   CNAME  example.com.",
+  "dbMiekNLDelegation": "\n$TTL    30M\n$ORIGIN miek.nl.\n@       IN      SOA     linode.atoom.net. miek.miek.nl. (\n                             1282630057 ; Serial\n                             4H         ; Refresh\n                             1H         ; Retry\n                             7D         ; Expire\n                             4H )       ; Negative Cache TTL\n                IN      NS      linode.atoom.net.\n                IN      NS      ns-ext.nlnetlabs.nl.\n                IN      NS      omval.tednet.nl.\n                IN      NS      ext.ns.whyscream.net.\n\n                IN      MX      1  aspmx.l.google.com.\n                IN      MX      5  alt1.aspmx.l.google.com.\n                IN      MX      5  alt2.aspmx.l.google.com.\n                IN      MX      10 aspmx2.googlemail.com.\n                IN      MX      10 aspmx3.googlemail.com.\n\ndelegated\tIN\tNS      a.delegated\n\t\tIN\tNS      ns-ext.nlnetlabs.nl.\n\na.delegated     IN      TXT     \"obscured\"\n                IN      A       139.162.196.78\n                IN      AAAA    2a01:7e00::f03c:91ff:fef1:6735\n\na               IN      A       139.162.196.78\n                IN      AAAA    2a01:7e00::f03c:91ff:fef1:6735\nwww             IN      CNAME   a\narchive         IN      CNAME   a",
+  "dbMiekNLSigned": "\n; File written on Sun Mar 27 04:13:01 2016\n; dnssec_signzone version 9.10.3-P4-Ubuntu\nmiek.nl.\t\t1800\tIN SOA\tlinode.atoom.net. miek.miek.nl. (\n\t\t\t\t\t1459051981 ; serial\n\t\t\t\t\t14400      ; refresh (4 hours)\n\t\t\t\t\t3600       ; retry (1 hour)\n\t\t\t\t\t604800     ; expire (1 week)\n\t\t\t\t\t14400      ; minimum (4 hours)\n\t\t\t\t\t)\n\t\t\t1800\tRRSIG\tSOA 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tFIrzy07acBzrf6kNW13Ypmq/ahojoMqOj0qJ\n\t\t\t\t\tixTevTvwOEcVuw9GlJoYIHTYg+hm1sZHtx9K\n\t\t\t\t\tRiVmYsm8SHKsJA1WzixtT4K7vQvM+T+qbeOJ\n\t\t\t\t\txA6YTivKUcGRWRXQlOTUAlHS/KqBEfmxKgRS\n\t\t\t\t\t68G4oOEClFDSJKh7RbtyQczy1dc= )\n\t\t\t1800\tNS\text.ns.whyscream.net.\n\t\t\t1800\tNS\tomval.tednet.nl.\n\t\t\t1800\tNS\tlinode.atoom.net.\n\t\t\t1800\tNS\tns-ext.nlnetlabs.nl.\n\t\t\t1800\tRRSIG\tNS 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tZLtsQhwaz+CwrgzgFiEAqbqS/JH65MYjziA3\n\t\t\t\t\t6EXwlGDy41lcfGm71PpxA7cDzFhWNkJNk4QF\n\t\t\t\t\tq48wtpP4IGPPpHbnJHKDUXj6se7S+ylAGbS+\n\t\t\t\t\tVgVJ4YaVcE6xA9ZVhVpz8CSSjeH34vmqq9xj\n\t\t\t\t\tzmFjofuDvraZflHfNpztFoR1Vxs= )\n\t\t\t1800\tA\t139.162.196.78\n\t\t\t1800\tRRSIG\tA 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\thl+6Q075tsCkxIqbop8zZ6U8rlFvooz7Izzx\n\t\t\t\t\tMgCZYVLcg75El28EXKIhBfRb1dPaKbd+v+AD\n\t\t\t\t\twrJMHL131pY5sU2Ly05K+7CqmmyaXgDaVsKS\n\t\t\t\t\trSw/TbhGDIItBemeseeuXGAKAbY2+gE7kNN9\n\t\t\t\t\tmZoQ9hRB3SrxE2jhctv66DzYYQQ= )\n\t\t\t1800\tMX\t1 aspmx.l.google.com.\n\t\t\t1800\tMX\t5 alt1.aspmx.l.google.com.\n\t\t\t1800\tMX\t5 alt2.aspmx.l.google.com.\n\t\t\t1800\tMX\t10 aspmx2.googlemail.com.\n\t\t\t1800\tMX\t10 aspmx3.googlemail.com.\n\t\t\t1800\tRRSIG\tMX 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tkLqG+iOrKSzms1H9Et9me8Zts1rbyeCFSVQD\n\t\t\t\t\tG9is/u6ec3Lqg2vwJddf/yRsjVpVgadWSAkc\n\t\t\t\t\tGSDuD2dK8oBeP24axWc3Z1OY2gdMI7w+PKWT\n\t\t\t\t\tZ+pjHVjbjM47Ii/a6jk5SYeOwpGMsdEwhtTP\n\t\t\t\t\tvk2O2WGljifqV3uE7GshF5WNR10= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735\n\t\t\t1800\tRRSIG\tAAAA 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tSsRTHytW4YTAuHovHQgfIMhNwMtMp4gaAU/Z\n\t\t\t\t\tlgTO+IkBb9y9F8uHrf25gG6RqA1bnGV/gezV\n\t\t\t\t\tNU5negXm50bf1BNcyn3aCwEbA0rCGYIL+nLJ\n\t\t\t\t\tszlBVbBu6me/Ym9bbJlfgfHRDfsVy2ZkNL+B\n\t\t\t\t\tjfNQtGCSDoJwshjcqJlfIVSardo= )\n\t\t\t14400\tNSEC\ta.miek.nl. A NS SOA MX AAAA RRSIG NSEC DNSKEY\n\t\t\t14400\tRRSIG\tNSEC 8 2 14400 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tmFfc3r/9PSC1H6oSpdC+FDy/Iu02W2Tf0x+b\n\t\t\t\t\tn6Lpe1gCC1uvcSUrrmBNlyAWRr5Zm+ZXssEb\n\t\t\t\t\tcKddRGiu/5sf0bUWrs4tqokL/HUl10X/sBxb\n\t\t\t\t\tHfwNAeD7R7+CkpMv67li5AhsDgmQzpX2r3P6\n\t\t\t\t\t/6oZyLvODGobysbmzeWM6ckE8IE= )\n\t\t\t1800\tDNSKEY\t256 3 8 (\n\t\t\t\t\tAwEAAcNEU67LJI5GEgF9QLNqLO1SMq1EdoQ6\n\t\t\t\t\tE9f85ha0k0ewQGCblyW2836GiVsm6k8Kr5EC\n\t\t\t\t\tIoMJ6fZWf3CQSQ9ycWfTyOHfmI3eQ/1Covhb\n\t\t\t\t\t2y4bAmL/07PhrL7ozWBW3wBfM335Ft9xjtXH\n\t\t\t\t\tPy7ztCbV9qZ4TVDTW/Iyg0PiwgoXVesz\n\t\t\t\t\t) ; ZSK; alg = RSASHA256; key id = 12051\n\t\t\t1800\tDNSKEY\t257 3 8 (\n\t\t\t\t\tAwEAAcWdjBl4W4wh/hPxMDcBytmNCvEngIgB\n\t\t\t\t\t9Ut3C2+QI0oVz78/WK9KPoQF7B74JQ/mjO4f\n\t\t\t\t\tvIncBmPp6mFNxs9/WQX0IXf7oKviEVOXLjct\n\t\t\t\t\tR4D1KQLX0wprvtUIsQFIGdXaO6suTT5eDbSd\n\t\t\t\t\t6tTwu5xIkGkDmQhhH8OQydoEuCwV245ZwF/8\n\t\t\t\t\tAIsqBYDNQtQ6zhd6jDC+uZJXg/9LuPOxFHbi\n\t\t\t\t\tMTjp6j3CCW0kHbfM/YHZErWWtjPj3U3Z7knQ\n\t\t\t\t\tSIm5PO5FRKBEYDdr5UxWJ/1/20SrzI3iztvP\n\t\t\t\t\twHDsA2rdHm/4YRzq7CvG4N0t9ac/T0a0Sxba\n\t\t\t\t\t/BUX2UVPWaIVBdTRBtgHi0s=\n\t\t\t\t\t) ; KSK; alg = RSASHA256; key id = 33694\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\to/D6o8+/bNGQyyRvwZ2hM0BJ+3HirvNjZoko\n\t\t\t\t\tyGhGe9sPSrYU39WF3JVIQvNJFK6W3/iwlKir\n\t\t\t\t\tTPOeYlN6QilnztFq1vpCxwj2kxJaIJhZecig\n\t\t\t\t\tLsKxY/fOHwZlIbBLZZadQG6JoGRLHnImSzpf\n\t\t\t\t\txtyVaXQtfnJFC07HHt9np3kICfE= )\n\t\t\t1800\tRRSIG\tDNSKEY 8 2 1800 (\n\t\t\t\t\t20160426031301 20160327031301 33694 miek.nl.\n\t\t\t\t\tAk/mbbQVQV+nUgw5Sw/c+TSoYqIwbLARzuNE\n\t\t\t\t\tQJvJNoRR4tKVOY6qSxQv+j5S7vzyORZ+yeDp\n\t\t\t\t\tNlEa1T9kxZVBMABoOtLX5kRqZncgijuH8fxb\n\t\t\t\t\tL57Sv2IzINI9+DOcy9Q9p9ygtwYzQKrYoNi1\n\t\t\t\t\t0hwHi6emGkVG2gGghruMinwOJASGgQy487Yd\n\t\t\t\t\teIpcEKJRw73nxd2le/4/Vafy+mBpKWOczfYi\n\t\t\t\t\t5m9MSSxcK56NFYjPG7TvdIw0m70F/smY9KBP\n\t\t\t\t\tpGWEdzRQDlqfZ4fpDaTAFGyRX0mPFzMbs1DD\n\t\t\t\t\t3hQ4LHUSi/NgQakdH9eF42EVEDeL4cI69K98\n\t\t\t\t\t6NNk6X9TRslO694HKw== )\na.miek.nl.\t\t1800\tIN A\t139.162.196.78\n\t\t\t1800\tRRSIG\tA 8 3 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tlxLotCjWZ3kikNNcePu6HOCqMHDINKFRJRD8\n\t\t\t\t\tlaz2KQ9DKtgXPdnRw5RJvVITSj8GUVzw1ec1\n\t\t\t\t\tCYVEKu/eMw/rc953Zns528QBypGPeMNLe2vu\n\t\t\t\t\tC6a6UhZnGHA48dSd9EX33eSJs0MP9xsC9csv\n\t\t\t\t\tLGdzYmv++eslkKxkhSOk2j/hTxk= )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735\n\t\t\t1800\tRRSIG\tAAAA 8 3 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tji3QMlaUzlK85ppB5Pc+y2WnfqOi6qrm6dm1\n\t\t\t\t\tbXgsEov/5UV1Lmcv8+Y5NBbTbBlXGlWcpqNp\n\t\t\t\t\tuWpf9z3lbguDWznpnasN2MM8t7yxo/Cr7WRf\n\t\t\t\t\tQCzui7ewpWiA5hq7j0kVbM4nnDc6cO+U93hO\n\t\t\t\t\tmMhVbeVI70HM2m0HaHkziEyzVZk= )\n\t\t\t14400\tNSEC\tarchive.miek.nl. A AAAA RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tGqnF6cut/KCxbnJj27MCjjVGkjObV0hLhHOP\n\t\t\t\t\tE1/GXAUTEKG6BWxJq8hidS3p/yrOmP5PEL9T\n\t\t\t\t\t4FjBp0/REdVmGpuLaiHyMselES82p/uMMdY5\n\t\t\t\t\tQqRM6LHhZdO1zsRbyzOZbm5MsW6GR7K2kHlX\n\t\t\t\t\t9TdBIULiRRGPQ1QGQE1ipmSHEao= )\narchive.miek.nl.\t1800\tIN CNAME a.miek.nl.\n\t\t\t1800\tRRSIG\tCNAME 8 3 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\ts4zVJiDrVuUiUFr8CNQLuXYYfpqpl8rovL50\n\t\t\t\t\tBYsub/xK756NENiOTAOjYH6KYg7RSzsygJjV\n\t\t\t\t\tYQwXolZly2/KXAr48SCtxzkGFxLexxiKcFaj\n\t\t\t\t\tvm7ZDl7Btoa5l68qmBcxOX5E/W0IKITi4PNK\n\t\t\t\t\tmhBs7dlaf0IbPGNgMxae72RosxM= )\n\t\t\t14400\tNSEC\tgo.dns.miek.nl. CNAME RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tjEp7LsoK++/PRFh2HieLzasA1jXBpp90NyDf\n\t\t\t\t\tRfpfOxdM69yRKfvXMc2bazIiMuDhxht79dGI\n\t\t\t\t\tGj02cn1cvX60SlaHkeFtqTdJcHdK9rbI65EK\n\t\t\t\t\tYHFZFzGh9XVnuMJKpUsm/xS1dnUSAnXN8q+0\n\t\t\t\t\txBlUDlQpsAFv/cx8lcp4do5fWXg= )\ngo.dns.miek.nl.\t\t1800\tIN TXT\t\"Hello!\"\n\t\t\t1800\tRRSIG\tTXT 8 4 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tO0uo1NsXTq2TTfgOmGbHQQEchrcpllaDAMMX\n\t\t\t\t\tdTDizw3t+vZ5SR32qJ8W7y6VXLgUqJgcdRxS\n\t\t\t\t\tFou1pp+t5juRZSQ0LKgxMpZAgHorkzPvRf1b\n\t\t\t\t\tE9eBKrDSuLGagsQRwHeldFGFgsXtCbf07vVH\n\t\t\t\t\tzoKR8ynuG4/cAoY0JzMhCts+56U= )\n\t\t\t14400\tNSEC\twww.miek.nl. TXT RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 4 14400 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tBW6qo7kYe3Z+Y0ebaVTWTy1c3bpdf8WUEoXq\n\t\t\t\t\tWDQxLDEj2fFiuEBDaSN5lTWRg3wj8kZmr6Uk\n\t\t\t\t\tLvX0P29lbATFarIgkyiAdbOEdaf88nMfqBW8\n\t\t\t\t\tz2T5xrPQcN0F13uehmv395yAJs4tebRxErMl\n\t\t\t\t\tKdkVF0dskaDvw8Wo3YgjHUf6TXM= )\nwww.miek.nl.\t\t1800\tIN CNAME a.miek.nl.\n\t\t\t1800\tRRSIG\tCNAME 8 3 1800 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tMiQQh2lScoNiNVZmMJaypS+wDL2Lar4Zw1zF\n\t\t\t\t\tUo4tL16BfQOt7yl8gXdAH2JMFqoKAoIdM2K6\n\t\t\t\t\tXwFOwKTOGSW0oNCOcaE7ts+1Z1U0H3O2tHfq\n\t\t\t\t\tFAzfg1s9pQ5zxk8J/bJgkVIkw2/cyB0y1/PK\n\t\t\t\t\tEmIqvChBSb4NchTuMCSqo63LJM8= )\n\t\t\t14400\tNSEC\tmiek.nl. CNAME RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 8 3 14400 (\n\t\t\t\t\t20160426031301 20160327031301 12051 miek.nl.\n\t\t\t\t\tOPPZ8iaUPrVKEP4cqeCiiv1WLRAY30GRIhc/\n\t\t\t\t\tme0gBwFkbmTEnvB+rUp831OJZDZBNKv4QdZj\n\t\t\t\t\tUyc26wKUOQeUyMJqv4IRDgxH7nq9GB5JRjYZ\n\t\t\t\t\tIVxtGD1aqWLXz+8aMaf9ARJjtYUd3K4lt8Wz\n\t\t\t\t\tLbJSo5Wdq7GOWqhgkY5n3XD0/FA= )",
+  "dbNoSOA": "\n$TTL         1M\n$ORIGIN      example.org.\n\nwww          IN  A      192.168.0.14\nmail         IN  A      192.168.0.15\nimap         IN  CNAME  mail\n",
+  "dbRelative": "@ 500 IN SOA ns.example. hostmaster.example. 3 3600 600 86400 300\n@ 500 IN NS ns.example.\nfoo 500 IN A 192.0.2.1\n",
+  "dbSOASerialTooLarge": "\n$TTL         1M\n$ORIGIN      example.org.\n\n@            IN  SOA    ns1.example.com. admin.example.com.  (\n                               202512200817 ; Serial - exceeds 32-bit uint\n                               1200       ; Refresh\n                               144        ; Retry\n                               1814400    ; Expire\n                               2h )       ; Minimum\n@            IN  NS     ns1.example.com.\n\nwww          IN  A      192.168.0.14\n",
+  "dbSVCBExample": "\n$TTL 30M\n$ORIGIN example.com.\n@\tIN SOA\tns.example.com. admin.example.com. (\n\t\t\t2024010100 ; serial\n\t\t\t14400      ; refresh (4 hours)\n\t\t\t3600       ; retry (1 hour)\n\t\t\t604800     ; expire (1 week)\n\t\t\t14400      ; minimum (4 hours)\n\t\t\t)\n\tIN NS\tns.example.com.\n\n; A/AAAA records for glue\nns\t\tIN A\t192.0.2.1\nsvc-target\tIN A\t192.0.2.10\n\t\tIN AAAA\t2001:db8::10\n\n; SVCB ServiceMode with in-bailiwick target (tests additional section processing)\n_8443._foo\tIN SVCB\t1 svc-target.example.com. alpn=h2,h3 port=8443\n\n; HTTPS ServiceMode with in-bailiwick target\nwww\t\tIN HTTPS 1 svc-target.example.com. alpn=h2,h3\n\n; SVCB AliasMode (Priority=0)\n_alias._foo\tIN SVCB\t0 svc-target.example.com.\n\n; Wildcard SVCB\n*._tcp\t\tIN SVCB\t1 svc-target.example.com. port=443\n\n; DNS-AID private-use keys (65400-65408)\n_dnsaid\t\tIN HTTPS 1 svc-target.example.com. alpn=h2 key65400=\"https://aid.example.com/cap\" key65401=\"sha256:e3b0c44298fc\" key65406=\"apphub-psc\"\n",
+  "dbSyntaxError": "\n$TTL         1M\n$ORIGIN      example.org.\n\n@            IN  SOA    ns1.example.com. admin.example.com.  (\n                               2005011437 ; Serial\n                               1200       ; Refresh\n                               144        ; Retry\n                               1814400    ; Expire\n                               2h )       ; Minimum\n@            IN  NS     ns1.example.com.\n\n# invalid comment\nwww          IN  A      192.168.0.14\nmail         IN  A      192.168.0.15\nimap         IN  CNAME  mail\n",
+  "dbWildcardAdditional": "\n$TTL 30M\n$ORIGIN example.org.\n@\tIN SOA\tns.example.org. admin.example.org. 2024010100 14400 3600 604800 14400\n\tIN NS\tns.example.org.\nns\tIN A\t192.0.2.1\nmail\tIN A\t192.0.2.10\n\tIN AAAA\t2001:db8::10\n*.wild\tIN MX\t10 mail.example.org.\n",
+  "doubleWildcard": "; example.org test file with wildcard at apex\n$TTL 3600\nexample.org.\t\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2015082541 7200 3600 1209600 3600\nexample.org.\t\tIN\tNS\tb.iana-servers.net.\n*.example.org.          IN      A       127.0.0.53\n*.intern.example.org.   IN      A       127.0.1.52\nfoo.example.org.        IN      A       127.0.0.54\n",
+  "emptyNonTerminalWildcard": "; example.org test file with an empty non-terminal wildcard\n$TTL 3600\nexample.org.             IN     SOA     ns.example.org. hostmaster.example.org. 1 7200 3600 1209600 3600\nexample.org.             IN     NS      ns.example.org.\nf.*.e.example.org.       IN     A       192.0.2.1\nt.e.example.org.         IN     A       192.0.2.2\nreal.deep.e.example.org. IN     A       192.0.2.3\n*.ordinary.example.org.  IN     A       192.0.2.4\n",
+  "exampleApexOnly": "$ORIGIN example.com.\n@   IN      SOA     ns1.example.com. admin.example.com.  (\n                               2005011437 ; Serial\n                               1200       ; Refresh\n                               144        ; Retry\n                               1814400    ; Expire\n                               2h )       ; Minimum\n@           IN  NS      ns1.example.com.\n",
+  "exampleOrg": "; example.org test file\n$TTL 3600\nexample.org.\t\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2015082541 7200 3600 1209600 3600\nexample.org.\t\tIN\tNS\tb.iana-servers.net.\nexample.org.\t\tIN\tNS\ta.iana-servers.net.\nexample.org.\t\tIN\tA\t127.0.0.1\nexample.org.\t\tIN\tA\t127.0.0.2\n*.w.example.org.        IN      TXT     \"Wildcard\"\na.b.c.w.example.org.    IN      TXT     \"Not a wildcard\"\n*.c.example.org.        IN      TXT     \"c Wildcard\"\n*.d.example.org.        IN      CNAME   alias.example.org.\nalias.example.org.      IN      TXT     \"Wildcard CNAME expansion\"\n",
+  "exampleOrgSigned": "\nexample.org.\t\t1800\tIN SOA\ta.iana-servers.net. devnull.example.org. (\n\t\t\t\t\t1282630057 ; serial\n\t\t\t\t\t14400      ; refresh (4 hours)\n\t\t\t\t\t3600       ; retry (1 hour)\n\t\t\t\t\t604800     ; expire (1 week)\n\t\t\t\t\t14400      ; minimum (4 hours)\n\t\t\t\t\t)\n\t\t\t1800\tRRSIG\tSOA 13 2 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tGVnMpFmN+6PDdgCtlYDEYBsnBNDgYmEJNvos\n\t\t\t\t\tBk9+PNTPNWNst+BXCpDadTeqRwrr1RHEAQ7j\n\t\t\t\t\tYWzNwqn81pN+IA== )\n\t\t\t1800\tNS\ta.iana-servers.net.\n\t\t\t1800\tNS\tb.iana-servers.net.\n\t\t\t1800\tRRSIG\tNS 13 2 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tllrHoIuwjnbo28LOt4p5zWAs98XGqrXicKVI\n\t\t\t\t\tQxyaf/ORM8boJvW2XrKr3nj6Y8FKMhzd287D\n\t\t\t\t\t5PBzVCL6MZyjQg== )\n\t\t\t14400\tNSEC\ta.example.org. NS SOA RRSIG NSEC DNSKEY\n\t\t\t14400\tRRSIG\tNSEC 13 2 14400 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tBQROf1swrmYi3GqpP5M/h5vTB8jmJ/RFnlaX\n\t\t\t\t\t7fjxvV7aMvXCsr3ekWeB2S7L6wWFihDYcKJg\n\t\t\t\t\t9BxVPqxzBKeaqg== )\n\t\t\t1800\tDNSKEY\t256 3 13 (\n\t\t\t\t\tUNTqlHbC51EbXuY0rshW19Iz8SkCuGVS+L0e\n\t\t\t\t\tbQj53dvtNlaKfWmtTauC797FoyVLbQwoMy/P\n\t\t\t\t\tG68SXgLCx8g+9g==\n\t\t\t\t\t) ; ZSK; alg = ECDSAP256SHA256; key id = 49035\n\t\t\t1800\tRRSIG\tDNSKEY 13 2 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tLnLHyqYJaCMOt7EHB4GZxzAzWLwEGCTFiEhC\n\t\t\t\t\tjj1X1VuQSjJcN42Zd3yF+jihSW6huknrig0Z\n\t\t\t\t\tMqv0FM6mJ/qPKg== )\na.delegated.example.org. 1800\tIN A\t139.162.196.78\n\t\t\t1800\tTXT\t\"obscured\"\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735\narchive.example.org.\t1800\tIN CNAME a.example.org.\n\t\t\t1800\tRRSIG\tCNAME 13 3 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tSDFW1z/PN9knzH8BwBvmWK0qdIwMVtGrMgRw\n\t\t\t\t\t7lgy4utRrdrRdCSLZy3xpkmkh1wehuGc4R0S\n\t\t\t\t\t05Z3DPhB0Fg5BA== )\n\t\t\t14400\tNSEC\tdelegated.example.org. CNAME RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 13 3 14400 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tDQqLSVNl8F6v1K09wRU6/M6hbHy2VUddnOwn\n\t\t\t\t\tJusJjMlrAOmoOctCZ/N/BwqCXXBA+d9yFGdH\n\t\t\t\t\tknYumXp+BVPBAQ== )\nwww.example.org.\t1800\tIN CNAME a.example.org.\n\t\t\t1800\tRRSIG\tCNAME 13 3 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tadzujOxCV0uBV4OayPGfR11iWBLiiSAnZB1R\n\t\t\t\t\tslmhBFaDKOKSNYijGtiVPeaF+EuZs63pzd4y\n\t\t\t\t\t6Nm2Iq9cQhAwAA== )\n\t\t\t14400\tNSEC\texample.org. CNAME RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 13 3 14400 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tjy3f96GZGBaRuQQjuqsoP1YN8ObZF37o+WkV\n\t\t\t\t\tPL7TruzI7iNl0AjrUDy9FplP8Mqk/HWyvlPe\n\t\t\t\t\tN3cU+W8NYlfDDQ== )\na.example.org.\t\t1800\tIN A\t139.162.196.78\n\t\t\t1800\tRRSIG\tA 13 3 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\t41jFz0Dr8tZBN4Kv25S5dD4vTmviFiLx7xSA\n\t\t\t\t\tqMIuLFm0qibKL07perKpxqgLqM0H1wreT4xz\n\t\t\t\t\tI9Y4Dgp1nsOuMA== )\n\t\t\t1800\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735\n\t\t\t1800\tRRSIG\tAAAA 13 3 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tbrHizDxYCxCHrSKIu+J+XQbodRcb7KNRdN4q\n\t\t\t\t\tVOWw8wHqeBsFNRzvFF6jwPQYphGP7kZh1KAb\n\t\t\t\t\tVuY5ZVVhM2kHjw== )\n\t\t\t14400\tNSEC\tarchive.example.org. A AAAA RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 13 3 14400 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tzIenVlg5ScLr157EWigrTGUgrv7W/1s49Fic\n\t\t\t\t\ti2k+OVjZfT50zw+q5X6DPKkzfAiUhIuqs53r\n\t\t\t\t\thZUzZwV/1Wew9Q== )\ndelegated.example.org.\t1800\tIN NS\ta.delegated.example.org.\n\t\t\t1800\tIN NS\tns-ext.nlnetlabs.nl.\n\t\t\t1800\tDS\t10056 5 1 (\n\t\t\t\t\tEE72CABD1927759CDDA92A10DBF431504B9E\n\t\t\t\t\t1F13 )\n\t\t\t1800\tDS\t10056 5 2 (\n\t\t\t\t\tE4B05F87725FA86D9A64F1E53C3D0E625094\n\t\t\t\t\t6599DFE639C45955B0ED416CDDFA )\n\t\t\t1800\tRRSIG\tDS 13 3 1800 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\trlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1j\n\t\t\t\t\tHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4\n\t\t\t\t\tjbznKKqk+DGKog== )\n\t\t\t14400\tNSEC\tsub.example.org. NS DS RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 13 3 14400 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tlNQ5kRTB26yvZU5bFn84LYFCjwWTmBcRCDbD\n\t\t\t\t\tcqWZvCSw4LFOcqbz1/wJKIRjIXIqnWIrfIHe\n\t\t\t\t\tfZ9QD5xZsrPgUQ== )\nsub.example.org.\t1800\tIN NS\tsub1.example.net.\n\t\t\t1800\tIN NS\tsub2.example.net.\n\t\t\t14400\tNSEC\twww.example.org. NS RRSIG NSEC\n\t\t\t14400\tRRSIG\tNSEC 13 3 14400 (\n\t\t\t\t\t20161129153240 20161030153240 49035 example.org.\n\t\t\t\t\tVYjahdV+TTkA3RBdnUI0hwXDm6U5k/weeZZr\n\t\t\t\t\tix1znORpOELbeLBMJW56cnaG+LGwOQfw9qqj\n\t\t\t\t\tbOuULDst84s4+g== )\n",
+  "nsec3Test": "example.org.\t\t1800\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082508 7200 3600 1209600 3600\naub8v9ce95ie18spjubsr058h41n7pa5.example.org. 284 IN NSEC3 1 1 5 D0CBEAAF0AC77314 AUB95P93VPKP55G6U5S4SGS7LS61ND85 NS SOA TXT RRSIG DNSKEY NSEC3PARAM\naub8v9ce95ie18spjubsr058h41n7pa5.example.org. 284 IN RRSIG NSEC3 8 2 600 20160910232502 20160827231002 14028 example.org. XBNpA7KAIjorPbXvTinOHrc1f630aHic2U716GHLHA4QMx9cl9ss4QjR Wj2UpDM9zBW/jNYb1xb0yjQoez/Jv200w0taSWjRci5aUnRpOi9bmcrz STHb6wIUjUsbJ+NstQsUwVkj6679UviF1FqNwr4GlJnWG3ZrhYhE+NI6 s0k=",
+  "nsec3paramTest": "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1460175181 14400 3600 604800 14400\nmiek.nl.\t\t1800\tIN\tNS\tomval.tednet.nl.\nmiek.nl.\t\t0\tIN\tNSEC3PARAM 1 0 5 A3DEBC9CC4F695C7",
+  "reloadZone2Test": "miek.nl.\t\t1627\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1460175182 14400 3600 604800 14400\nmiek.nl.\t\t1627\tIN\tNS\text.ns.whyscream.net.\nmiek.nl.\t\t1627\tIN\tNS\tomval.tednet.nl.\n",
+  "reloadZoneTest": "miek.nl.\t\t1627\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1460175181 14400 3600 604800 14400\nmiek.nl.\t\t1627\tIN\tNS\text.ns.whyscream.net.\nmiek.nl.\t\t1627\tIN\tNS\tomval.tednet.nl.\nmiek.nl.\t\t1627\tIN\tNS\tlinode.atoom.net.\nmiek.nl.\t\t1627\tIN\tNS\tns-ext.nlnetlabs.nl.\n",
+  "testAdditionalOrigin": "example.org.",
+  "testSVCBOrigin": "example.com.",
+  "testWildcardAdditionalOrigin": "example.org.",
+  "testZone": "secondary.miek.nl.",
+  "testzone": "miek.nl.",
+  "testzone1": "dnssex.nl."
+ },
+ "tables": [
+  {
+   "file": "alias_delegation_test.go",
+   "func": "TestAliasToDelegation",
+   "name": "tests",
+   "line": 28,
+   "value": [
+    {
+     "additional": [
+      "ns.child.example.org.\t300\tIN\tA\t192.0.2.2",
+      "ns.child.example.org.\t300\tIN\tAAAA\t2001:db8::2"
+     ],
+     "answer": [
+      "alias.example.org.\t300\tIN\tCNAME\thost.child.example.org."
+     ],
+     "authoritative": true,
+     "authority": [
+      "child.example.org.\t300\tIN\tNS\tns.child.example.org."
+     ],
+     "name": "CNAME to delegated child",
+     "qname": "alias.example.org.",
+     "qtype": 1
+    },
+    {
+     "additional": [
+      "ns.child.example.org.\t300\tIN\tA\t192.0.2.2",
+      "ns.child.example.org.\t300\tIN\tAAAA\t2001:db8::2"
+     ],
+     "answer": [
+      "alias.example.org.\t300\tIN\tCNAME\thost.child.example.org.",
+      "chain.example.org.\t300\tIN\tCNAME\talias.example.org."
+     ],
+     "authoritative": true,
+     "authority": [
+      "child.example.org.\t300\tIN\tNS\tns.child.example.org."
+     ],
+     "name": "CNAME chain to delegated child",
+     "qname": "chain.example.org.",
+     "qtype": 1
+    },
+    {
+     "additional": [
+      "ns.child.example.org.\t300\tIN\tA\t192.0.2.2",
+      "ns.child.example.org.\t300\tIN\tAAAA\t2001:db8::2"
+     ],
+     "answer": [
+      "name.wild.example.org.\t300\tIN\tCNAME\thost.child.example.org."
+     ],
+     "authoritative": true,
+     "authority": [
+      "child.example.org.\t300\tIN\tNS\tns.child.example.org."
+     ],
+     "name": "wildcard CNAME to delegated child",
+     "qname": "name.wild.example.org.",
+     "qtype": 1
+    },
+    {
+     "additional": [
+      "ns.host.example.org.\t300\tIN\tA\t192.0.2.3",
+      "ns.host.example.org.\t300\tIN\tAAAA\t2001:db8::3"
+     ],
+     "answer": [
+      "host.mapped.example.org.\t300\tIN\tCNAME\thost.example.org.",
+      "mapped.example.org.\t300\tIN\tDNAME\texample.org."
+     ],
+     "authoritative": true,
+     "authority": [
+      "host.example.org.\t300\tIN\tNS\tns.host.example.org."
+     ],
+     "name": "DNAME to delegated child",
+     "qname": "host.mapped.example.org.",
+     "qtype": 1
+    },
+    {
+     "additional": [
+      "ns.host.example.org.\t300\tIN\tA\t192.0.2.3",
+      "ns.host.example.org.\t300\tIN\tAAAA\t2001:db8::3"
+     ],
+     "answer": [
+      "host.mapped.example.org.\t300\tIN\tCNAME\thost.example.org.",
+      "mapped.example.org.\t300\tIN\tDNAME\texample.org."
+     ],
+     "authoritative": true,
+     "authority": [
+      "host.example.org.\t300\tIN\tNS\tns.host.example.org."
+     ],
+     "name": "DNAME NS query to delegated child",
+     "qname": "host.mapped.example.org.",
+     "qtype": 2
+    },
+    {
+     "additional": [
+      "ns.child.example.org.\t300\tIN\tA\t192.0.2.2",
+      "ns.child.example.org.\t300\tIN\tAAAA\t2001:db8::2"
+     ],
+     "answer": null,
+     "authoritative": false,
+     "authority": [
+      "child.example.org.\t300\tIN\tNS\tns.child.example.org."
+     ],
+     "name": "direct delegated child",
+     "qname": "host.child.example.org.",
+     "qtype": 1
+    }
+   ]
+  },
+  {
+   "file": "alias_delegation_test.go",
+   "func": "TestAliasToDelegation",
+   "name": "want",
+   "line": 145,
+   "dropped": "undefined: tc"
+  },
+  {
+   "file": "alias_delegation_test.go",
+   "func": "TestSignedAliasToDelegation",
+   "name": "tests",
+   "line": 204,
+   "value": [
+    {
+     "additional": [
+      "a.delegated.example.org.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.example.org.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "answer": [
+      "alias.example.org.\t1800\tIN\tCNAME\ta.delegated.example.org."
+     ],
+     "authority": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tNS\ta.delegated.example.org.",
+      "delegated.example.org.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog=="
+     ],
+     "name": "signed partial referral",
+     "qname": "alias.example.org.",
+     "qtype": 1
+    },
+    {
+     "additional": null,
+     "answer": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog==",
+      "ds-alias.example.org.\t1800\tIN\tCNAME\tdelegated.example.org."
+     ],
+     "authority": [
+      "example.org.\t1800\tIN\tNS\ta.iana-servers.net.",
+      "example.org.\t1800\tIN\tNS\tb.iana-servers.net.",
+      "example.org.\t1800\tIN\tRRSIG\tNS 13 2 1800 20161129153240 20161030153240 49035 example.org. llrHoIuw="
+     ],
+     "name": "DS at zone cut remains authoritative",
+     "qname": "ds-alias.example.org.",
+     "qtype": 43
+    }
+   ]
+  },
+  {
+   "file": "alias_delegation_test.go",
+   "func": "TestSignedAliasToDelegation",
+   "name": "want",
+   "line": 245,
+   "dropped": "undefined: tc"
+  },
+  {
+   "file": "closest_test.go",
+   "func": "TestClosestEncloser",
+   "name": "tests",
+   "line": 14,
+   "value": [
+    {
+     "in": "miek.nl.",
+     "out": "miek.nl."
+    },
+    {
+     "in": "www.miek.nl.",
+     "out": "www.miek.nl."
+    },
+    {
+     "in": "blaat.miek.nl.",
+     "out": "miek.nl."
+    },
+    {
+     "in": "blaat.www.miek.nl.",
+     "out": "www.miek.nl."
+    },
+    {
+     "in": "www.blaat.miek.nl.",
+     "out": "miek.nl."
+    },
+    {
+     "in": "blaat.a.miek.nl.",
+     "out": "a.miek.nl."
+    },
+    {
+     "in": "blaat.z.a.miek.nl.",
+     "out": "a.miek.nl."
+    }
+   ]
+  },
+  {
+   "file": "delegation_test.go",
+   "name": "delegationTestCases",
+   "line": 14,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "a.delegated.miek.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "delegated.miek.nl.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "foo.delegated.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "foo.delegated.miek.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "foo.delegated.miek.nl.",
+     "Qtype": 6,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 6,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "delegation_test.go",
+   "name": "secureDelegationTestCases",
+   "line": 85,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": [
+      "a.delegated.example.org.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.example.org.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tNS\ta.delegated.example.org.",
+      "delegated.example.org.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog=="
+     ],
+     "Qname": "a.delegated.example.org.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": [
+      "a.delegated.example.org.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.example.org.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tNS\ta.delegated.example.org.",
+      "delegated.example.org.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog=="
+     ],
+     "Qname": "delegated.example.org.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": [
+      "a.delegated.example.org.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.example.org.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tNS\ta.delegated.example.org.",
+      "delegated.example.org.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog=="
+     ],
+     "Qname": "foo.delegated.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": [
+      "a.delegated.example.org.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.example.org.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tNS\ta.delegated.example.org.",
+      "delegated.example.org.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog=="
+     ],
+     "Qname": "foo.delegated.example.org.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 1 EE72CABD1927759CDDA92A10DBF431504B9E1F13",
+      "delegated.example.org.\t1800\tIN\tDS\t10056 5 2 E4B05F87725FA86D9A64F1E53C3D0E6250946599DFE639C45955B0ED416CDDFA",
+      "delegated.example.org.\t1800\tIN\tRRSIG\tDS 13 3 1800 20161129153240 20161030153240 49035 example.org. rlNNzcUmtbjLSl02ZzQGUbWX75yCUx0Mug1jHtKVqRq1hpPE2S3863tIWSlz+W9wz4o19OI4jbznKKqk+DGKog=="
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\ta.iana-servers.net.",
+      "example.org.\t1800\tIN\tNS\tb.iana-servers.net.",
+      "example.org.\t1800\tIN\tRRSIG\tNS 13 2 1800 20161129153240 20161030153240 49035 example.org. llrHoIuw="
+     ],
+     "Qname": "delegated.example.org.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "delegation_test.go",
+   "name": "miekAuth",
+   "line": 157,
+   "value": [
+    "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+    "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+    "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+    "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+   ]
+  },
+  {
+   "file": "dnssec_test.go",
+   "name": "dnssecTestCases",
+   "line": 15,
+   "value": [
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160426031301 20160327031301 12051 miek.nl. FIrzy07acBbtyQczy1dc=",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160426031301 20160327031301 12051 miek.nl. ZLtsQhwazbqSpztFoR1Vxs="
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 6,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735",
+      "miek.nl.\t1800\tIN\tRRSIG\tAAAA 8 2 1800 20160426031301 20160327031301 12051 miek.nl. SsRT="
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160426031301 20160327031301 12051 miek.nl. ZLtsQhwazbqSpztFoR1Vxs="
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160426031301 20160327031301 12051 miek.nl. ZLtsQhwaz+lHfNpztFoR1Vxs="
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "miek.nl.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tMX\t1 aspmx.l.google.com.",
+      "miek.nl.\t1800\tIN\tMX\t10 aspmx2.googlemail.com.",
+      "miek.nl.\t1800\tIN\tMX\t10 aspmx3.googlemail.com.",
+      "miek.nl.\t1800\tIN\tMX\t5 alt1.aspmx.l.google.com.",
+      "miek.nl.\t1800\tIN\tMX\t5 alt2.aspmx.l.google.com.",
+      "miek.nl.\t1800\tIN\tRRSIG\tMX 8 2 1800 20160426031301 20160327031301 12051 miek.nl. kLqG+iOr="
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160426031301 20160327031301 12051 miek.nl. ZLtsQhwazbqSpztFoR1Vxs="
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "a.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.miek.nl.\t1800\tIN\tRRSIG\tA 8 3 1800 20160426031301 20160327031301 12051 miek.nl. lxLotCjWZ3kihTxk=",
+      "www.miek.nl.\t1800\tIN\tCNAME\ta.miek.nl.",
+      "www.miek.nl.\t1800\tIN\tRRSIG\tCNAME 8 3 1800 20160426031301 20160327031301 12051 miek.nl. NVZmMJaypS+wDL2Lar4Zw1zF"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160426031301 20160327031301 12051 miek.nl. ZLtsQhwazbqSpztFoR1Vxs="
+     ],
+     "Qname": "www.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "a.miek.nl.\t14400\tIN\tNSEC\tarchive.miek.nl. A AAAA RRSIG NSEC",
+      "a.miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160426031301 20160327031301 12051 miek.nl. GqnF6cutipmSHEao=",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160426031301 20160327031301 12051 miek.nl. FIrzy07acBbtyQczy1dc=",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "a.miek.nl.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "archive.miek.nl.\t14400\tIN\tNSEC\tgo.dns.miek.nl. CNAME RRSIG NSEC",
+      "archive.miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160426031301 20160327031301 12051 miek.nl. jEpx8lcp4do5fWXg=",
+      "miek.nl.\t14400\tIN\tNSEC\ta.miek.nl. A NS SOA MX AAAA RRSIG NSEC DNSKEY",
+      "miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 2 14400 20160426031301 20160327031301 12051 miek.nl. mFfc3r/9PSC1H6oSpdC",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160426031301 20160327031301 12051 miek.nl. FIrzy07acBbtyQczy1dc=",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "b.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "archive.miek.nl.\t14400\tIN\tNSEC\tgo.dns.miek.nl. CNAME RRSIG NSEC",
+      "archive.miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160426031301 20160327031301 12051 miek.nl. jEpx8lcp4do5fWXg=",
+      "miek.nl.\t14400\tIN\tNSEC\ta.miek.nl. A NS SOA MX AAAA RRSIG NSEC DNSKEY",
+      "miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 2 14400 20160426031301 20160327031301 12051 miek.nl. mFfc3r/9PSC1H6oSpdC",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160426031301 20160327031301 12051 miek.nl. FIrzy07acBbtyQczy1dc=",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "b.blaat.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "a.miek.nl.\t14400\tIN\tNSEC\tarchive.miek.nl. A AAAA RRSIG NSEC",
+      "a.miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160426031301 20160327031301 12051 miek.nl. GqnF6cut/RRGPQ1QGQE1ipmSHEao=",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160426031301 20160327031301 12051 miek.nl. FIrzy07acBbtyQczy1dc=",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "b.a.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "dnssec_test.go",
+   "name": "auth",
+   "line": 111,
+   "value": [
+    "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+    "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+    "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+    "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+    "miek.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160426031301 20160327031301 12051 miek.nl. ZLtsQhwazbqSpztFoR1Vxs="
+   ]
+  },
+  {
+   "file": "ds_test.go",
+   "name": "dsTestCases",
+   "line": 14,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "a.delegated.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.delegated.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.delegated.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "delegated.miek.nl.\t1800\tIN\tNS\ta.delegated.miek.nl.",
+      "delegated.miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl."
+     ],
+     "Qname": "_udp.delegated.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "_udp.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "ent_test.go",
+   "name": "entTestCases",
+   "line": 14,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "b.c.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "a.miek.nl.\t14400\tIN\tNSEC\ta.b.c.miek.nl. A RRSIG NSEC",
+      "a.miek.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160502144311 20160402144311 12051 miek.nl. d5XZEy6SUpq98ZKUlzqhAfkLI9pQPc=",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160502144311 20160402144311 12051 miek.nl. KegoBxA3Tbrhlc4cEdkRiteIkOfsq",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "b.c.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "escape_test.go",
+   "func": "TestLookupOwnerNameWithDecimalEscape",
+   "name": "tc",
+   "line": 36,
+   "value": {
+    "Answer": [
+     "has\\.dot.campus.edu.\t500\tIN\tA\t192.0.2.2"
+    ],
+    "AuthenticatedData": false,
+    "Authoritative": false,
+    "CheckingDisabled": false,
+    "Do": false,
+    "Error": null,
+    "Extra": null,
+    "Ns": [
+     "campus.edu.\t500\tIN\tNS\tns1.outside.edu."
+    ],
+    "Qname": "has\\.dot.campus.edu.",
+    "Qtype": 1,
+    "Rcode": 0,
+    "RecursionAvailable": false,
+    "Truncated": false
+   }
+  },
+  {
+   "file": "escape_test.go",
+   "func": "TestCanonicalEscape",
+   "name": "cases",
+   "line": 56,
+   "value": [
+    {
+     "in": "has\\046dot.campus.edu.",
+     "want": "has\\.dot.campus.edu."
+    },
+    {
+     "in": "has\\.dot.campus.edu.",
+     "want": "has\\.dot.campus.edu."
+    },
+    {
+     "in": "plain.campus.edu.",
+     "want": "plain.campus.edu."
+    },
+    {
+     "in": "a\\009b.campus.edu.",
+     "want": "a\\009b.campus.edu."
+    }
+   ]
+  },
+  {
+   "file": "file_test.go",
+   "func": "TestParseSOAOrigin",
+   "name": "tests",
+   "line": 26,
+   "value": [
+    {
+     "name": "at",
+     "origin": "example.org.",
+     "owner": "@",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "absolute",
+     "origin": "example.org.",
+     "owner": "example.org.",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "mixed case",
+     "origin": "example.org.",
+     "owner": "ExAmPlE.OrG.",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "mixed case origin",
+     "origin": "ExAmPlE.OrG.",
+     "owner": "example.org.",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "origin without final dot",
+     "origin": "example.org",
+     "owner": "@",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "relative to parent",
+     "origin": "example.org.",
+     "owner": "example",
+     "prefix": "$ORIGIN org.\n",
+     "wantErr": false
+    },
+    {
+     "name": "decimal escape",
+     "origin": "example.org.",
+     "owner": "\\101xample.org.",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "escaped dot",
+     "origin": "has\\.dot.example.",
+     "owner": "has\\046dot.example.",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "root",
+     "origin": ".",
+     "owner": "@",
+     "prefix": "",
+     "wantErr": false
+    },
+    {
+     "name": "relative owner",
+     "origin": "test",
+     "owner": "test",
+     "prefix": "",
+     "wantErr": true
+    },
+    {
+     "name": "child",
+     "origin": "example.org.",
+     "owner": "child.example.org.",
+     "prefix": "",
+     "wantErr": true
+    },
+    {
+     "name": "parent",
+     "origin": "example.org.",
+     "owner": "org.",
+     "prefix": "",
+     "wantErr": true
+    },
+    {
+     "name": "unrelated",
+     "origin": "example.org.",
+     "owner": "example.net.",
+     "prefix": "",
+     "wantErr": true
+    },
+    {
+     "name": "different ORIGIN",
+     "origin": "example.org.",
+     "owner": "@",
+     "prefix": "$ORIGIN example.net.\n",
+     "wantErr": true
+    },
+    {
+     "name": "not root",
+     "origin": ".",
+     "owner": "example.org.",
+     "prefix": "",
+     "wantErr": true
+    }
+   ]
+  },
+  {
+   "file": "glue_test.go",
+   "name": "atoomTestCases",
+   "line": 15,
+   "value": [
+    {
+     "Answer": [
+      "atoom.net.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "atoom.net.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "atoom.net.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "atoom.net.\t1800\tIN\tRRSIG\tNS 8 2 1800 20170112031301 20161213031301 53289 atoom.net. DLe+G1jlw="
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": [
+      "linode.atoom.net.\t1800\tIN\tA\t176.58.119.54",
+      "linode.atoom.net.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fe79:234c",
+      "linode.atoom.net.\t1800\tIN\tRRSIG\tA 8 3 1800 20170112031301 20161213031301 53289 atoom.net. Z4Ka4OLDoyxj72CLvkI=",
+      "linode.atoom.net.\t1800\tIN\tRRSIG\tAAAA 8 3 1800 20170112031301 20161213031301 53289 atoom.net. l+9Qc914zFH/okG2fzJ1qolQ="
+     ],
+     "Ns": null,
+     "Qname": "atoom.net.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "lookup_test.go",
+   "name": "dnsTestCases",
+   "line": 16,
+   "value": [
+    {
+     "Answer": [
+      "a.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "www.miek.nl.\t1800\tIN\tCNAME\ta.miek.nl."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "www.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "a.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735",
+      "www.miek.nl.\t1800\tIN\tCNAME\ta.miek.nl."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "www.miek.nl.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 6,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "mIeK.NL.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tMX\t1 aspmx.l.google.com.",
+      "miek.nl.\t1800\tIN\tMX\t10 aspmx2.googlemail.com.",
+      "miek.nl.\t1800\tIN\tMX\t10 aspmx3.googlemail.com.",
+      "miek.nl.\t1800\tIN\tMX\t5 alt1.aspmx.l.google.com.",
+      "miek.nl.\t1800\tIN\tMX\t5 alt2.aspmx.l.google.com."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "a.miek.nl.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "b.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "srv.miek.nl.\t1800\tIN\tSRV\t10 10 8080 a.miek.nl."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "srv.miek.nl.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "mx.miek.nl.\t1800\tIN\tMX\t10 a.miek.nl."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "a.miek.nl.\t1800\tIN\tA\t139.162.196.78",
+      "a.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735"
+     ],
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "mx.miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "asterisk.x.miek.nl.\t1800\tIN\tCNAME\twww.miek.nl."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "asterisk.x.miek.nl.",
+     "Qtype": 5,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "a.b.x.miek.nl.",
+     "Qtype": 5,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "asterisk.y.miek.nl.\t1800\tIN\tA\t139.162.196.78"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "asterisk.y.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "dname.miek.nl.\t1800\tIN\tDNAME\tx.miek.nl.",
+      "foo.dname.miek.nl.\t1800\tIN\tCNAME\tfoo.x.miek.nl."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "foo.dname.miek.nl.",
+     "Qtype": 5,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "ext-cname.miek.nl.\t1800\tIN\tCNAME\texample.com."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "ext-cname.miek.nl.",
+     "Qtype": 1,
+     "Rcode": 2,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "txt.miek.nl.\t1800\tIN\tTXT\t\"v=spf1 a mx ~all\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "txt.miek.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "caa.miek.nl.\t1800\tIN\tCAA\t0 issue \"letsencrypt.org\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\text.ns.whyscream.net.",
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "miek.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "caa.miek.nl.",
+     "Qtype": 257,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "lookup_test.go",
+   "func": "TestLookUpNoDataResult",
+   "name": "noDataTestCases",
+   "line": 201,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "a.miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "wildcard.nodata.miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "lookup_test.go",
+   "func": "TestLookupFallthrough",
+   "name": "fallsWithTestCases",
+   "line": 230,
+   "value": [
+    {
+     "Cases": [
+      {
+       "Answer": null,
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "doesnotexist.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 2,
+       "RecursionAvailable": false,
+       "Truncated": false
+      },
+      {
+       "Answer": null,
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "x.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 2,
+       "RecursionAvailable": false,
+       "Truncated": false
+      }
+     ],
+     "Fall": {
+      "Zones": [
+       "."
+      ]
+     }
+    },
+    {
+     "Cases": [
+      {
+       "Answer": null,
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "a.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "Truncated": false
+      },
+      {
+       "Answer": null,
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "doesnotexist.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 3,
+       "RecursionAvailable": false,
+       "Truncated": false
+      },
+      {
+       "Answer": [],
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "passthrough.a.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 2,
+       "RecursionAvailable": false,
+       "Truncated": false
+      }
+     ],
+     "Fall": {
+      "Zones": [
+       "a.miek.nl."
+      ]
+     }
+    },
+    {
+     "Cases": [
+      {
+       "Answer": null,
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "x.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 2,
+       "RecursionAvailable": false,
+       "Truncated": false
+      },
+      {
+       "Answer": null,
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Do": false,
+       "Error": null,
+       "Extra": null,
+       "Ns": null,
+       "Qname": "wildcard.x.miek.nl.",
+       "Qtype": 1,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "Truncated": false
+      }
+     ],
+     "Fall": {
+      "Zones": [
+       "x.miek.nl."
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "lookup_test.go",
+   "name": "additionalAuth",
+   "line": 364,
+   "value": [
+    "example.org.\t1800\tIN\tNS\tns.example.org."
+   ]
+  },
+  {
+   "file": "lookup_test.go",
+   "name": "additionalTestCases",
+   "line": 368,
+   "value": [
+    {
+     "Answer": [
+      "mx.example.org.\t1800\tIN\tMX\t10 host.example.org.",
+      "mx.example.org.\t1800\tIN\tMX\t20 host.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "host.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "host.example.org.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "mx.example.org.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "srv.example.org.\t1800\tIN\tSRV\t10 50 8080 host.example.org.",
+      "srv.example.org.\t1800\tIN\tSRV\t20 50 8080 host.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "host.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "host.example.org.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "srv.example.org.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "two.example.org.\t1800\tIN\tMX\t10 host.example.org.",
+      "two.example.org.\t1800\tIN\tMX\t20 other.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "host.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "host.example.org.\t1800\tIN\tAAAA\t2001:db8::10",
+      "other.example.org.\t1800\tIN\tA\t192.0.2.20",
+      "other.example.org.\t1800\tIN\tAAAA\t2001:db8::20"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "two.example.org.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "cname-srv.example.org.\t1800\tIN\tCNAME\tsrv.example.org.",
+      "srv.example.org.\t1800\tIN\tSRV\t10 50 8080 host.example.org.",
+      "srv.example.org.\t1800\tIN\tSRV\t20 50 8080 host.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "host.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "host.example.org.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "cname-srv.example.org.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "foo.wild.example.org.\t1800\tIN\tCNAME\tsrv.example.org.",
+      "srv.example.org.\t1800\tIN\tSRV\t10 50 8080 host.example.org.",
+      "srv.example.org.\t1800\tIN\tSRV\t20 50 8080 host.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "host.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "host.example.org.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "foo.wild.example.org.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "dname.example.org.\t1800\tIN\tDNAME\tdsub.example.org.",
+      "srv.dname.example.org.\t1800\tIN\tCNAME\tsrv.dsub.example.org.",
+      "srv.dsub.example.org.\t1800\tIN\tSRV\t10 50 8080 host.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "host.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "host.example.org.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "srv.dname.example.org.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "reload_test.go",
+   "func": "TestZoneReloadByMtime",
+   "name": "expectedNS",
+   "line": 259,
+   "value": [
+    "ext.ns.whyscream.net.",
+    "omval.tednet.nl."
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestFileParse",
+   "name": "tests",
+   "line": 46,
+   "dropped": "undefined: zoneFileName1"
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParseReload",
+   "name": "tests",
+   "line": 150,
+   "dropped": "undefined: name"
+  },
+  {
+   "file": "svcb_test.go",
+   "name": "svcbAuth",
+   "line": 14,
+   "value": [
+    "example.com.\t1800\tIN\tNS\tns.example.com."
+   ]
+  },
+  {
+   "file": "svcb_test.go",
+   "name": "svcbTestCases",
+   "line": 18,
+   "value": [
+    {
+     "Answer": [
+      "_8443._foo.example.com.\t1800\tIN\tSVCB\t1 svc-target.example.com. alpn=\"h2,h3\" port=\"8443\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "svc-target.example.com.\t1800\tIN\tA\t192.0.2.10",
+      "svc-target.example.com.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.com.\t1800\tIN\tNS\tns.example.com."
+     ],
+     "Qname": "_8443._foo.example.com.",
+     "Qtype": 64,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "www.example.com.\t1800\tIN\tHTTPS\t1 svc-target.example.com. alpn=\"h2,h3\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "svc-target.example.com.\t1800\tIN\tA\t192.0.2.10",
+      "svc-target.example.com.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.com.\t1800\tIN\tNS\tns.example.com."
+     ],
+     "Qname": "www.example.com.",
+     "Qtype": 65,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "_alias._foo.example.com.\t1800\tIN\tSVCB\t0 svc-target.example.com."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "svc-target.example.com.\t1800\tIN\tA\t192.0.2.10",
+      "svc-target.example.com.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.com.\t1800\tIN\tNS\tns.example.com."
+     ],
+     "Qname": "_alias._foo.example.com.",
+     "Qtype": 64,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "_http._tcp.example.com.\t1800\tIN\tSVCB\t1 svc-target.example.com. port=\"443\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "svc-target.example.com.\t1800\tIN\tA\t192.0.2.10",
+      "svc-target.example.com.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.com.\t1800\tIN\tNS\tns.example.com."
+     ],
+     "Qname": "_http._tcp.example.com.",
+     "Qtype": 64,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.com.\t1800\tIN\tSOA\tns.example.com. admin.example.com. 2024010100 14400 3600 604800 14400"
+     ],
+     "Qname": "svc-target.example.com.",
+     "Qtype": 64,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.com.\t1800\tIN\tSOA\tns.example.com. admin.example.com. 2024010100 14400 3600 604800 14400"
+     ],
+     "Qname": "nonexistent.example.com.",
+     "Qtype": 64,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "wildcardTestCases",
+   "line": 16,
+   "value": [
+    {
+     "Answer": [
+      "wild.dnssex.nl.\t1800\tIN\tTXT\t\"Doing It Safe Is Better\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "dnssex.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "dnssex.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "dnssex.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "wild.dnssex.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "a.wild.dnssex.nl.\t1800\tIN\tTXT\t\"Doing It Safe Is Better\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "dnssex.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "dnssex.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "dnssex.nl.\t1800\tIN\tNS\tomval.tednet.nl."
+     ],
+     "Qname": "a.wild.dnssex.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "wild.dnssex.nl.\t1800\tIN\tRRSIG\tTXT 8 2 1800 20160428190224 20160329190224 14460 dnssex.nl. FUZSTyvZfeuuOpCm",
+      "wild.dnssex.nl.\t1800\tIN\tTXT\t\"Doing It Safe Is Better\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "a.dnssex.nl.\t14400\tIN\tNSEC\twww.dnssex.nl. A AAAA RRSIG NSEC",
+      "a.dnssex.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160428190224 20160329190224 14460 dnssex.nl. S+UMs2ySgRaaRY",
+      "dnssex.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "dnssex.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "dnssex.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "dnssex.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160428190224 20160329190224 14460 dnssex.nl. dLIeEvP86jj5ndkcLzhgvWixTABjWAGRTGQsPsVDFXsGMf9TGGC9FEomgkCVeNC0="
+     ],
+     "Qname": "wild.dnssex.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "a.wild.dnssex.nl.\t1800\tIN\tRRSIG\tTXT 8 2 1800 20160428190224 20160329190224 14460 dnssex.nl. FUZSTyvZfeuuOpCm",
+      "a.wild.dnssex.nl.\t1800\tIN\tTXT\t\"Doing It Safe Is Better\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "a.dnssex.nl.\t14400\tIN\tNSEC\twww.dnssex.nl. A AAAA RRSIG NSEC",
+      "a.dnssex.nl.\t14400\tIN\tRRSIG\tNSEC 8 3 14400 20160428190224 20160329190224 14460 dnssex.nl. S+UMs2ySgRaaRY",
+      "dnssex.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "dnssex.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+      "dnssex.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+      "dnssex.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160428190224 20160329190224 14460 dnssex.nl. dLIeEvP86jj5ndkcLzhgvWixTABjWAGRTGQsPsVDFXsGMf9TGGC9FEomgkCVeNC0="
+     ],
+     "Qname": "a.wild.dnssex.nl.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "dnssex.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1459281744 14400 3600 604800 14400"
+     ],
+     "Qname": "wild.dnssex.nl.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "*.dnssex.nl.\t14400\tIN\tNSEC\ta.dnssex.nl. TXT RRSIG NSEC",
+      "*.dnssex.nl.\t14400\tIN\tRRSIG\tNSEC 8 2 14400 20160428190224 20160329190224 14460 dnssex.nl. os6INm6q2eXknD5z8TaaDOV+Ge/Ko+2dXnKP+J1fqJzafXJVH1F0nDrcXmMlR6jlBHA=",
+      "dnssex.nl.\t1800\tIN\tRRSIG\tSOA 8 2 1800 20160428190224 20160329190224 14460 dnssex.nl. CA/Y3m9hCOiKC/8ieSOv8SeP964Bq++lyH8BZJcTaabAsERs4xj5PRtcxicwQXZiF8fYUCpROlUS0YR8Cdw=",
+      "dnssex.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1459281744 14400 3600 604800 14400"
+     ],
+     "Qname": "wild.dnssex.nl.",
+     "Qtype": 33,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "dnssexAuth",
+   "line": 72,
+   "value": [
+    "dnssex.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+    "dnssex.nl.\t1800\tIN\tNS\tns-ext.nlnetlabs.nl.",
+    "dnssex.nl.\t1800\tIN\tNS\tomval.tednet.nl.",
+    "dnssex.nl.\t1800\tIN\tRRSIG\tNS 8 2 1800 20160428190224 20160329190224 14460 dnssex.nl. dLIeEvP86jj5ndkcLzhgvWixTABjWAGRTGQsPsVDFXsGMf9TGGC9FEomgkCVeNC0="
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "wildcardDoubleTestCases",
+   "line": 105,
+   "value": [
+    {
+     "Answer": [
+      "wild.w.example.org.\t3600\tIN\tTXT\t\"Wildcard\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\ta.iana-servers.net.",
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "wild.w.example.org.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "wild.c.example.org.\t3600\tIN\tTXT\t\"c Wildcard\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\ta.iana-servers.net.",
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "wild.c.example.org.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "alias.example.org.\t3600\tIN\tTXT\t\"Wildcard CNAME expansion\"",
+      "wild.d.example.org.\t3600\tIN\tCNAME\talias.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\ta.iana-servers.net.",
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "wild.d.example.org.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "alias.example.org.\t3600\tIN\tTXT\t\"Wildcard CNAME expansion\""
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\ta.iana-servers.net.",
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "alias.example.org.",
+     "Qtype": 16,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "exampleAuth",
+   "line": 137,
+   "value": [
+    "example.org.\t3600\tIN\tNS\ta.iana-servers.net.",
+    "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "func": "TestReplaceWithAsteriskLabel",
+   "name": "tests",
+   "line": 169,
+   "value": [
+    {
+     "in": ".",
+     "out": ""
+    },
+    {
+     "in": "miek.nl.",
+     "out": "*.nl."
+    },
+    {
+     "in": "www.miek.nl.",
+     "out": "*.miek.nl."
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "apexWildcardTestCases",
+   "line": 185,
+   "value": [
+    {
+     "Answer": [
+      "foo.example.org.\t3600\tIN\tA\t127.0.0.54"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "foo.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "bar.example.org.\t3600\tIN\tA\t127.0.0.53"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "bar.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "multiWildcardTestCases",
+   "line": 225,
+   "value": [
+    {
+     "Answer": [
+      "foo.example.org.\t3600\tIN\tA\t127.0.0.54"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "foo.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "bar.example.org.\t3600\tIN\tA\t127.0.0.53"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "bar.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "bar.intern.example.org.\t3600\tIN\tA\t127.0.1.52"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "bar.intern.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "wildcardAdditionalTestCases",
+   "line": 317,
+   "value": [
+    {
+     "Answer": [
+      "foo.wild.example.org.\t1800\tIN\tMX\t10 mail.example.org."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": [
+      "mail.example.org.\t1800\tIN\tA\t192.0.2.10",
+      "mail.example.org.\t1800\tIN\tAAAA\t2001:db8::10"
+     ],
+     "Ns": [
+      "example.org.\t1800\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "foo.wild.example.org.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "closerENTWildcardTestCases",
+   "line": 367,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2015082541 7200 3600 1209600 3600"
+     ],
+     "Qname": "nonexistent.deeper.example.org.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "nonexistent.example.org.\t3600\tIN\tA\t127.0.0.53"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tb.iana-servers.net."
+     ],
+     "Qname": "nonexistent.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "wildcard_test.go",
+   "name": "emptyNonTerminalWildcardTestCases",
+   "line": 425,
+   "value": [
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tSOA\tns.example.org. hostmaster.example.org. 1 7200 3600 1209600 3600"
+     ],
+     "Qname": "something.e.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tSOA\tns.example.org. hostmaster.example.org. 1 7200 3600 1209600 3600"
+     ],
+     "Qname": "something.e.example.org.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tSOA\tns.example.org. hostmaster.example.org. 1 7200 3600 1209600 3600"
+     ],
+     "Qname": "something.somewhere.e.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "f.*.e.example.org.\t3600\tIN\tA\t192.0.2.1"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "f.*.e.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tSOA\tns.example.org. hostmaster.example.org. 1 7200 3600 1209600 3600"
+     ],
+     "Qname": "missing.*.e.example.org.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tSOA\tns.example.org. hostmaster.example.org. 1 7200 3600 1209600 3600"
+     ],
+     "Qname": "missing.deep.e.example.org.",
+     "Qtype": 1,
+     "Rcode": 3,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "something.ordinary.example.org.\t3600\tIN\tA\t192.0.2.4"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "example.org.\t3600\tIN\tNS\tns.example.org."
+     ],
+     "Qname": "something.ordinary.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "zone_test.go",
+   "func": "TestNameFromRight",
+   "name": "tests",
+   "line": 16,
+   "value": [
+    {
+     "expected": "example.org.",
+     "in": "example.org.",
+     "labels": 0,
+     "shot": false
+    },
+    {
+     "expected": "example.org.",
+     "in": "a.example.org.",
+     "labels": 0,
+     "shot": false
+    },
+    {
+     "expected": "a.example.org.",
+     "in": "a.example.org.",
+     "labels": 1,
+     "shot": false
+    },
+    {
+     "expected": "a.example.org.",
+     "in": "a.example.org.",
+     "labels": 2,
+     "shot": true
+    },
+    {
+     "expected": "a.b.example.org.",
+     "in": "a.b.example.org.",
+     "labels": 2,
+     "shot": false
+    }
+   ]
+  }
+ ]
+}
