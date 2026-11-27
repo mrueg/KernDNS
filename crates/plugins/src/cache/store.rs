@@ -13,7 +13,8 @@ pub struct Store<T> {
 
 impl<T> Store<T> {
     pub fn new(cap: usize) -> Self {
-        let shard_cap = (cap / SHARDS).max(1);
+        // at least 4 per shard, like plugin/pkg/cache
+        let shard_cap = (cap / SHARDS).max(4);
         Self {
             shards: (0..SHARDS).map(|_| Mutex::new(HashMap::new())).collect(),
             shard_cap,
@@ -47,6 +48,14 @@ impl<T> Store<T> {
         self.shard(key).lock().unwrap().remove(&key);
     }
 
+    /// Keep only the entries for which `f` is true, like `Cache.Walk`
+    /// deleting items.
+    pub fn retain(&self, mut f: impl FnMut(&T) -> bool) {
+        for s in &self.shards {
+            s.lock().unwrap().retain(|_, v| f(v));
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.shards.iter().map(|s| s.lock().unwrap().len()).sum()
     }
@@ -64,9 +73,9 @@ mod tests {
     fn capacity_and_eviction() {
         let s: Store<u32> = Store::new(256);
         for k in 0..512u64 {
-            s.add(k * 256, Arc::new(k as u32)); // all in shard 0, capacity 1
+            s.add(k * 256, Arc::new(k as u32)); // all in shard 0, capacity 4
         }
-        assert_eq!(s.len(), 1);
+        assert_eq!(s.len(), 4);
         assert_eq!(*s.get(511 * 256).unwrap(), 511);
         assert!(!s.add(511 * 256, Arc::new(0)), "replacing doesn't evict");
     }
