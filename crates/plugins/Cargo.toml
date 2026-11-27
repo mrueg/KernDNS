@@ -29,4 +29,6 @@ ring.workspace = true
 md-5.workspace = true
 pprof.workspace = true
 flate2.workspace = true
+maxminddb.workspace = true
+serde.workspace = true
 

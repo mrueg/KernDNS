@@ -1,0 +1,16 @@
+# about: geoip City lookup of the EDNS client subnet (81.2.69.142) on every query, its city selecting a view + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -E 8:000120005102458e
+.:{PORT} {
+    view cambridge {
+        expr metadata('geoip/city/name') == 'Cambridge'
+    }
+    metadata
+    geoip {BENCH}/../third_party/coredns/plugin/geoip/testdata/GeoLite2-City.mmdb {
+        edns-subnet
+    }
+    whoami
+}
+.:{PORT} {
+    chaos
+}

@@ -23,6 +23,7 @@ pub mod errors;
 pub mod expr;
 pub mod file;
 pub mod forward;
+pub mod geoip;
 pub mod grpc;
 pub mod grpc_server;
 pub mod header;
@@ -124,5 +125,6 @@ pub fn registry() -> Registry {
     r.register(proxyproto::Setup);
     r.register(on::Setup);
     r.register(pprof::Setup);
+    r.register(geoip::Setup);
     r
 }
