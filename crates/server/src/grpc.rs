@@ -287,7 +287,7 @@ async fn query(d: &Dispatcher, src: SocketAddr, local: SocketAddr, raw: &[u8]) -
         Ok(m) => m,
         Err(e) => return error(StatusCode::OK, Code::Unknown, &e),
     };
-    let wires = crate::udp::answer(d, msg, raw, src, local, Protocol::Grpc).await;
+    let wires = crate::udp::answer(d, msg, raw, src, local, Protocol::Grpc, Default::default()).await;
     // the writer keeps the last message written, and starts out holding
     // the request itself
     match wires.last() {

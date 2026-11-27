@@ -41,11 +41,15 @@ async fn measure_with(label: &str, corefile: &str, q: &[u8], registry: &kerndns_
         .and_then(|n| n.parse().ok())
         .unwrap_or(300_000);
     for _ in 0..(n / 15).max(1) {
-        assert!(!handle(&d, q, src, local, Protocol::Udp).await.is_empty());
+        assert!(
+            !handle(&d, q, src, local, Protocol::Udp, Default::default())
+                .await
+                .is_empty()
+        );
     }
     let t = Instant::now();
     for _ in 0..n {
-        std::hint::black_box(handle(&d, q, src, local, Protocol::Udp).await);
+        std::hint::black_box(handle(&d, q, src, local, Protocol::Udp, Default::default()).await);
     }
     println!("{label:<24} {:>6.0} ns/query", t.elapsed().as_nanos() as f64 / n as f64);
 }

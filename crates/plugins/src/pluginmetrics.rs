@@ -281,6 +281,16 @@ pub static DNS64_REQUESTS_TRANSLATED: LazyLock<CounterVec> = LazyLock::new(|| {
     )
 });
 
+// shed
+pub static SHED_DROPPED: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "shed",
+        "dropped_total",
+        "Counter of queries and responses dropped, per server, by reason.",
+        &["server", "reason"],
+    )
+});
+
 // siit
 pub static SIIT_REQUESTS_TRANSLATED: LazyLock<CounterVec> = LazyLock::new(|| {
     counter(

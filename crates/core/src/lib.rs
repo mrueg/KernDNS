@@ -30,6 +30,7 @@ pub mod request;
 pub mod response;
 pub mod transfer;
 pub mod typify;
+pub mod udpwrite;
 pub mod upstream;
 pub mod wire;
 pub mod zones;
@@ -42,7 +43,7 @@ pub use handler::{
     Context, Handler, HandlerResult, Next, PluginError, ResponseSigner, client_write, next_or_failure, result_rcode,
 };
 pub use plugin::{BlockConfig, Controller, Hooks, PluginFactory, PluginFn, Registry, SetupError};
-pub use request::{Protocol, Request};
+pub use request::{ConnInfo, Protocol, Request};
 pub use response::{CaptureWriter, Recorder, ResponseWriter};
 pub use upstream::Upstream;
 pub use zones::Fall;

@@ -1,0 +1,6 @@
+# about: shed + whoami: every UDP response goes through the socket's bounded stack and single writer
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    shed
+    whoami
+}

@@ -132,6 +132,9 @@ pub struct BlockConfig {
     /// Connection and stream limits of the DoH, DoH3, gRPC and DoQ
     /// listeners (`https`, `https3`, `grpc_server`, `quic`).
     pub limits: ListenerLimits,
+    /// Takes over the UDP listener's writes (`UDPDecorateWriterFunc`, set
+    /// by `shed`).
+    pub udp_decorator: Option<Arc<dyn crate::udpwrite::UdpDecorator>>,
     /// Handlers registered by setup, with their directive names, in the
     /// order setup ran (which is the execution order).
     pub plugins: Vec<(&'static str, PluginFn)>,
@@ -157,6 +160,7 @@ impl BlockConfig {
             conn: ConnLimits::default(),
             num_sockets: 0,
             limits: ListenerLimits::default(),
+            udp_decorator: None,
             plugins: Vec::new(),
             extensions: Extensions::default(),
         }
