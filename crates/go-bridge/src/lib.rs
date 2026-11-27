@@ -636,6 +636,10 @@ async fn run_next(
 ) -> (u16, Vec<u8>, String) {
     let mut r = req.clone();
     match Message::from_vec(wire) {
+        // Rust plugins rely on the server's guarantee of one question
+        // (`Request::query`); a Go plugin can call its next plugin with a
+        // message without one, so answer SERVFAIL like the server does
+        Ok(m) if m.queries.is_empty() => return (2, Vec::new(), "message without a question".into()),
         Ok(m) => r.msg = m,
         Err(e) => return (2, Vec::new(), e.to_string()),
     }
@@ -768,6 +772,9 @@ pub mod fuzz {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kerndns_core::Protocol;
+    use kerndns_core::proto::op::{MessageType, OpCode, Query};
+    use kerndns_core::proto::rr::{Name, RecordType};
     use kerndns_corefile::Token;
 
     fn tok(text: &str, line: usize) -> Token {
@@ -826,6 +833,37 @@ mod tests {
             fuzz::caddy_lex("a \"b c\" \"d\\\"e\" \"f\\g\" # x\nh\"i ``"),
             vec!["a", "b c", "d\"e", "f\\g", "h\"i", "``"]
         );
+    }
+
+    /// A next plugin that reads the question, as every Rust plugin may.
+    struct ReadsQuestion;
+
+    #[async_trait]
+    impl Handler for ReadsQuestion {
+        fn name(&self) -> &'static str {
+            "reads-question"
+        }
+        async fn serve_dns(&self, _: &mut Context, _: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
+            let _ = req.qname();
+            Ok(ResponseCode::NoError)
+        }
+    }
+
+    /// Found by the CI fuzz job (bridge target): a Go plugin calling its
+    /// next plugin with a message without a question panicked the Rust
+    /// chain at `Request::query`.
+    #[tokio::test]
+    async fn next_without_question_is_servfail() {
+        let a: std::net::SocketAddr = "127.0.0.1:53".parse().unwrap();
+        let mut q = Message::new(1, MessageType::Query, OpCode::Query);
+        q.add_query(Query::query(Name::from_ascii("example.org.").unwrap(), RecordType::A));
+        let req = Request::new(q, a, a, Protocol::Udp);
+        let next: Next = Some(Arc::new(ReadsQuestion));
+        let empty = Message::new(2, MessageType::Query, OpCode::Query).to_vec().unwrap();
+        let mut ctx = Context::new(".", "dns://:53");
+        let (code, out, err) = run_next("test", &next, &mut ctx, &req, &empty).await;
+        assert_eq!((code, out.is_empty()), (2, true));
+        assert!(err.contains("question"), "{err}");
     }
 
     #[test]
