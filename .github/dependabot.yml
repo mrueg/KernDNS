@@ -9,6 +9,10 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # RustCrypto crates share `digest` and only build when updated
+      # together (e.g. hmac 0.13 with sha2/sha1/md-5 0.11)
+      rustcrypto:
+        patterns: [digest, hmac, sha1, sha2, md-5]
       cargo-minor-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 10
