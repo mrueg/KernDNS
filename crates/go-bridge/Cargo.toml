@@ -9,4 +9,4 @@ license.workspace = true
 kerndns-core.workspace = true
 kerndns-corefile.workspace = true
 tokio.workspace = true
-libloading = "0.8"
+libloading = "0.9"
