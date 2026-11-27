@@ -1,0 +1,9 @@
+# about: AXFR of a 100-name zone over TCP (one message per transfer)
+# queries: {DIR}/queries-axfr.txt
+# dnsperf: -m tcp
+example.org:{PORT} {
+    file {FIX}/db.100.example.org
+    transfer {
+        to *
+    }
+}

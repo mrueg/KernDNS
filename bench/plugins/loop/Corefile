@@ -1,0 +1,6 @@
+# about: loop (one probe at startup, then a no-op per query) + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    loop
+    whoami
+}

@@ -1,0 +1,6 @@
+# about: loadbalance shuffles 8 A records per answer (from file)
+# queries: {DIR}/queries.txt
+example.org:{PORT} {
+    loadbalance round_robin
+    file {DIR}/db.example.org
+}

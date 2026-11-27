@@ -1,0 +1,5 @@
+# about: authoritative zone, 100k names: hits, NXDOMAIN, wildcard, CNAME
+# queries: {FIX}/q-file-100k.txt
+example.org:{PORT} {
+    file {FIX}/db.100k.example.org
+}

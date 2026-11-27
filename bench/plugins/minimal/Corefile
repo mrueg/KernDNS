@@ -1,0 +1,6 @@
+# about: minimal strips the authority/additional sections from file answers (10k names)
+# queries: {FIX}/q-file.txt
+example.org:{PORT} {
+    minimal
+    file {FIX}/db.example.org
+}

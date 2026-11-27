@@ -1,0 +1,5 @@
+# about: 100 names with 8 A records each: the loadbalance case without loadbalance
+# queries: {BENCH}/plugins/loadbalance/queries.txt
+example.org:{PORT} {
+    file {BENCH}/plugins/loadbalance/db.example.org
+}

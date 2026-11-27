@@ -1,0 +1,8 @@
+# about: acl blocks (REFUSED) every query
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    acl {
+        block
+    }
+    whoami
+}

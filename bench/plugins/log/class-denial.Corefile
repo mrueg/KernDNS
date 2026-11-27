@@ -1,0 +1,8 @@
+# about: log with "class denial": every query is checked, none is written
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    log . {
+        class denial
+    }
+    whoami
+}

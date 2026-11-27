@@ -1,0 +1,6 @@
+# about: log every query (output to /dev/null) + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    log
+    whoami
+}

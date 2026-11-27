@@ -1,0 +1,12 @@
+# about: caching resolver: errors, health, ready, prometheus, cache, forward, loop, reload
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    errors
+    health 127.0.0.1:0
+    ready 127.0.0.1:0
+    prometheus 127.0.0.1:0
+    cache 30
+    forward . 127.0.0.1:{BACKEND}
+    loop
+    reload
+}

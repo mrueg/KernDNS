@@ -1,0 +1,9 @@
+# about: header sets RA and clears AA on every response + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    header {
+        response set ra
+        response clear aa
+    }
+    whoami
+}

@@ -1,0 +1,6 @@
+# about: prometheus metrics for every query + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    prometheus 127.0.0.1:0
+    whoami
+}

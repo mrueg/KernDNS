@@ -1,0 +1,9 @@
+# about: k8s_external answers for the external IPs of 1000 Services (fake API server)
+# queries: {FIX}/q-k8s-external.txt
+# needs: kubernetes
+example.com:{PORT} cluster.local:{PORT} {
+    k8s_external example.com
+    kubernetes cluster.local {
+        kubeconfig {KUBECONFIG}
+    }
+}

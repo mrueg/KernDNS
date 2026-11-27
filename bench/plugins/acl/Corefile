@@ -1,0 +1,11 @@
+# about: acl with four rules; every query is allowed by the third + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    acl {
+        block type ANY net 192.0.2.0/24
+        filter type AAAA net 10.0.0.0/8
+        allow net 127.0.0.0/8 ::1/128
+        block
+    }
+    whoami
+}

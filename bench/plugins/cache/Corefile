@@ -1,0 +1,6 @@
+# about: cache in front of forward; all hits after warmup
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    cache
+    forward . 127.0.0.1:{BACKEND}
+}

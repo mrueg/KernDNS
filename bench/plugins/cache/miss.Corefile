@@ -1,0 +1,9 @@
+# about: cache with room for 256 answers of each kind in front of forward, 4k names: mostly misses
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    cache {
+        success 256
+        denial 256
+    }
+    forward . 127.0.0.1:{BACKEND}
+}

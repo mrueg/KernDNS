@@ -1,0 +1,9 @@
+# Plugins without a level 2 scenario directory, one per line as
+# "name: reason". `cargo xtask bench --check` fails for every other plugin
+# in KernDNS's registry that has no bench/plugins/<name>/ directory.
+bind: picks the listen addresses; no per-query work
+root: sets the base directory for relative paths at setup; no per-query work
+debug: only turns off panic recovery; no per-query work
+health: an HTTP endpoint outside the DNS path; no per-query work
+ready: an HTTP endpoint outside the DNS path; no per-query work
+reload: polls the Corefile in the background; no per-query work

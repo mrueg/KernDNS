@@ -1,0 +1,6 @@
+# about: cancel adds a deadline to every query + whoami
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    cancel
+    whoami
+}

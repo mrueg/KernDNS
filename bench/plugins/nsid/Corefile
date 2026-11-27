@@ -1,0 +1,7 @@
+# about: nsid adds the NSID option to every response (queries carry an NSID option; dnsperf cannot send an empty one) + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -E 3:00
+.:{PORT} {
+    nsid kerndns-bench
+    whoami
+}

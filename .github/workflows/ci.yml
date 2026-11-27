@@ -22,6 +22,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - name: Every plugin has a benchmark scenario
+        run: cargo xtask bench --check
       - name: CoreDNS integration tests
         run: cargo xtask compat-test
       - name: Differential test against CoreDNS
@@ -30,3 +32,19 @@ jobs:
         run: |
           sudo apt-get install -y etcd-server
           cargo xtask compat-test --bridge
+
+  bench-smoke:
+    # a short level 2 run of a few scenarios: checks that the harness and
+    # the scenarios work with both servers (the numbers mean nothing here)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: third_party/coredns/go.mod
+          cache-dependency-path: third_party/coredns/go.sum
+      - run: sudo apt-get install -y dnsperf
+      - run: cargo xtask bench --level 2 --plugin cache,file,rewrite,tsig --duration 1

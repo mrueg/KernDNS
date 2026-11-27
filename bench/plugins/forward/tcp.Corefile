@@ -1,0 +1,7 @@
+# about: forward over TCP (force_tcp, pooled connections) to a shared upstream
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    forward . 127.0.0.1:{BACKEND} {
+        force_tcp
+    }
+}

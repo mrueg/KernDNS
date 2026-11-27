@@ -1,0 +1,10 @@
+# about: tsig verifies every query (hmac-sha256) and signs every response + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -y hmac-sha256:bench.key.:i9M+00yrECfVZG2qCjr4mPpaGim/Bq+IWMiNrLjUO4Y=
+.:{PORT} {
+    tsig {
+        secret bench.key. i9M+00yrECfVZG2qCjr4mPpaGim/Bq+IWMiNrLjUO4Y=
+        require all
+    }
+    whoami
+}

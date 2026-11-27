@@ -1,0 +1,10 @@
+# about: timeouts on the listeners + whoami (configuration only; expected to cost nothing)
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    timeouts {
+        read 10s
+        write 10s
+        idle 60s
+    }
+    whoami
+}

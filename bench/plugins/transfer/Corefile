@@ -1,0 +1,8 @@
+# about: file (10k names) with transfer enabled: the cost of transfer in the chain
+# queries: {FIX}/q-file.txt
+example.org:{PORT} {
+    file {FIX}/db.example.org
+    transfer {
+        to *
+    }
+}
