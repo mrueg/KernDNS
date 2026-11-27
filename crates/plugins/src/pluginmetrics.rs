@@ -1,0 +1,142 @@
+//! Plugin-specific Prometheus metrics, with CoreDNS's names and labels.
+
+use std::sync::LazyLock;
+
+use prometheus::{
+    CounterVec, GaugeVec, HistogramOpts, HistogramVec, IntCounter, Opts, register_counter_vec, register_gauge_vec,
+    register_histogram_vec, register_int_counter,
+};
+
+fn counter(subsystem: &str, name: &str, help: &str, labels: &[&str]) -> CounterVec {
+    register_counter_vec!(Opts::new(name, help).namespace("coredns").subsystem(subsystem), labels).unwrap()
+}
+
+fn gauge(subsystem: &str, name: &str, help: &str, labels: &[&str]) -> GaugeVec {
+    register_gauge_vec!(Opts::new(name, help).namespace("coredns").subsystem(subsystem), labels).unwrap()
+}
+
+// cache
+pub static CACHE_ENTRIES: LazyLock<GaugeVec> = LazyLock::new(|| {
+    gauge(
+        "cache",
+        "entries",
+        "The number of elements in the cache.",
+        &["server", "type", "zones", "view"],
+    )
+});
+pub static CACHE_REQUESTS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "requests_total",
+        "The count of cache requests.",
+        &["server", "zones", "view"],
+    )
+});
+pub static CACHE_HITS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "hits_total",
+        "The count of cache hits.",
+        &["server", "type", "zones", "view"],
+    )
+});
+pub static CACHE_MISSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "misses_total",
+        "The count of cache misses. Deprecated, derive misses from cache hits/requests counters.",
+        &["server", "zones", "view"],
+    )
+});
+pub static CACHE_PREFETCHES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "prefetch_total",
+        "The number of times the cache has prefetched a cached item.",
+        &["server", "zones", "view"],
+    )
+});
+pub static CACHE_DROPS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "drops_total",
+        "The number responses that are not cached, because the reply is malformed.",
+        &["server", "zones", "view"],
+    )
+});
+pub static CACHE_SERVED_STALE: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "served_stale_total",
+        "The number of requests served from stale cache entries.",
+        &["server", "zones", "view"],
+    )
+});
+pub static CACHE_EVICTIONS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "cache",
+        "evictions_total",
+        "The count of cache evictions.",
+        &["server", "type", "zones", "view"],
+    )
+});
+
+// forward / proxy
+pub static PROXY_REQUEST_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
+    register_histogram_vec!(
+        HistogramOpts::new("request_duration_seconds", "Histogram of the time each request took.")
+            .namespace("coredns")
+            .subsystem("proxy")
+            .buckets(kerndns_core::metrics::time_buckets()),
+        &["proxy_name", "to", "rcode"]
+    )
+    .unwrap()
+});
+pub static PROXY_HC_FAILURES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "proxy",
+        "healthcheck_failures_total",
+        "Counter of the number of failed healthchecks.",
+        &["proxy_name", "to"],
+    )
+});
+pub static FORWARD_HC_BROKEN: LazyLock<IntCounter> = LazyLock::new(|| {
+    register_int_counter!(
+        Opts::new(
+            "healthcheck_broken_total",
+            "Counter of the number of complete failures of the healthchecks."
+        )
+        .namespace("coredns")
+        .subsystem("forward")
+    )
+    .unwrap()
+});
+pub static FORWARD_MAX_CONCURRENT_REJECTS: LazyLock<IntCounter> = LazyLock::new(|| {
+    register_int_counter!(
+        Opts::new(
+            "max_concurrent_rejects_total",
+            "Counter of the number of queries rejected because the concurrent queries were at maximum."
+        )
+        .namespace("coredns")
+        .subsystem("forward")
+    )
+    .unwrap()
+});
+
+// hosts
+pub static HOSTS_ENTRIES: LazyLock<GaugeVec> = LazyLock::new(|| {
+    gauge(
+        "hosts",
+        "entries",
+        "The combined number of entries in hosts and Corefile.",
+        &["hostsfile"],
+    )
+});
+pub static HOSTS_RELOAD_TIME: LazyLock<GaugeVec> = LazyLock::new(|| {
+    gauge(
+        "hosts",
+        "reload_timestamp_seconds",
+        "The timestamp of the last reload of hosts file.",
+        &[],
+    )
+});
