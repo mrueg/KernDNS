@@ -38,32 +38,54 @@ impl std::error::Error for ZoneFileError {}
 /// Read a zone from `text`. `file` is used for errors and relative
 /// `$INCLUDE` paths; `origin` must be fully qualified.
 pub fn parse_zone(text: &str, origin: &Name, file: &Path) -> Result<Vec<Record>, ZoneFileError> {
+    let mut records = Vec::new();
+    parse_zone_with(text, origin, file, &mut |r| {
+        records.push(r);
+        Ok(())
+    })?;
+    Ok(records)
+}
+
+/// Like [`parse_zone`], but hands each record to `sink` as soon as it is
+/// read (like miekg/dns's `ZoneParser.Next`), so a large zone is never held
+/// as text tokens or as a list of records. An error from `sink` stops the
+/// parse and is returned as is.
+pub fn parse_zone_with(
+    text: &str,
+    origin: &Name,
+    file: &Path,
+    sink: &mut dyn FnMut(Record) -> Result<(), ZoneFileError>,
+) -> Result<(), ZoneFileError> {
     let mut st = State {
         origin: origin.clone(),
         def_ttl: None,
         ttl_by_directive: false,
         last_owner: None,
         last_ttl: 0,
-        records: Vec::new(),
+        sink,
     };
-    st.read(text, file, 0)?;
-    Ok(st.records)
+    st.read(text, file, 0)
 }
 
 /// Parse the first record in `text` like miekg/dns's `NewRR`: names are
 /// relative to the root and the default TTL is 3600. `Ok(None)` if `text`
 /// holds no record.
 pub fn new_rr(text: &str) -> Result<Option<Record>, ZoneFileError> {
+    let mut first = None;
+    let mut sink = |r: Record| {
+        first.get_or_insert(r);
+        Ok(())
+    };
     let mut st = State {
         origin: Name::root(),
         def_ttl: Some(3600),
         ttl_by_directive: false,
         last_owner: None,
         last_ttl: 0,
-        records: Vec::new(),
+        sink: &mut sink,
     };
     st.read(text, Path::new(""), 0)?;
-    Ok(st.records.into_iter().next())
+    Ok(first)
 }
 
 #[derive(Debug, Clone)]
@@ -80,10 +102,11 @@ struct Line {
     toks: Vec<Tok>,
 }
 
-/// Split master-file text into logical lines (parentheses join lines).
+/// Split master-file text into logical lines (parentheses join lines) and
+/// hand each to `line` as soon as it is complete. Errors from `line` are
+/// passed through; lexer errors are reported through `lex_err`.
 #[allow(unused_assignments)] // the final push_tok! resets state that is not read again
-fn lex(text: &str) -> Result<Vec<Line>, String> {
-    let mut lines = Vec::new();
+fn lex<E>(text: &str, mut line: impl FnMut(Line) -> Result<(), E>, lex_err: impl Fn(String) -> E) -> Result<(), E> {
     let mut toks: Vec<Tok> = Vec::new();
     let mut cur = String::new();
     let mut in_tok = false;
@@ -175,7 +198,7 @@ fn lex(text: &str) -> Result<Vec<Line>, String> {
             ')' => {
                 push_tok!();
                 if parens == 0 {
-                    return Err(format!("line {line_no}: extra closing parenthesis"));
+                    return Err(lex_err(format!("line {line_no}: extra closing parenthesis")));
                 }
                 parens -= 1;
             }
@@ -184,11 +207,11 @@ fn lex(text: &str) -> Result<Vec<Line>, String> {
                 line_no += 1;
                 if parens == 0 {
                     if !toks.is_empty() {
-                        lines.push(Line {
+                        line(Line {
                             no: start_no,
                             blank_owner,
                             toks: std::mem::take(&mut toks),
-                        });
+                        })?;
                     }
                     blank_owner = false;
                 }
@@ -204,23 +227,23 @@ fn lex(text: &str) -> Result<Vec<Line>, String> {
         }
     }
     if in_quote {
-        return Err(format!("line {line_no}: unterminated quoted string"));
+        return Err(lex_err(format!("line {line_no}: unterminated quoted string")));
     }
     if parens > 0 {
-        return Err(format!("line {line_no}: unbalanced parenthesis"));
+        return Err(lex_err(format!("line {line_no}: unbalanced parenthesis")));
     }
     push_tok!();
     if !toks.is_empty() {
-        lines.push(Line {
+        line(Line {
             no: start_no,
             blank_owner,
             toks,
-        });
+        })?;
     }
-    Ok(lines)
+    Ok(())
 }
 
-struct State {
+struct State<'a> {
     origin: Name,
     /// TTL for records without one: `$TTL`, or the last explicit TTL.
     def_ttl: Option<u32>,
@@ -228,53 +251,56 @@ struct State {
     last_owner: Option<Name>,
     /// TTL of the previous record (miekg/dns reuses its RR header).
     last_ttl: u32,
-    records: Vec<Record>,
+    /// Takes each record as it is read.
+    sink: &'a mut dyn FnMut(Record) -> Result<(), ZoneFileError>,
 }
 
-impl State {
+impl State<'_> {
     fn read(&mut self, text: &str, file: &Path, depth: usize) -> Result<(), ZoneFileError> {
+        let lex_err = |e: String| ZoneFileError(format!("dns: {e} in {}", file.display()));
+        lex(text, |line| self.line(line, file, depth), lex_err)
+    }
+
+    /// One logical line: a directive or a record.
+    fn line(&mut self, line: Line, file: &Path, depth: usize) -> Result<(), ZoneFileError> {
         let err = |no: usize, msg: String| ZoneFileError(format!("dns: {msg}: {}:{no}", file.display()));
-        let lines = lex(text).map_err(|e| ZoneFileError(format!("dns: {e} in {}", file.display())))?;
-        for line in lines {
-            let t = &line.toks;
-            let first = t[0].text.as_str();
-            if !t[0].quoted && first.starts_with('$') {
-                match first.to_ascii_uppercase().as_str() {
-                    "$ORIGIN" => {
-                        let o = t.get(1).ok_or_else(|| err(line.no, "$ORIGIN needs a name".into()))?;
+        let t = &line.toks;
+        let first = t[0].text.as_str();
+        if !t[0].quoted && first.starts_with('$') {
+            match first.to_ascii_uppercase().as_str() {
+                "$ORIGIN" => {
+                    let o = t.get(1).ok_or_else(|| err(line.no, "$ORIGIN needs a name".into()))?;
+                    self.origin = parse_name(&o.text, &self.origin).map_err(|e| err(line.no, e))?;
+                }
+                "$TTL" => {
+                    let v = t.get(1).ok_or_else(|| err(line.no, "$TTL needs a value".into()))?;
+                    self.def_ttl = Some(parse_ttl(&v.text).map_err(|e| err(line.no, format!("bad $TTL: {e}")))?);
+                    self.ttl_by_directive = true;
+                }
+                "$INCLUDE" => {
+                    if depth >= MAX_INCLUDE_DEPTH {
+                        return Err(err(line.no, "too deeply nested $INCLUDE".into()));
+                    }
+                    let p = t.get(1).ok_or_else(|| err(line.no, "$INCLUDE needs a file".into()))?;
+                    let mut path = PathBuf::from(&p.text);
+                    if path.is_relative() {
+                        path = file.parent().unwrap_or(Path::new(".")).join(path);
+                    }
+                    let content = std::fs::read_to_string(&path)
+                        .map_err(|e| err(line.no, format!("failed to open `{}': {e}", path.display())))?;
+                    let saved = self.origin.clone();
+                    if let Some(o) = t.get(2) {
                         self.origin = parse_name(&o.text, &self.origin).map_err(|e| err(line.no, e))?;
                     }
-                    "$TTL" => {
-                        let v = t.get(1).ok_or_else(|| err(line.no, "$TTL needs a value".into()))?;
-                        self.def_ttl = Some(parse_ttl(&v.text).map_err(|e| err(line.no, format!("bad $TTL: {e}")))?);
-                        self.ttl_by_directive = true;
-                    }
-                    "$INCLUDE" => {
-                        if depth >= MAX_INCLUDE_DEPTH {
-                            return Err(err(line.no, "too deeply nested $INCLUDE".into()));
-                        }
-                        let p = t.get(1).ok_or_else(|| err(line.no, "$INCLUDE needs a file".into()))?;
-                        let mut path = PathBuf::from(&p.text);
-                        if path.is_relative() {
-                            path = file.parent().unwrap_or(Path::new(".")).join(path);
-                        }
-                        let content = std::fs::read_to_string(&path)
-                            .map_err(|e| err(line.no, format!("failed to open `{}': {e}", path.display())))?;
-                        let saved = self.origin.clone();
-                        if let Some(o) = t.get(2) {
-                            self.origin = parse_name(&o.text, &self.origin).map_err(|e| err(line.no, e))?;
-                        }
-                        self.read(&content, &path, depth + 1)?;
-                        self.origin = saved;
-                    }
-                    other => return Err(err(line.no, format!("unsupported directive {other}"))),
+                    self.read(&content, &path, depth + 1)?;
+                    self.origin = saved;
                 }
-                continue;
+                other => return Err(err(line.no, format!("unsupported directive {other}"))),
             }
-            let rec = self.record(&line).map_err(|e| err(line.no, e))?;
-            self.records.push(rec);
+            return Ok(());
         }
-        Ok(())
+        let rec = self.record(&line).map_err(|e| err(line.no, e))?;
+        (self.sink)(rec)
     }
 
     fn record(&mut self, line: &Line) -> Result<Record, String> {

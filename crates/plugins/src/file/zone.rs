@@ -1,7 +1,7 @@
 //! Zone data: a canonical-order tree of owner names plus the apex records,
 //! ported from `plugin/file/zone.go` and `plugin/file/tree`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use kerndns_core::proto::dnssec::rdata::DNSSECRData;
 use kerndns_core::proto::rr::{Name, RData, Record, RecordType};
 
-use super::zonefile::{ZoneFileError, parse_zone};
+use super::zonefile::{ZoneFileError, parse_zone_with};
 
 /// The type an RRSIG covers.
 pub fn rrsig_covers(r: &Record) -> Option<RecordType> {
@@ -31,25 +31,47 @@ pub fn label_count(n: &Name) -> usize {
     n.iter().count()
 }
 
-/// All records of one owner name, by type.
+/// All records of one owner name, grouped by type (in the order each type
+/// first appeared). A name has only a few records, so one exactly sized
+/// list is both smaller and faster to search than a map of lists.
 #[derive(Debug, Clone)]
 pub struct Elem {
-    name: Name,
-    m: HashMap<RecordType, Vec<Record>>,
+    /// Never empty; the first record's name is the element's name.
+    rrs: Vec<Record>,
 }
 
 impl Elem {
     pub fn name(&self) -> &Name {
-        &self.name
+        &self.rrs[0].name
     }
 
     /// Records of type `t` (empty if none).
     pub fn typ(&self, t: RecordType) -> &[Record] {
-        self.m.get(&t).map(Vec::as_slice).unwrap_or(&[])
+        let Some(start) = self.rrs.iter().position(|r| r.record_type() == t) else {
+            return &[];
+        };
+        let len = self.rrs[start..].iter().take_while(|r| r.record_type() == t).count();
+        &self.rrs[start..start + len]
     }
 
     pub fn has(&self, t: RecordType) -> bool {
-        self.m.contains_key(&t)
+        self.rrs.iter().any(|r| r.record_type() == t)
+    }
+
+    /// Add `r` after the records of its type.
+    fn push(&mut self, r: Record) {
+        let t = r.record_type();
+        let at = self
+            .rrs
+            .iter()
+            .rposition(|x| x.record_type() == t)
+            .map_or(self.rrs.len(), |i| i + 1);
+        if self.rrs.len() == self.rrs.capacity() {
+            // grow by half instead of doubling (or starting at four): most
+            // names have one or two records
+            self.rrs.reserve_exact((self.rrs.len() / 2).max(1));
+        }
+        self.rrs.insert(at, r);
     }
 
     /// Records of type `t` renamed to `qname`, for wildcard answers.
@@ -65,7 +87,7 @@ impl Elem {
     }
 
     pub fn all(&self) -> impl Iterator<Item = &Record> {
-        self.m.values().flatten()
+        self.rrs.iter()
     }
 }
 
@@ -78,11 +100,15 @@ pub struct Tree {
 
 impl Tree {
     pub fn insert(&mut self, r: Record) {
-        let e = self.map.entry(r.name.clone()).or_insert_with(|| Elem {
-            name: r.name.clone(),
-            m: HashMap::new(),
-        });
-        e.m.entry(r.record_type()).or_default().push(r);
+        match self.map.get_mut(&r.name) {
+            Some(e) => e.push(r),
+            None => {
+                let mut rrs = Vec::with_capacity(1);
+                let name = r.name.clone();
+                rrs.push(r);
+                self.map.insert(name, Elem { rrs });
+            }
+        }
     }
 
     pub fn search(&self, name: &Name) -> Option<&Elem> {
@@ -270,20 +296,19 @@ impl std::fmt::Display for LoadError {
 /// Parse a zone file for `origin`, like `file.Parse`. If `serial` is not
 /// negative and the file's SOA has that serial, return `NoChange`.
 pub fn parse(text: &str, origin: &Name, file: &Path, serial: i64) -> Result<ZoneData, LoadError> {
-    let records = parse_zone(text, origin, file).map_err(|ZoneFileError(e)| {
-        LoadError::Other(format!(
-            "failed to parse file {:?} for origin {} with error {}",
-            file.display().to_string(),
-            origin,
-            e
-        ))
-    })?;
     let mut data = ZoneData::default();
     let mut seen_soa = false;
-    for rr in records {
+    // why the sink stopped the parse
+    let mut stop: Option<LoadError> = None;
+    // like file.Parse: records go into the zone as they are read
+    let mut sink = |rr: Record| -> Result<(), ZoneFileError> {
+        let mut fail = |e: LoadError| {
+            stop = Some(e);
+            Err(ZoneFileError(String::new()))
+        };
         if let RData::SOA(soa) = &rr.data {
             if &rr.name != origin {
-                return Err(LoadError::Other(format!(
+                return fail(LoadError::Other(format!(
                     "file {:?} has SOA owner {} that does not match origin {}",
                     file.display().to_string(),
                     rr.name,
@@ -293,7 +318,7 @@ pub fn parse(text: &str, origin: &Name, file: &Path, serial: i64) -> Result<Zone
             if !seen_soa {
                 seen_soa = true;
                 if serial >= 0 && soa.serial as i64 == serial {
-                    return Err(LoadError::NoChange {
+                    return fail(LoadError::NoChange {
                         origin: origin.to_string(),
                         file: file.display().to_string(),
                         serial,
@@ -301,8 +326,23 @@ pub fn parse(text: &str, origin: &Name, file: &Path, serial: i64) -> Result<Zone
                 }
             }
         }
-        data.insert(origin, rr).map_err(LoadError::Other)?;
+        match data.insert(origin, rr) {
+            Ok(()) => Ok(()),
+            Err(e) => fail(LoadError::Other(e)),
+        }
+    };
+    let parsed = parse_zone_with(text, origin, file, &mut sink);
+    if let Some(e) = stop {
+        return Err(e);
     }
+    parsed.map_err(|ZoneFileError(e)| {
+        LoadError::Other(format!(
+            "failed to parse file {:?} for origin {} with error {}",
+            file.display().to_string(),
+            origin,
+            e
+        ))
+    })?;
     if !seen_soa {
         return Err(LoadError::Other(format!(
             "file {:?} has no SOA record for origin {}",
