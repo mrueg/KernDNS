@@ -47,6 +47,9 @@ struct Running {
     handle: DispatcherHandle,
     /// Our UDP, TCP, DoT, DoH, DoH3, DoQ and gRPC loops.
     tasks: tokio::task::JoinSet<()>,
+    /// Whether its UDP writes are decorated (`shed`), fixed when the
+    /// listener started.
+    shed: bool,
 }
 
 impl Running {
@@ -149,6 +152,12 @@ impl Instance {
                             r.info.label,
                             r.info.servers,
                             l.num_sockets.max(1)
+                        );
+                    }
+                    if l.udp_decorator.is_some() != r.shed {
+                        kerndns_core::warning!(
+                            "{}: adding or removing shed takes effect after a restart, not on reload",
+                            r.info.label
                         );
                     }
                     r.handle.update(&l.zones, l.class_chaos);
@@ -272,7 +281,7 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
     };
     let servers = tcp.len().max(1);
     let mut tasks = match l.transport {
-        Transport::Dns => udp::serve(udp, dispatcher.clone(), any_local),
+        Transport::Dns => udp::serve(udp, dispatcher.clone(), any_local, l.udp_decorator.clone()),
         Transport::Quic => {
             let s = quic::Settings::new(&l.limits, &conn);
             let ep = quic::endpoint(
@@ -320,7 +329,12 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
         tcp: tcp_local,
         servers,
     };
-    Ok(Running { info, handle, tasks })
+    Ok(Running {
+        info,
+        handle,
+        tasks,
+        shed: l.udp_decorator.is_some(),
+    })
 }
 
 fn merge(mut a: tokio::task::JoinSet<()>, b: tokio::task::JoinSet<()>) -> tokio::task::JoinSet<()> {

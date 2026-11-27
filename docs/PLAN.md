@@ -271,6 +271,14 @@ More wave 5 ports:
   is marked (`Context::synthesis`), and the mark travels with every
   internal lookup made under it, so `siit` and `dns64` never re-enter each
   other, as in CoreDNS.
+- `shed`: UDP responses go through a bounded stack per socket (depth
+  1024, oldest evicted, newest sent first) and one writer task; while a
+  socket's stack is full its queries are dropped before the chain, counted
+  in `coredns_shed_dropped_total{server, reason}`. The listener installs
+  the writer when it binds the socket (`UdpDecorator`, CoreDNS's
+  `UDPDecorateWriterFunc`), so adding or removing `shed` takes a restart
+  (a reload warns). Tokio has no equivalent of Go's per-socket write mutex
+  limit; the plugin bounds the same backlog.
 
 Performance follow-ups from the first benchmarks, done:
 

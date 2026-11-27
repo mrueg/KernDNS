@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use kerndns_core::proto::op::{Header, Message, MessageType, ResponseCode};
 use kerndns_core::proto::serialize::binary::{BinDecodable, BinDecoder};
-use kerndns_core::{Protocol, Request};
+use kerndns_core::udpwrite::UdpDecorator;
+use kerndns_core::{ConnInfo, Protocol, Request};
 use socket2::{Domain, Protocol as SockProto, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::task::JoinSet;
@@ -46,12 +47,24 @@ pub fn bind_reuseport(addr: SocketAddr, n: usize) -> std::io::Result<Vec<UdpSock
     Ok(socks)
 }
 
-/// Serve `socks` until the returned tasks are aborted.
-pub fn serve(socks: Vec<UdpSocket>, dispatcher: Dispatcher, local: SocketAddr) -> JoinSet<()> {
+/// Serve `socks` until the returned tasks are aborted. With a
+/// `decorator` (`shed`), each socket's responses go through the writer it
+/// installs instead of straight to the socket.
+pub fn serve(
+    socks: Vec<UdpSocket>,
+    dispatcher: Dispatcher,
+    local: SocketAddr,
+    decorator: Option<Arc<dyn UdpDecorator>>,
+) -> JoinSet<()> {
     let mut set = JoinSet::new();
     for sock in socks {
         let sock = Arc::new(sock);
         let d = dispatcher.clone();
+        let writer = decorator.as_ref().map(|dec| {
+            let (w, task) = dec.decorate(d.label(), sock.clone());
+            set.spawn(task);
+            w
+        });
         set.spawn(async move {
             let mut buf = vec![0u8; 65535];
             loop {
@@ -60,10 +73,19 @@ pub fn serve(socks: Vec<UdpSocket>, dispatcher: Dispatcher, local: SocketAddr) -
                     Err(_) => continue,
                 };
                 let packet = buf[..n].to_vec();
-                let (sock, d) = (sock.clone(), d.clone());
+                let (sock, d, writer) = (sock.clone(), d.clone(), writer.clone());
                 tokio::spawn(async move {
-                    for wire in handle(&d, &packet, src, local, Protocol::Udp).await {
-                        let _ = sock.send_to(&wire, src).await;
+                    let conn = ConnInfo {
+                        udp_writer: writer.clone(),
+                    };
+                    let wires = handle(&d, &packet, src, local, Protocol::Udp, conn).await;
+                    for wire in wires {
+                        match &writer {
+                            Some(w) => w.write(wire, src),
+                            None => {
+                                let _ = sock.send_to(&wire, src).await;
+                            }
+                        }
                     }
                 });
             }
@@ -79,6 +101,7 @@ pub async fn handle(
     src: SocketAddr,
     local: SocketAddr,
     protocol: Protocol,
+    conn: ConnInfo,
 ) -> Vec<Vec<u8>> {
     let msg = match Message::from_vec(packet) {
         Ok(m) => m,
@@ -88,7 +111,7 @@ pub async fn handle(
     if msg.metadata.message_type == MessageType::Response {
         return Vec::new();
     }
-    answer(d, msg, packet, src, local, protocol).await
+    answer(d, msg, packet, src, local, protocol, conn).await
 }
 
 /// Serve a parsed request `msg` (received as `packet`); returns the wire
@@ -100,9 +123,11 @@ pub async fn answer(
     src: SocketAddr,
     local: SocketAddr,
     protocol: Protocol,
+    conn: ConnInfo,
 ) -> Vec<Vec<u8>> {
     let mut req = Request::new(msg, local, src, protocol);
     req.wire = Some(Arc::from(packet));
+    req.conn = conn;
     let answer = d.answer(&req).await;
     let size = crate::dispatch::effective_request(&req, answer.edns.as_deref(), answer.bufsize).size() as usize;
     encode(answer, size)

@@ -48,6 +48,7 @@ pub mod reload;
 pub mod rewrite;
 pub mod root;
 pub mod secondary;
+pub mod shed;
 pub mod sign;
 pub mod siit;
 pub mod template;
@@ -116,5 +117,6 @@ pub fn registry() -> Registry {
     r.register(dnssec::Setup);
     r.register(sign::Setup);
     r.register(siit::Setup);
+    r.register(shed::Setup);
     r
 }

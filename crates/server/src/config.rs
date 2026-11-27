@@ -69,6 +69,9 @@ pub struct ListenerPlan {
     /// DoH/DoH3/gRPC/DoQ limits: those of the listener's first zone, like
     /// CoreDNS's `group[0]` (DoH's `max_streams` from any zone).
     pub limits: kerndns_core::plugin::ListenerLimits,
+    /// Decorates the UDP sockets' writes (`shed`); the last block on the
+    /// listener that sets one wins, like CoreDNS.
+    pub udp_decorator: Option<Arc<dyn kerndns_core::udpwrite::UdpDecorator>>,
 }
 
 impl ListenerPlan {
@@ -248,6 +251,7 @@ fn group_by_listener(configs: &[BlockConfig]) -> Result<Vec<ListenerPlan>, LoadE
                             conn: Default::default(),
                             num_sockets: cfg.num_sockets,
                             limits,
+                            udp_decorator: None,
                         });
                         https_streams.push(None);
                         listeners.len() - 1
@@ -270,6 +274,9 @@ fn group_by_listener(configs: &[BlockConfig]) -> Result<Vec<ListenerPlan>, LoadE
                     l.tls = cfg.tls.clone();
                 }
                 l.conn.merge(&cfg.conn);
+                if cfg.udp_decorator.is_some() {
+                    l.udp_decorator = cfg.udp_decorator.clone();
+                }
                 l.zones.push((key.zone.clone(), handler.clone()));
             }
         }

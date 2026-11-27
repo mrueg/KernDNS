@@ -106,7 +106,7 @@ pass  TestSIITAfterForward
 pass  TestSecondaryFallthrough
 pass  TestSecondaryZoneNotify
 pass  TestSecondaryZoneTransfer
-xfail TestShed                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'shed' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestShed
 pass  TestTLS
 skip  TestTempFile                                    does not start a server through the test helpers
 pass  TestTemplateUpstream

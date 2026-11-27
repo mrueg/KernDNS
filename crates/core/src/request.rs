@@ -76,6 +76,23 @@ pub struct Request {
     /// The request exactly as received, when it came off the wire (TSIG
     /// verification needs the original bytes).
     pub wire: Option<std::sync::Arc<[u8]>>,
+    /// What the listener knows about the connection beyond its addresses.
+    pub conn: ConnInfo,
+}
+
+/// Per-connection extras a listener attaches to a request.
+#[derive(Clone, Default)]
+pub struct ConnInfo {
+    /// The UDP socket's decorated writer (`shed`), if any.
+    pub udp_writer: Option<std::sync::Arc<dyn crate::udpwrite::UdpWriter>>,
+}
+
+impl fmt::Debug for ConnInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ConnInfo")
+            .field("udp_writer", &self.udp_writer.is_some())
+            .finish()
+    }
 }
 
 /// `name` lowercased and fully qualified in presentation format. Labels
@@ -112,6 +129,7 @@ impl Request {
             remote,
             protocol,
             wire: None,
+            conn: ConnInfo::default(),
         }
     }
 

@@ -274,6 +274,7 @@ async fn stream(shared: &Shared, conn: &quinn::Connection, mut send: SendStream,
         conn.remote_address(),
         shared.local,
         Protocol::Quic,
+        Default::default(),
     )
     .await;
     // the writer closes the stream after the first message, so later ones

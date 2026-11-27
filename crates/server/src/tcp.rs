@@ -133,7 +133,7 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
             Ok(Ok(_)) => {}
             _ => return,
         }
-        for wire in handle(d, &buf, src, local, protocol).await {
+        for wire in handle(d, &buf, src, local, protocol, Default::default()).await {
             let Ok(n) = u16::try_from(wire.len()) else {
                 kerndns_core::error!("dropping a {}-byte response: too big for TCP", wire.len());
                 continue;
