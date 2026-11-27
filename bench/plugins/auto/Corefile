@@ -1,0 +1,7 @@
+# about: zones loaded from a directory (the 10k-name zone), served like file
+# queries: {FIX}/q-file.txt
+example.org:{PORT} {
+    auto example.org {
+        directory {FIX} ^db\.(example\.org)$ {1}
+    }
+}

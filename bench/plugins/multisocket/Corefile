@@ -1,0 +1,6 @@
+# about: whoami behind 2 SO_REUSEPORT servers per address
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    multisocket 2
+    whoami
+}
