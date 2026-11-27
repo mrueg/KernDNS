@@ -1,0 +1,232 @@
+{
+ "plugin": "proxyproto",
+ "strings": {},
+ "tables": [
+  {
+   "file": "metadata_test.go",
+   "func": "TestMetadataThroughChain",
+   "name": "tlvs",
+   "line": 22,
+   "value": [
+    {
+     "Type": 234,
+     "Value": {
+      "bytes": "cafe"
+     }
+    }
+   ]
+  },
+  {
+   "file": "metadata_test.go",
+   "func": "TestMetadataPublishesTLV",
+   "name": "tlvs",
+   "line": 110,
+   "value": [
+    {
+     "Type": 234,
+     "Value": {
+      "bytes": "0102"
+     }
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 16,
+   "value": [
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow 127.0.0.1/8 ::1/128\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow 127.0.0.1/8 ::1/128\ndefault ignore\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking 28s\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 28000000000,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow 10.0.0.0/8\nudp_session_tracking 1m\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 60000000000,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking 28s 20000\n}",
+     "sessionTrackingMaxSessions": 20000,
+     "sessionTrackingTTL": 28000000000,
+     "shouldErr": false
+    },
+    {
+     "config": true,
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow 10.0.0.0/8\nudp_session_tracking 1m 500\n}",
+     "sessionTrackingMaxSessions": 500,
+     "sessionTrackingTTL": 60000000000,
+     "shouldErr": false
+    },
+    {
+     "config": false,
+     "expectedErrContent": "unknown option",
+     "expectedRoot": "",
+     "input": "proxyproto {\nunknown\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "Wrong argument",
+     "expectedRoot": "",
+     "input": "proxyproto extra_arg",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "invalid CIDR address",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow invalid_ip\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "Wrong argument",
+     "expectedRoot": "",
+     "input": "proxyproto {\nallow 127.0.0.1/8\ndefault invalid_policy\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "Wrong argument",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "Wrong argument",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking 28s 100 extra\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "invalid duration",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking notaduration\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "invalid max sessions",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking 28s notanumber\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "invalid max sessions",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking 28s 0\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    },
+    {
+     "config": false,
+     "expectedErrContent": "invalid max sessions",
+     "expectedRoot": "",
+     "input": "proxyproto {\nudp_session_tracking 28s -1\n}",
+     "sessionTrackingMaxSessions": 0,
+     "sessionTrackingTTL": 0,
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestTLVMetadataFlag",
+   "name": "tests",
+   "line": 92,
+   "value": [
+    {
+     "expectTLV": true,
+     "input": "proxyproto {\ntlv_metadata\n}",
+     "shouldErr": false
+    },
+    {
+     "expectTLV": true,
+     "input": "proxyproto {\nallow 10.0.0.0/8\ntlv_metadata\n}",
+     "shouldErr": false
+    },
+    {
+     "expectTLV": false,
+     "input": "proxyproto {\nallow 10.0.0.0/8\n}",
+     "shouldErr": false
+    },
+    {
+     "expectTLV": false,
+     "input": "proxyproto {\ntlv_metadata on\n}",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1024 @@
+{
+ "plugin": "dns64",
+ "strings": {
+  "pluginName": "dns64"
+ },
+ "tables": [
+  {
+   "file": "dns64_test.go",
+   "func": "TestRequestShouldIntercept",
+   "name": "tests",
+   "line": 25,
+   "value": [
+    {
+     "allowIpv4": true,
+     "msg": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 37379,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "should intercept request from IPv6 network - AAAA - IN",
+     "remoteIP": "::1",
+     "want": true
+    },
+    {
+     "allowIpv4": true,
+     "msg": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 15559,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "should intercept request from IPv4 network - AAAA - IN",
+     "remoteIP": "127.0.0.1",
+     "want": true
+    },
+    {
+     "allowIpv4": false,
+     "msg": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 56546,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "should not intercept request from IPv4 network - AAAA - IN",
+     "remoteIP": "127.0.0.1",
+     "want": false
+    },
+    {
+     "allowIpv4": false,
+     "msg": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 18046,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "name": "should not intercept request from IPv6 network - A - IN",
+     "remoteIP": "::1",
+     "want": false
+    }
+   ]
+  },
+  {
+   "file": "dns64_test.go",
+   "func": "TestResponseShould",
+   "name": "tests",
+   "line": 111,
+   "value": [
+    {
+     "expected": false,
+     "resp": {
+      "Answer": [
+       "example.com.\t3600\tIN\tAAAA\t::1"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": null
+     },
+     "translateAll": false
+    },
+    {
+     "expected": true,
+     "resp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 1 1 1 1"
+      ],
+      "Question": null
+     },
+     "translateAll": false
+    },
+    {
+     "expected": true,
+     "resp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 4,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 1 1 1 1"
+      ],
+      "Question": null
+     },
+     "translateAll": false
+    },
+    {
+     "expected": false,
+     "resp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 3,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 1 1 1 1"
+      ],
+      "Question": null
+     },
+     "translateAll": false
+    },
+    {
+     "expected": true,
+     "resp": {
+      "Answer": [
+       "example.com.\t3600\tIN\tAAAA\t::1"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": null
+     },
+     "translateAll": true
+    }
+   ]
+  },
+  {
+   "file": "dns64_test.go",
+   "func": "TestDNS64",
+   "name": "cases",
+   "line": 193,
+   "value": [
+    {
+     "aResp": {
+      "Answer": [
+       "example.com.\t60\tIN\tA\t192.0.2.42",
+       "example.com.\t5000\tIN\tA\t192.0.2.43"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 43,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "initResp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t70\tIN\tSOA\tfoo. bar. 1 1 1 1 1"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "standard flow",
+     "req": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "resp": {
+      "Answer": [
+       "example.com.\t60\tIN\tAAAA\t64:ff9b::c000:22a",
+       "example.com.\t70\tIN\tAAAA\t64:ff9b::c000:22b"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     }
+    },
+    {
+     "aResp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 43,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 7200 900 1209600 86400"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "initResp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 7200 900 1209600 86400"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "a empty",
+     "req": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "resp": {
+      "Answer": [],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 7200 900 1209600 86400"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     }
+    },
+    {
+     "aResp": {
+      "Answer": [
+       "example.com.\t60\tIN\tA\t192.0.2.42",
+       "example.com.\t5000\tIN\tA\t192.0.2.43"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 43,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "initResp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 5,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "non-nxdomain error",
+     "req": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "resp": {
+      "Answer": [
+       "example.com.\t60\tIN\tAAAA\t64:ff9b::c000:22a",
+       "example.com.\t600\tIN\tAAAA\t64:ff9b::c000:22b"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     }
+    },
+    {
+     "aResp": null,
+     "initResp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 3,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 7200 900 1209600 86400"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "nxdomain",
+     "req": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "resp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 3,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t3600\tIN\tSOA\tfoo. bar. 1 7200 900 1209600 86400"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     }
+    },
+    {
+     "aResp": null,
+     "initResp": {
+      "Answer": [
+       "example.com.\t60\tIN\tAAAA\t::1",
+       "example.com.\t5000\tIN\tAAAA\t::2"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "AAAA record",
+     "req": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "resp": {
+      "Answer": [
+       "example.com.\t60\tIN\tAAAA\t::1",
+       "example.com.\t5000\tIN\tAAAA\t::2"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     }
+    },
+    {
+     "aResp": {
+      "Answer": [
+       "example.com.\t60\tIN\tA\t192.0.2.42",
+       "example.com.\t5000\tIN\tA\t192.0.2.43"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 43,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": true,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "initResp": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": [
+       "example.com.\t70\tIN\tSOA\tfoo. bar. 1 1 1 1 1"
+      ],
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "name": "truncated A response",
+     "req": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     },
+     "resp": {
+      "Answer": [
+       "example.com.\t60\tIN\tAAAA\t64:ff9b::c000:22a",
+       "example.com.\t70\tIN\tAAAA\t64:ff9b::c000:22b"
+      ],
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 42,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": true,
+       "Truncated": true,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.com.",
+        "Qclass": 1,
+        "Qtype": 28
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupDns64",
+   "name": "tests",
+   "line": 30,
+   "value": [
+    {
+     "inputUpstreams": "dns64",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 64:dead::/96",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:dead::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\ttranslate_all\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 64:ff9b::/96\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 64:ff9b::/32\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/32"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 64:ff9b::/52\n\t\t\t}",
+     "shouldErr": true,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/52"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 64:ff9b::/104\n\t\t\t}",
+     "shouldErr": true,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/104"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 8.8.8.8/24\n\t\t\t}",
+     "shouldErr": true,
+     "wantAllowIpv4": false,
+     "wantPrefix": "8.8.9.9/24"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 64:ff9b::/96\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 2002:ac12:b083::/96\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "2002:ac12:b083::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tprefix 2002:c0a8:a88a::/48\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": false,
+     "wantPrefix": "2002:c0a8:a88a::/48"
+    },
+    {
+     "inputUpstreams": "dns64 foobar {\n\t\t\t\tprefix 64:ff9b::/96\n\t\t\t}",
+     "shouldErr": true,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 foobar",
+     "shouldErr": true,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tfoobar\n\t\t\t}",
+     "shouldErr": true,
+     "wantAllowIpv4": false,
+     "wantPrefix": "64:ff9b::/96"
+    },
+    {
+     "inputUpstreams": "dns64 {\n\t\t\t\tallow_ipv4\n\t\t\t}",
+     "shouldErr": false,
+     "wantAllowIpv4": true,
+     "wantPrefix": "64:ff9b::/96"
+    }
+   ]
+  }
+ ]
+}

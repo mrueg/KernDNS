@@ -29,6 +29,7 @@ fn dir() -> PathBuf {
 /// One extracted table.
 pub struct Table {
     pub id: String,
+    pub file: String,
     pub value: Value,
     pub error: Option<String>,
     pub dropped: Option<String>,
@@ -69,6 +70,7 @@ pub struct Run {
 
 impl Run {
     pub fn load(plugin: &str) -> Run {
+        let plugin = plugin.trim_start_matches("r#");
         let path = dir().join(format!("{plugin}.json"));
         let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         let v: Value = serde_json::from_str(&text).unwrap();
@@ -93,6 +95,7 @@ impl Run {
             let id = if *n == 1 { base } else { format!("{base}@{n}") };
             tables.push(Table {
                 id,
+                file: t["file"].as_str().unwrap_or("").to_string(),
                 value: t["value"].clone(),
                 error: t["error"].as_str().map(str::to_string),
                 dropped: t["dropped"].as_str().map(str::to_string),
@@ -233,6 +236,28 @@ impl Run {
             if not_extracted.is_empty() { "" } else { ":\n  " },
             not_extracted.join("\n  ")
         );
+        let mut run_files: Vec<&str> = self
+            .tables
+            .iter()
+            .filter(|t| self.used.contains(&t.id))
+            .map(|t| t.file.as_str())
+            .collect();
+        run_files.sort();
+        run_files.dedup();
+        let mut other: Vec<&str> = self
+            .tables
+            .iter()
+            .map(|t| t.file.as_str())
+            .filter(|f| !run_files.contains(f))
+            .collect();
+        other.sort();
+        other.dedup();
+        eprintln!(
+            "plugin_cases_files {}: run {}; not run {}",
+            self.plugin,
+            run_files.join(","),
+            other.join(",")
+        );
         assert!(
             self.failures.is_empty(),
             "{}: {} problems:\n  {}",
@@ -273,9 +298,20 @@ impl Drop for TempDir {
 /// Calls of the `nomad` stand-in per tag.
 static NEXT_CALLS: std::sync::Mutex<BTreeMap<String, usize>> = std::sync::Mutex::new(BTreeMap::new());
 
+type ReplyFn = Arc<dyn Fn(&Request) -> (Option<Message>, ResponseCode) + Send + Sync>;
+
+/// Responses of `nomad TAG reply` per tag.
+static REPLIES: std::sync::Mutex<BTreeMap<String, ReplyFn>> = std::sync::Mutex::new(BTreeMap::new());
+
 /// How often the `nomad TAG ...` stand-in has been called.
 pub fn next_calls(tag: &str) -> usize {
     NEXT_CALLS.lock().unwrap().get(tag).copied().unwrap_or(0)
+}
+
+/// What `nomad TAG reply` does: the message to write (if any) and the
+/// rcode to return. Like the Go tests' hand-written next handlers.
+pub fn set_reply(tag: &str, f: impl Fn(&Request) -> (Option<Message>, ResponseCode) + Send + Sync + 'static) {
+    REPLIES.lock().unwrap().insert(tag.to_string(), Arc::new(f));
 }
 
 /// The next handlers of the Go tests, registered as directive `nomad`
@@ -283,15 +319,21 @@ pub fn next_calls(tag: &str) -> usize {
 /// under test):
 ///
 /// - `nomad TAG rcode NAME`: `test.NextHandler(rcode, nil)`, writes nothing;
-/// - `nomad TAG error`: `test.ErrorHandler()`, writes SERVFAIL.
+/// - `nomad TAG error`: `test.ErrorHandler()`, writes SERVFAIL;
+/// - `nomad TAG reply`: runs what [`set_reply`] registered for TAG.
 ///
 /// Each call is counted under TAG ([`next_calls`]).
 struct TestNext;
 
+enum NextMode {
+    Rcode(ResponseCode),
+    Error,
+    Reply,
+}
+
 struct TestNextHandler {
     tag: String,
-    write: bool,
-    rcode: ResponseCode,
+    mode: NextMode,
 }
 
 impl PluginFactory for TestNext {
@@ -302,12 +344,12 @@ impl PluginFactory for TestNext {
     fn setup(&self, c: &mut Controller<'_>) -> Result<(), SetupError> {
         c.next();
         let args = c.remaining_args();
-        let (tag, write, rcode) = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
-            [tag, "error"] => (tag.to_string(), true, ResponseCode::ServFail),
+        let (tag, mode) = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
+            [tag, "error"] => (tag.to_string(), NextMode::Error),
+            [tag, "reply"] => (tag.to_string(), NextMode::Reply),
             [tag, "rcode", rc] => (
                 tag.to_string(),
-                false,
-                match rc {
+                NextMode::Rcode(match rc {
                     "NOERROR" => ResponseCode::NoError,
                     "NXDOMAIN" => ResponseCode::NXDomain,
                     "SERVFAIL" => ResponseCode::ServFail,
@@ -315,15 +357,19 @@ impl PluginFactory for TestNext {
                     "FORMERR" => ResponseCode::FormErr,
                     "NOTIMP" => ResponseCode::NotImp,
                     _ => return Err(c.arg_err()),
-                },
+                }),
             ),
             _ => return Err(c.arg_err()),
         };
+        let mode = Arc::new(mode);
         c.add_plugin(move |_| {
             Arc::new(TestNextHandler {
                 tag: tag.clone(),
-                write,
-                rcode,
+                mode: match *mode {
+                    NextMode::Rcode(rc) => NextMode::Rcode(rc),
+                    NextMode::Error => NextMode::Error,
+                    NextMode::Reply => NextMode::Reply,
+                },
             })
         });
         Ok(())
@@ -338,10 +384,26 @@ impl Handler for TestNextHandler {
 
     async fn serve_dns(&self, _: &mut Context, w: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
         *NEXT_CALLS.lock().unwrap().entry(self.tag.clone()).or_default() += 1;
-        if self.write {
-            let _ = w.write_msg(req.error_reply(self.rcode)).await;
+        match self.mode {
+            NextMode::Rcode(rc) => Ok(rc),
+            NextMode::Error => {
+                let _ = w.write_msg(req.error_reply(ResponseCode::ServFail)).await;
+                Ok(ResponseCode::ServFail)
+            }
+            NextMode::Reply => {
+                let f = REPLIES
+                    .lock()
+                    .unwrap()
+                    .get(&self.tag)
+                    .cloned()
+                    .expect("set_reply for the tag");
+                let (m, rc) = f(req);
+                if let Some(m) = m {
+                    let _ = w.write_msg(m).await;
+                }
+                Ok(rc)
+            }
         }
-        Ok(self.rcode)
     }
 }
 
@@ -349,6 +411,103 @@ pub fn registry() -> Registry {
     let mut r = kerndns_plugins::registry();
     r.register(TestNext);
     r
+}
+
+/// A `*dns.Msg` (or `dns.Msg`) of a table.
+pub fn msg_from(v: &Value) -> Message {
+    let h = &v["MsgHdr"];
+    let flag = |k: &str| h[k].as_bool().unwrap_or(false);
+    let response = flag("Response");
+    let mut m = Message::new(
+        u16_of(&h["Id"]),
+        if response {
+            MessageType::Response
+        } else {
+            MessageType::Query
+        },
+        match u16_of(&h["Opcode"]) {
+            0 => OpCode::Query,
+            4 => OpCode::Notify,
+            5 => OpCode::Update,
+            n => OpCode::Unknown(n as u8),
+        },
+    );
+    m.metadata.authoritative = flag("Authoritative");
+    m.metadata.truncation = flag("Truncated");
+    m.metadata.recursion_desired = flag("RecursionDesired");
+    m.metadata.recursion_available = flag("RecursionAvailable");
+    m.metadata.authentic_data = flag("AuthenticatedData");
+    m.metadata.checking_disabled = flag("CheckingDisabled");
+    m.metadata.response_code = ResponseCode::from(0, u16_of(&h["Rcode"]) as u8);
+    for q in v["Question"].as_array().into_iter().flatten() {
+        let mut query = Query::query(
+            Name::from_ascii(str_of(&q["Name"])).unwrap(),
+            RecordType::from(u16_of(&q["Qtype"])),
+        );
+        query.set_query_class(DNSClass::from(u16_of(&q["Qclass"])));
+        m.add_query(query);
+    }
+    m.answers = records(&v["Answer"]);
+    m.authorities = records(&v["Ns"]);
+    m.additionals = records(&v["Extra"]);
+    for x in v["Extra"].as_array().into_iter().flatten() {
+        if let Ok(Want::Opt { udp, do_bit }) = want(x) {
+            set_edns(&mut m, udp, do_bit);
+        }
+    }
+    m
+}
+
+/// A response compared field by field, as `reflect.DeepEqual` on two
+/// `*dns.Msg` does for what goes on the wire: id, flags, rcode, question and
+/// the records of each section in order (as text).
+pub fn same_msg(want: &Message, got: &Message) -> Result<(), String> {
+    let hdr = |m: &Message| {
+        let h = &m.metadata;
+        format!(
+            "id={} qr={:?} op={:?} aa={} tc={} rd={} ra={} ad={} cd={} rcode={}",
+            h.id,
+            h.message_type,
+            h.op_code,
+            h.authoritative,
+            h.truncation,
+            h.recursion_desired,
+            h.recursion_available,
+            h.authentic_data,
+            h.checking_disabled,
+            h.response_code
+        )
+    };
+    if hdr(want) != hdr(got) {
+        return Err(format!("header {} != {}", hdr(got), hdr(want)));
+    }
+    if want.queries != got.queries {
+        return Err(format!("question {:?} != {:?}", got.queries, want.queries));
+    }
+    for (name, w, g) in [
+        ("answer", &want.answers, &got.answers),
+        ("ns", &want.authorities, &got.authorities),
+        ("extra", &want.additionals, &got.additionals),
+    ] {
+        let w: Vec<String> = w.iter().map(|r| r.to_string()).collect();
+        let g: Vec<String> = g.iter().map(|r| r.to_string()).collect();
+        if w != g {
+            return Err(format!("{name}: {g:?} != {w:?}"));
+        }
+    }
+    Ok(())
+}
+
+/// Records from presentation format (the tables' `test.A(...)` etc.).
+pub fn records(v: &Value) -> Vec<Record> {
+    v.as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| match want(r) {
+            Ok(Want::Rr(r)) => Some(*r),
+            _ => None,
+        })
+        .collect()
 }
 
 /// A Corefile loaded through KernDNS's normal setup, served in-process by
@@ -388,18 +547,9 @@ impl Server {
         self
     }
 
-    /// The response the client gets, if any. TCP by default so that large
-    /// answers aren't truncated: CoreDNS's unit tests call the plugin
-    /// directly and never truncate.
-    pub async fn exchange(&self, m: Message) -> Option<Message> {
-        self.exchange_from(m, REMOTE).await
-    }
-
-    pub async fn exchange_from(&self, m: Message, remote: &str) -> Option<Message> {
-        self.serve_from(m, remote).await.msg
-    }
-
     /// What the chain did, like calling `ServeDNS` on the plugin in Go.
+    /// TCP by default so that large answers aren't truncated: CoreDNS's
+    /// unit tests call the plugin directly and never truncate.
     pub async fn serve(&self, m: Message) -> Served {
         self.serve_from(m, REMOTE).await
     }
@@ -541,11 +691,11 @@ pub fn want(v: &Value) -> Result<Want, String> {
         Ok(Some(r)) => Ok(Want::Rr(Box::new(r))),
         Ok(None) => Err(format!("no record in {s:?}")),
         Err(e) => {
-            // miekg/dns keeps an RRSIG's signature as text, and the tables
-            // abbreviate it to invalid base64; test.Section doesn't compare
-            // it, so any valid signature does
+            // the tables abbreviate RRSIG signatures and DNSKEY keys to
+            // invalid base64, which miekg/dns doesn't check; test.Section
+            // compares neither, so any valid value does
             let f: Vec<&str> = s.split_whitespace().collect();
-            if f.len() > 4 && f[3] == "RRSIG" {
+            if f.len() > 4 && matches!(f[3], "RRSIG" | "DNSKEY") {
                 let fixed = format!("{} AAAA", f[..f.len() - 1].join(" "));
                 if let Ok(Some(r)) = new_rr(&fixed) {
                     return Ok(Want::Rr(Box::new(r)));
@@ -720,12 +870,68 @@ pub fn setup_corefile(corefile: &str) -> Result<(), String> {
 /// setup fails and `content`, if given and not empty, a substring of the
 /// error.
 pub fn setup_rows(r: &mut Run, id: &str, input: &str, should_err: &str, content: Option<&str>) {
+    setup_rows_with(r, id, input, should_err, content, &SetupOpts::default());
+}
+
+/// How a setup table's input becomes a Corefile.
+#[derive(Default)]
+pub struct SetupOpts<'a> {
+    /// Format of the directive text, `{}` is the input (e.g. `cache {{\n{}\n}}`
+    /// for tables of options inside the block).
+    pub wrap: Option<&'a str>,
+    /// `root` directory for relative file names (files the Go test writes
+    /// into its working directory).
+    pub root: Option<&'a str>,
+    /// Run the input as a whole Corefile.
+    pub corefile: bool,
+    /// The input is a list of arguments after the directive (`args`).
+    pub args_of: Option<&'a str>,
+}
+
+pub fn setup_rows_with(r: &mut Run, id: &str, input: &str, should_err: &str, content: Option<&str>, o: &SetupOpts<'_>) {
     for (row, v) in r.rows(id) {
-        let res = setup(str_of(&v[input]));
-        let want_err = v[should_err].as_bool().unwrap_or(false);
+        let text = match o.args_of {
+            Some(d) => format!(
+                "{d} {}",
+                v[input]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|a| {
+                        let a = str_of(a);
+                        if a.is_empty() || a.contains(char::is_whitespace) || a.contains('"') {
+                            format!("{a:?}")
+                        } else {
+                            a.to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            None => str_of(&v[input]).to_string(),
+        };
+        let text = match o.wrap {
+            Some(w) => w.replace("{}", &text),
+            None => text,
+        };
+        let body = match o.root {
+            Some(root) => format!("root {root}\n{text}"),
+            None => text.clone(),
+        };
+        let res = if o.corefile {
+            setup_corefile(&body)
+        } else {
+            setup(&body)
+        };
+        let want_err = match &v[should_err] {
+            Value::Bool(b) => *b,
+            // an expected error message: setup fails if it isn't empty
+            Value::String(s) => !s.is_empty(),
+            _ => false,
+        };
         let out = match (&res, want_err) {
-            (Ok(()), true) => Err(format!("expected an error for {:?}", str_of(&v[input]))),
-            (Err(e), false) => Err(format!("unexpected error for {:?}: {e}", str_of(&v[input]))),
+            (Ok(()), true) => Err(format!("expected an error for {text:?}")),
+            (Err(e), false) => Err(format!("unexpected error for {text:?}: {e}")),
             (Err(e), true) => match content.map(|c| str_of(&v[c])) {
                 Some(c) if !c.is_empty() && !e.contains(c) => Err(format!("error {e:?} does not contain {c:?}")),
                 _ => Ok(()),
@@ -733,6 +939,80 @@ pub fn setup_rows(r: &mut Run, id: &str, input: &str, should_err: &str, content:
             (Ok(()), false) => Ok(()),
         };
         r.check(id, &row, out);
+    }
+}
+
+/// Input fields of setup tables, the boolean "setup fails" fields and the
+/// "error contains" fields, by the names CoreDNS's tests use.
+const SETUP_INPUT: &[&str] = &[
+    "input",
+    "config",
+    "inputFileRules",
+    "inputUpstreams",
+    "inputErrorsRules",
+    "inputLogRules",
+    "corefile",
+    "in",
+];
+const SETUP_ERR: &[&str] = &[
+    "shouldErr",
+    "wantErr",
+    "expectedErr",
+    "shouldError",
+    "expectErr",
+    "err",
+    "fail",
+];
+const SETUP_CONTENT: &[&str] = &[
+    "expectedErrContent",
+    "errContains",
+    "expectedErrMsg",
+    "errMsg",
+    "wantErrContent",
+];
+
+impl Run {
+    /// Run every table that has the shape
+    /// `{input: Corefile snippet for this plugin, shouldErr: bool, ...}`:
+    /// setup must succeed or fail as it does in CoreDNS, and fail with the
+    /// expected message when the table has one. Fields that hold the
+    /// parsed configuration are Go internals and not compared.
+    pub fn auto_setup(&mut self) {
+        let plugin = self.plugin.clone();
+        let ids: Vec<(String, &'static str, &'static str, Option<&'static str>)> = self
+            .tables
+            .iter()
+            .filter(|t| t.dropped.is_none() && t.error.is_none())
+            .filter(|t| !self.used.contains(&t.id))
+            .filter(|t| !matches!(self.expect.get(&t.id), Some((Status::Skip, _))))
+            .filter_map(|t| {
+                let first = t.value.as_array()?.first()?.as_object()?;
+                let input = SETUP_INPUT
+                    .iter()
+                    .find(|k| first.get(**k).is_some_and(Value::is_string))?;
+                let err = SETUP_ERR
+                    .iter()
+                    .find(|k| first.get(**k).is_some_and(Value::is_boolean))?;
+                let content = SETUP_CONTENT
+                    .iter()
+                    .find(|k| first.get(**k).is_some_and(Value::is_string))
+                    .copied();
+                // the inputs must be this plugin's directive
+                t.value
+                    .as_array()?
+                    .iter()
+                    .all(|row| {
+                        str_of(&row[*input])
+                            .split_whitespace()
+                            .next()
+                            .is_none_or(|w| w == plugin || (plugin == "metrics" && w == "prometheus"))
+                    })
+                    .then(|| (t.id.clone(), *input, *err, content))
+            })
+            .collect();
+        for (id, input, err, content) in ids {
+            setup_rows(self, &id, input, err, content);
+        }
     }
 }
 

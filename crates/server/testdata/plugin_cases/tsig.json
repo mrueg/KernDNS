@@ -1,0 +1,534 @@
+{
+ "plugin": "tsig",
+ "strings": {
+  "pluginName": "tsig"
+ },
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestParse",
+   "name": "secrets",
+   "line": 15,
+   "value": {
+    "name.key.": "test-key",
+    "name2.key.": "test-key-2"
+   }
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParse",
+   "name": "tests",
+   "line": 34,
+   "dropped": "undefined: secretsFile"
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParse",
+   "name": "serverBlockKeys",
+   "line": 142,
+   "value": [
+    "."
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParseKeyFile",
+   "name": "expectedSecrets",
+   "line": 230,
+   "value": {
+    "bar.": "X28hl0BOfAL5G0jsmJWSacrwn7YRm2f6U5brnzwWEus=",
+    "baz.": "BycDPXSx/5YCD44Q4g5Nd2QNxNRDKwWTXddrU/zpIQM=",
+    "foo.": "36eowrtmxceNA3T5AdE+JNUOWFCw3amtcyHACnrDVgQ="
+   }
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParseKeyFileErrors",
+   "name": "tests",
+   "line": 253,
+   "value": [
+    {
+     "err": "expected key name \"key {\"",
+     "in": "key {"
+    },
+    {
+     "err": "unexpected token \"foo\"",
+     "in": "foo \"key\" {"
+    },
+    {
+     "err": "key \"foo.\" redefined",
+     "in": "key \"foo\" {\n\t\tsecret \"36eowrtmxceNA3T5AdE+JNUOWFCw3amtcyHACnrDVgQ=\";\n\t};\n\t\tkey \"foo\" {\n\t\tsecret \"X28hl0BOfAL5G0jsmJWSacrwn7YRm2f6U5brnzwWEus=\";\n\t}; "
+    },
+    {
+     "err": "unexpected token \"schmalgorithm\"",
+     "in": "key \"foo\" {\n\tschmalgorithm hmac-sha256;"
+    },
+    {
+     "err": "unexpected token \"schmecret\"",
+     "in": "key \"foo\" {\n\tschmecret \"36eowrtmxceNA3T5AdE+JNUOWFCw3amtcyHACnrDVgQ=\";"
+    },
+    {
+     "err": "expected secret key \"\\tsecret\"",
+     "in": "key \"foo\" {\n\tsecret"
+    },
+    {
+     "err": "expected secret key \"\\tsecret ;\"",
+     "in": "key \"foo\" {\n\tsecret ;"
+    },
+    {
+     "err": "expected secret for key \"foo.\"",
+     "in": "key \"foo\" {\n\t};"
+    }
+   ]
+  },
+  {
+   "file": "tsig_test.go",
+   "func": "TestServeDNS",
+   "name": "cases",
+   "line": 18,
+   "value": [
+    {
+     "allOpcodes": false,
+     "allTypes": true,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": true,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": true,
+     "expectRcode": 5,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": false,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": true,
+     "expectRcode": 0,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": false,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "another.domain."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": true,
+     "expectRcode": 0,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": true,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "another.domain."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": true,
+     "qType": 252,
+     "reqOpCodes": null,
+     "reqTypes": {
+      "252": {}
+     },
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": false,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": {},
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": true,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": {},
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": true,
+     "expectRcode": 9,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": true,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": true,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 5,
+     "qTsig": true,
+     "qType": 6,
+     "reqOpCodes": {
+      "5": {}
+     },
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 5,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 5,
+     "qTsig": false,
+     "qType": 6,
+     "reqOpCodes": {
+      "5": {}
+     },
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": false,
+     "qType": 1,
+     "reqOpCodes": {
+      "5": {}
+     },
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 4,
+     "qTsig": true,
+     "qType": 6,
+     "reqOpCodes": {
+      "4": {}
+     },
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": false,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 5,
+     "qTsig": true,
+     "qType": 1,
+     "reqOpCodes": {
+      "5": {}
+     },
+     "reqTypes": {
+      "252": {}
+     },
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": true,
+     "allTypes": false,
+     "expectRcode": 0,
+     "expectTsig": true,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": true,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "allOpcodes": true,
+     "allTypes": false,
+     "expectRcode": 5,
+     "expectTsig": false,
+     "extra": null,
+     "opcode": 0,
+     "qTsig": false,
+     "qType": 1,
+     "reqOpCodes": null,
+     "reqTypes": null,
+     "statusError": false,
+     "zones": [
+      "."
+     ]
+    }
+   ]
+  },
+  {
+   "file": "tsig_test.go",
+   "func": "TestServeDNSTsigErrors",
+   "name": "cases",
+   "line": 253,
+   "value": [
+    {
+     "desc": "Unknown Key",
+     "expectError": 17,
+     "expectOtherLength": 0,
+     "expectRcode": 9,
+     "expectTimeSigned": 0,
+     "reqError": 0,
+     "tsigErr": {
+      "error": "dns: no secrets defined"
+     }
+    },
+    {
+     "desc": "Bad Signature",
+     "expectError": 16,
+     "expectOtherLength": 0,
+     "expectRcode": 9,
+     "expectTimeSigned": 0,
+     "reqError": 0,
+     "tsigErr": {
+      "error": "dns: bad signature"
+     }
+    },
+    {
+     "desc": "Bad Time",
+     "expectError": 18,
+     "expectOtherLength": 6,
+     "expectRcode": 9,
+     "expectTimeSigned": 1795814852,
+     "reqError": 0,
+     "tsigErr": {
+      "error": "dns: bad time"
+     }
+    },
+    {
+     "desc": "Client Set Error",
+     "expectError": 0,
+     "expectOtherLength": 0,
+     "expectRcode": 0,
+     "expectTimeSigned": 0,
+     "reqError": 17,
+     "tsigErr": null
+    }
+   ]
+  },
+  {
+   "file": "tsig_test.go",
+   "func": "TestServeDNSTsigNext",
+   "name": "cases",
+   "line": 354,
+   "value": [
+    {
+     "desc": "Optional TSIG",
+     "expectExtra": [
+      41
+     ],
+     "expectKey": "",
+     "expectNext": 1,
+     "expectValid": false,
+     "reqExtra": [
+      {
+       "OPT": {
+        "do": true,
+        "options": [],
+        "rcode": 0,
+        "udp": 42,
+        "version": 0
+       }
+      }
+     ],
+     "reqSigned": false,
+     "tsigRequired": false,
+     "tsigStatus": null,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "desc": "Missing TSIG",
+     "expectExtra": null,
+     "expectKey": "",
+     "expectNext": 0,
+     "expectValid": false,
+     "reqExtra": [
+      {
+       "OPT": {
+        "do": true,
+        "options": [],
+        "rcode": 0,
+        "udp": 42,
+        "version": 0
+       }
+      }
+     ],
+     "reqSigned": false,
+     "tsigRequired": true,
+     "tsigStatus": null,
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "desc": "Bad Zone",
+     "expectExtra": [
+      41,
+      250
+     ],
+     "expectKey": "",
+     "expectNext": 1,
+     "expectValid": false,
+     "reqExtra": [
+      {
+       "OPT": {
+        "do": true,
+        "options": [],
+        "rcode": 0,
+        "udp": 42,
+        "version": 0
+       }
+      }
+     ],
+     "reqSigned": true,
+     "tsigRequired": false,
+     "tsigStatus": null,
+     "zones": [
+      "another.domain."
+     ]
+    },
+    {
+     "desc": "Bad Status",
+     "expectExtra": null,
+     "expectKey": "",
+     "expectNext": 0,
+     "expectValid": false,
+     "reqExtra": [
+      {
+       "OPT": {
+        "do": true,
+        "options": [],
+        "rcode": 0,
+        "udp": 42,
+        "version": 0
+       }
+      }
+     ],
+     "reqSigned": true,
+     "tsigRequired": true,
+     "tsigStatus": {
+      "error": "dns: bad signature"
+     },
+     "zones": [
+      "."
+     ]
+    },
+    {
+     "desc": "Success",
+     "expectExtra": [
+      41
+     ],
+     "expectKey": "test.key.",
+     "expectNext": 1,
+     "expectValid": true,
+     "reqExtra": [
+      {
+       "OPT": {
+        "do": true,
+        "options": [],
+        "rcode": 0,
+        "udp": 42,
+        "version": 0
+       }
+      }
+     ],
+     "reqSigned": true,
+     "tsigRequired": true,
+     "tsigStatus": null,
+     "zones": [
+      "."
+     ]
+    }
+   ]
+  }
+ ]
+}

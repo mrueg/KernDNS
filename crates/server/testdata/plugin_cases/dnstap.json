@@ -1,0 +1,49 @@
+{
+ "plugin": "dnstap",
+ "strings": {
+  "TestDnstap/extraFormat": "extra_field_{/metadata/test}_{type}_{name}_{class}_{proto}_{size}_{remote}_{port}_{local}",
+  "TestMultiDnstap/input": "\n      dnstap dnstap1.sock\n      dnstap dnstap2.sock\n      dnstap dnstap3.sock\n    ",
+  "TestTapMessage/extraFormat": "extra_field_no_replacement_{/metadata/test}_{type}_{name}_{class}_{proto}_{size}_{remote}_{port}_{local}"
+ },
+ "tables": [
+  {
+   "file": "io_test.go",
+   "func": "TestTransport",
+   "name": "transport",
+   "line": 73,
+   "value": [
+    [
+     "tcp",
+     ":0"
+    ],
+    [
+     "unix",
+     "dnstap.sock"
+    ]
+   ]
+  },
+  {
+   "file": "listener_test.go",
+   "func": "TestListenerCreation",
+   "name": "tests",
+   "line": 13,
+   "value": [
+    {
+     "endpoint": "127.0.0.1:16000",
+     "proto": "tcp"
+    },
+    {
+     "endpoint": "/tmp/dnstap-test.sock",
+     "proto": "unix"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestConfig",
+   "name": "tests",
+   "line": 30,
+   "dropped": "undefined: hostname"
+  }
+ ]
+}

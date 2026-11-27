@@ -1,0 +1,54 @@
+{
+ "plugin": "health",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupHealth",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedErrContent": "",
+     "input": "health",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "input": "health localhost:1234",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "input": "health localhost:1234 {\n\t\t\tlameduck 4s\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "input": "health bla:a",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "input": "health bla",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "",
+     "input": "health bla bla",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "",
+     "input": "health localhost:1234 {\n\t\t\tlameduck a\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "unknown property",
+     "input": "health localhost:1234 {\n\t\t\tlamedudk 4\n} ",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,276 @@
+{
+ "plugin": "metrics",
+ "strings": {
+  "TestRegistryGetOrSet/addr": "localhost:12345",
+  "clientCertFile": "test_data/client_selfsigned.crt",
+  "clientKeyFile": "test_data/client_selfsigned.key",
+  "defaultAddr": "localhost:9153",
+  "serverCertFile": "test_data/server.crt",
+  "serverKeyFile": "test_data/server.key",
+  "tlsCaChainFile": "test_data/tls-ca-chain.pem"
+ },
+ "tables": [
+  {
+   "file": "metrics_test.go",
+   "func": "TestMetricsTLS",
+   "name": "tests",
+   "line": 245,
+   "value": [
+    {
+     "UseTLSClient": false,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": false,
+     "name": "No TLS config: starts a HTTP server, connect successfully with default client",
+     "tlsConfigPath": ""
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": true,
+     "expectStartupError": false,
+     "name": "No TLS config: starts HTTP server, connection fails with TLS client",
+     "tlsConfigPath": ""
+    },
+    {
+     "UseTLSClient": false,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": false,
+     "name": "Empty TLS config: starts a HTTP server",
+     "tlsConfigPath": "test_data/configs/empty.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": false,
+     "name": "Valid TLS config, no client cert, successful connection with TLS client",
+     "tlsConfigPath": "test_data/configs/valid_verifyclientcertifgiven.yml"
+    },
+    {
+     "UseTLSClient": false,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": true,
+     "expectStartupError": false,
+     "name": "Valid TLS config, connection fails with default client",
+     "tlsConfigPath": "test_data/configs/valid_verifyclientcertifgiven.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": true,
+     "expectRequestError": false,
+     "expectStartupError": false,
+     "name": "Valid TLS config with RequireAnyClientCert, connection succeeds with TLS client presenting (valid) certificate",
+     "tlsConfigPath": "test_data/configs/valid_requireanyclientcert.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": true,
+     "name": "Wrong path to TLS config file fails to start server",
+     "tlsConfigPath": "test_data/configs/this-does-not-exist.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": true,
+     "name": "TLS config hasinvalid structure, fails to start server",
+     "tlsConfigPath": "test_data/configs/junk.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": true,
+     "name": "Missing key file, fails to start server",
+     "tlsConfigPath": "test_data/configs/keyPath_empty.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": true,
+     "name": "Missing cert file, fails to start server",
+     "tlsConfigPath": "test_data/configs/certPath_empty.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": true,
+     "name": "Wrong key file path, fails to start server",
+     "tlsConfigPath": "test_data/configs/keyPath_invalid.yml"
+    },
+    {
+     "UseTLSClient": true,
+     "caFile": "",
+     "clientCertificate": false,
+     "expectRequestError": false,
+     "expectStartupError": true,
+     "name": "Wrong cert file path, fails to start server",
+     "tlsConfigPath": "test_data/configs/certPath_invalid.yml"
+    }
+   ]
+  },
+  {
+   "file": "metrics_test.go",
+   "func": "TestMetrics",
+   "name": "tests",
+   "line": 480,
+   "value": [
+    {
+     "expectedValue": "1",
+     "metric": "coredns_dns_requests_total",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "example.org.",
+     "qtype": 0
+    },
+    {
+     "expectedValue": "2",
+     "metric": "coredns_dns_requests_total",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "example.org.",
+     "qtype": 0
+    },
+    {
+     "expectedValue": "3",
+     "metric": "coredns_dns_requests_total",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "example.org.",
+     "qtype": 0
+    },
+    {
+     "expectedValue": "4",
+     "metric": "coredns_dns_responses_total",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "example.org.",
+     "qtype": 0
+    }
+   ]
+  },
+  {
+   "file": "recorder_test.go",
+   "func": "TestRecorder_WriteMsg",
+   "name": "tests",
+   "line": 63,
+   "value": [
+    {
+     "msg": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": null
+     },
+     "name": "should record successful response"
+    },
+    {
+     "msg": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": null
+     },
+     "name": "should record nxdomain response"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestPrometheusParse",
+   "name": "tests",
+   "line": 10,
+   "value": [
+    {
+     "addr": "localhost:9153",
+     "input": "prometheus",
+     "shouldErr": false
+    },
+    {
+     "addr": "localhost:53",
+     "input": "prometheus localhost:53",
+     "shouldErr": false
+    },
+    {
+     "addr": "localhost:9153",
+     "input": "prometheus {\n\t\t\truntime_metrics\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "addr": "localhost:53",
+     "input": "prometheus localhost:53 {\n\t\t\truntime_metrics\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "addr": "",
+     "input": "prometheus {}",
+     "shouldErr": true
+    },
+    {
+     "addr": "",
+     "input": "prometheus {\n\t\t\truntime_metrics extra_arg\n\t\t}",
+     "shouldErr": true
+    },
+    {
+     "addr": "",
+     "input": "prometheus /foo",
+     "shouldErr": true
+    },
+    {
+     "addr": "",
+     "input": "prometheus a b c",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

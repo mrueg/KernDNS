@@ -1,0 +1,69 @@
+{
+ "plugin": "sign",
+ "strings": {
+  "TestParseNoSOA/dbNoSOA": "\n$TTL         1M\n$ORIGIN      example.org.\n\nwww          IN  A      192.168.0.14\n",
+  "TestParseRejectsInvalidDbfileToken/input": "sign \"�\" 8.44.in-addr.arpa. 9.44.in-addr.arpa. {}",
+  "TestParseSyntaxErrorBeforeSOA/dbSyntaxErrorBeforeSOA": "\n$TTL         1M\n$ORIGIN      example.org.\n\n@            IN  SOA    ns1.example.com. admin.example.com.  (\n                               foobarbaz  ; Invalid serial\n                               1200       ; Refresh\n                               144        ; Retry\n                               1814400    ; Expire\n                               2h )       ; Minimum\n",
+  "TestSign/input": "sign testdata/db.miek.nl miek.nl {\n\t\tkey file testdata/Kmiek.nl.+013+59725\n\t\tdirectory testdata\n\t}",
+  "TestSignApexZone/apex": "$TTL    30M\n$ORIGIN example.org.\n@       IN      SOA     linode miek.miek.nl. ( 1282630060 4H 1H 7D 4H )\n        IN      NS      linode\n",
+  "TestSignApexZone/input": "sign db.apex-test.example.org example.org {\n\t\tkey file testdata/Kmiek.nl.+013+59725\n\t\tdirectory testdata\n\t}",
+  "TestSignDS/input": "sign testdata/db.miek.nl_ns miek.nl {\n               key file testdata/Kmiek.nl.+013+59725\n               directory testdata\n       }",
+  "TestSignDS/name": "child.miek.nl.",
+  "TestSignGlue/input": "sign testdata/db.miek.nl miek.nl {\n               key file testdata/Kmiek.nl.+013+59725\n               directory testdata\n       }",
+  "timeFmt": "2006-01-02T15:04:05.000Z07:00"
+ },
+ "tables": [
+  {
+   "file": "nsec_test.go",
+   "func": "TestNames",
+   "name": "expected",
+   "line": 22,
+   "value": [
+    "miek.nl.",
+    "child.miek.nl.",
+    "www.miek.nl."
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParse",
+   "name": "tests",
+   "line": 10,
+   "value": [
+    {
+     "exp": {
+      "dbfile": "testdata/db.miek.nl",
+      "directory": "/var/lib/coredns",
+      "jitterExpir": 0,
+      "jitterIncep": 0,
+      "keys": [],
+      "origin": "miek.nl.",
+      "signedfile": "db.miek.nl.signed",
+      "stop": null
+     },
+     "input": "sign testdata/db.miek.nl miek.nl {\n\t\t\tkey file testdata/Kmiek.nl.+013+59725\n\t\t }",
+     "shouldErr": false
+    },
+    {
+     "exp": {
+      "dbfile": "testdata/db.miek.nl",
+      "directory": "testdata",
+      "jitterExpir": 0,
+      "jitterIncep": 0,
+      "keys": [],
+      "origin": "example.org.",
+      "signedfile": "db.example.org.signed",
+      "stop": null
+     },
+     "input": "sign testdata/db.miek.nl example.org {\n\t\t\tkey file testdata/Kmiek.nl.+013+59725\n\t\t\tdirectory testdata\n\t\t }",
+     "shouldErr": false
+    },
+    {
+     "exp": null,
+     "input": "sign db.example.org {\n\t\t\tkey file /etc/coredns/keys/Kexample.org\n\t\t }",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

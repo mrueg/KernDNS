@@ -10,6 +10,7 @@ import (
 	kerndnsReflect "reflect"
 	kerndnsRuntime "runtime"
 	kerndnsSort "sort"
+	kerndnsStr "strings"
 	kerndnsTesting "testing"
 	kerndnsUnsafe "unsafe"
 
@@ -49,6 +50,7 @@ func kerndnsString(name string, v any) {
 var (
 	kerndnsRRType    = kerndnsReflect.TypeOf((*kerndnsDNS.RR)(nil)).Elem()
 	kerndnsErrType   = kerndnsReflect.TypeOf((*error)(nil)).Elem()
+	kerndnsTypeType  = kerndnsReflect.TypeOf((*kerndnsReflect.Type)(nil)).Elem()
 	kerndnsIPType    = kerndnsReflect.TypeOf(kerndnsNet.IP(nil))
 	kerndnsIPNetType = kerndnsReflect.TypeOf(kerndnsNet.IPNet{})
 )
@@ -97,9 +99,28 @@ func kerndnsValue(v kerndnsReflect.Value, depth int) any {
 		}
 		return rr.String()
 	}
+	if t.Implements(kerndnsTypeType) && t.Kind() != kerndnsReflect.Interface {
+		if rt, ok := kerndnsIface(v).(kerndnsReflect.Type); ok && rt != nil {
+			return map[string]any{"type": rt.String()}
+		}
+	}
 	if t.Implements(kerndnsErrType) && t.Kind() != kerndnsReflect.Interface {
 		if e, ok := kerndnsIface(v).(error); ok && e != nil {
 			return map[string]any{"error": e.Error()}
+		}
+	}
+	if st := t; st.Kind() == kerndnsReflect.Struct || (st.Kind() == kerndnsReflect.Pointer && st.Elem().Kind() == kerndnsReflect.Struct) {
+		// structs of the standard library (regexp, templates, mutexes,
+		// TLS configs): their text form or just their type, not their
+		// internals
+		if st.Kind() == kerndnsReflect.Pointer {
+			st = st.Elem()
+		}
+		if p := st.PkgPath(); p != "" && !kerndnsStr.ContainsRune(kerndnsStr.SplitN(p, "/", 2)[0], '.') && p != "net" {
+			if s, ok := kerndnsIface(v).(kerndnsFmt.Stringer); ok {
+				return s.String()
+			}
+			return map[string]any{"type": t.String()}
 		}
 	}
 	switch t {

@@ -1,0 +1,89 @@
+{
+ "plugin": "pprof",
+ "strings": {
+  "defaultAddr": "localhost:6053",
+  "path": "/debug/pprof"
+ },
+ "tables": [
+  {
+   "file": "pprof_test.go",
+   "func": "TestHandlerPprofEndpoints",
+   "name": "testCases",
+   "line": 89,
+   "value": [
+    {
+     "expectedStatus": 200,
+     "path": "/debug/pprof/"
+    },
+    {
+     "expectedStatus": 200,
+     "path": "/debug/pprof/cmdline"
+    },
+    {
+     "expectedStatus": 200,
+     "path": "/debug/pprof/symbol"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestPProf",
+   "name": "tests",
+   "line": 10,
+   "value": [
+    {
+     "input": "pprof",
+     "shouldErr": false
+    },
+    {
+     "input": "pprof 1.2.3.4:1234",
+     "shouldErr": false
+    },
+    {
+     "input": "pprof :1234",
+     "shouldErr": false
+    },
+    {
+     "input": "pprof :1234 -1",
+     "shouldErr": true
+    },
+    {
+     "input": "pprof {\n                }",
+     "shouldErr": false
+    },
+    {
+     "input": "pprof /foo",
+     "shouldErr": true
+    },
+    {
+     "input": "pprof {\n            a b\n        }",
+     "shouldErr": true
+    },
+    {
+     "input": "pprof { block\n                }",
+     "shouldErr": false
+    },
+    {
+     "input": "pprof :1234 {\n                   block 20\n                }",
+     "shouldErr": false
+    },
+    {
+     "input": "pprof {\n                   block 20 30\n                }",
+     "shouldErr": true
+    },
+    {
+     "input": "pprof {\n                   block invalid\n                }",
+     "shouldErr": true
+    },
+    {
+     "input": "pprof {\n                   unknown_property\n                }",
+     "shouldErr": true
+    },
+    {
+     "input": "pprof\n          pprof",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

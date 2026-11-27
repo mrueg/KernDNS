@@ -1,0 +1,357 @@
+{
+ "plugin": "grpc",
+ "strings": {
+  "TestSetupResolvconf/resolv": "resolv.conf"
+ },
+ "tables": [
+  {
+   "file": "grpc_test.go",
+   "func": "TestGRPC",
+   "name": "tests",
+   "line": 28,
+   "dropped": "undefined: msg"
+  },
+  {
+   "file": "policy_test.go",
+   "func": "TestPoliciesOrdering",
+   "name": "in",
+   "line": 43,
+   "value": [
+    {
+     "addr": "p0",
+     "client": null,
+     "conn": null,
+     "dialOpts": null
+    },
+    {
+     "addr": "p1",
+     "client": null,
+     "conn": null,
+     "dialOpts": null
+    },
+    {
+     "addr": "p2",
+     "client": null,
+     "conn": null,
+     "dialOpts": null
+    }
+   ]
+  },
+  {
+   "file": "policy_test.go",
+   "func": "TestPoliciesOrdering",
+   "name": "in2",
+   "line": 104,
+   "value": [
+    {
+     "addr": "p0",
+     "client": null,
+     "conn": null,
+     "dialOpts": null
+    },
+    {
+     "addr": "p1",
+     "client": null,
+     "conn": null,
+     "dialOpts": null
+    }
+   ]
+  },
+  {
+   "file": "proxy_test.go",
+   "func": "TestProxy",
+   "name": "tests",
+   "line": 25,
+   "value": {
+    "nil_response": {
+     "p": {
+      "addr": "",
+      "client": null,
+      "conn": null,
+      "dialOpts": null
+     },
+     "res": null,
+     "wantErr": true
+    },
+    "response_ok": {
+     "p": {
+      "addr": "",
+      "client": null,
+      "conn": null,
+      "dialOpts": null
+     },
+     "res": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": null
+     },
+     "wantErr": false
+    },
+    "tls": {
+     "p": {
+      "addr": "",
+      "client": null,
+      "conn": null,
+      "dialOpts": [
+       {
+        "f": {
+         "func": "google.golang.org/grpc.WithTransportCredentials.1"
+        }
+       }
+      ]
+     },
+     "res": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 0,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": false,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": null
+     },
+     "wantErr": false
+    }
+   }
+  },
+  {
+   "file": "setup_policy_test.go",
+   "func": "TestSetupPolicy",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedPolicy": "random",
+     "input": "grpc . 127.0.0.1 {\npolicy random\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedPolicy": "round_robin",
+     "input": "grpc . 127.0.0.1 {\npolicy round_robin\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedPolicy": "sequential",
+     "input": "grpc . 127.0.0.1 {\npolicy sequential\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "unknown policy",
+     "expectedPolicy": "random",
+     "input": "grpc . 127.0.0.1 {\npolicy random2\n}\n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 14,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . 127.0.0.1",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . 127.0.0.1 {\nexcept miek.nl\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . 127.0.0.1",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . 127.0.0.1:53",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . 127.0.0.1:8080",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . [::1]:53",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . [2003::1]:53",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "input": "grpc . unix:///var/run/g.sock",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "not an IP",
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "input": "grpc . a27.0.0.1",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "unknown property",
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "input": "grpc . 127.0.0.1 {\nblaatl\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "plugin",
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "input": "grpc . ::1\n\t\tgrpc com ::2",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "unable to normalize 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'",
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "input": "grpc xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 127.0.0.1",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupTLS",
+   "name": "tests",
+   "line": 68,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedServerName": "dns",
+     "input": "grpc . 127.0.0.1 {\ntls_servername dns\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "",
+     "input": "grpc . 127.0.0.1 {\ntls\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "",
+     "input": "grpc . 127.0.0.1",
+     "shouldErr": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupResolvconf",
+   "name": "tests",
+   "line": 117,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedNames": [
+      "10.10.255.252:53",
+      "10.10.255.253:53"
+     ],
+     "input": "grpc . resolv.conf",
+     "shouldErr": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupFallthrough",
+   "name": "tests",
+   "line": 158,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedFallthrough": {
+      "Zones": [
+       "."
+      ]
+     },
+     "input": "grpc . 127.0.0.1 {\n\tfallthrough\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFallthrough": {
+      "Zones": [
+       "example.org."
+      ]
+     },
+     "input": "grpc . 127.0.0.1 {\n\tfallthrough example.org\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFallthrough": {
+      "Zones": [
+       "example.org.",
+       "example.com."
+      ]
+     },
+     "input": "grpc . 127.0.0.1 {\n\tfallthrough example.org example.com\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFallthrough": {
+      "Zones": []
+     },
+     "input": "grpc . 127.0.0.1",
+     "shouldErr": false
+    }
+   ]
+  }
+ ]
+}

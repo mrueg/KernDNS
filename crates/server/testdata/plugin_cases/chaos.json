@@ -1,0 +1,75 @@
+{
+ "plugin": "chaos",
+ "strings": {
+  "version": "CoreDNS-001"
+ },
+ "tables": [
+  {
+   "file": "chaos_test.go",
+   "func": "TestChaos",
+   "name": "tests",
+   "line": 20,
+   "value": [
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": "CoreDNS-001",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "version.bind",
+     "qtype": 0
+    },
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": "Miek Gieben",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "authors.bind",
+     "qtype": 0
+    },
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": "",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/test.NextHandler.1"
+     },
+     "qname": "authors.bind",
+     "qtype": 33
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupChaos",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedAuthor": "",
+     "expectedErrContent": "",
+     "expectedVersion": "v2",
+     "input": "chaos v2",
+     "shouldErr": false
+    },
+    {
+     "expectedAuthor": "Miek Gieben",
+     "expectedErrContent": "",
+     "expectedVersion": "v3",
+     "input": "chaos v3 \"Miek Gieben\"",
+     "shouldErr": false
+    },
+    {
+     "expectedAuthor": "",
+     "expectedErrContent": "unknown property",
+     "expectedVersion": "",
+     "input": "chaos v2 {\n\t\t\t\tunknown\n\t\t\t}",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

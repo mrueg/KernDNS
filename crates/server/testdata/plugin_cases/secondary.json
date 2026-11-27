@@ -1,0 +1,179 @@
+{
+ "plugin": "secondary",
+ "strings": {
+  "TestTransferInCatalog/origin": "catalog.example.",
+  "TestTransferInCatalogRejectsInvalidCatalog/origin": "catalog.example.",
+  "TestTransferInCatalogRemovesMemberZone/origin": "catalog.example.",
+  "TestTransferInCatalogResetsMemberZoneOnIDChange/origin": "catalog.example.",
+  "TestTransferInCatalogRestrictsMemberZones/allowed": "tenant.allowed.example.",
+  "TestTransferInCatalogRestrictsMemberZones/denied": "tenant.denied.example.",
+  "TestTransferInCatalogRestrictsMemberZones/origin": "catalog.example.",
+  "TestTransferInSkipsCatalogParseForRegularZone/origin": "catalog.example."
+ },
+ "tables": [
+  {
+   "file": "catalog_test.go",
+   "func": "TestTransferInCatalogRejectsUncoordinatedMigration",
+   "name": "tests",
+   "line": 355,
+   "value": [
+    {
+     "coo": "",
+     "name": "missing coo"
+    },
+    {
+     "coo": "other.catalog.example.",
+     "name": "wrong coo"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSecondaryParse",
+   "name": "tests",
+   "line": 13,
+   "value": [
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": null
+    },
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary example.org {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": [
+      "example.org."
+     ]
+    },
+    {
+     "catalogZones": {
+      "catalog.example.": null
+     },
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary catalog.example {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tcatalog\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": [
+      "catalog.example."
+     ]
+    },
+    {
+     "catalogZones": {
+      "catalog.example.": [
+       "example.org.",
+       "internal.example."
+      ]
+     },
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary catalog.example {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tcatalog EXAMPLE.ORG internal.example\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": [
+      "catalog.example."
+     ]
+    },
+    {
+     "catalogZones": {
+      "catalog.example.": [
+       "example.org.",
+       "internal.example."
+      ]
+     },
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary catalog.example {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tcatalog example.org EXAMPLE.ORG\n\t\t\t\tcatalog internal.example\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": [
+      "catalog.example."
+     ]
+    },
+    {
+     "catalogZones": {
+      "catalog.example.": null
+     },
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary catalog.example {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tcatalog example.org\n\t\t\t\tcatalog\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": [
+      "catalog.example."
+     ]
+    },
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary catalog.example {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tcatalog :\n\t\t\t}",
+     "shouldErr": true,
+     "transferFrom": "",
+     "zones": null
+    },
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary",
+     "shouldErr": true,
+     "transferFrom": "",
+     "zones": null
+    },
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": null
+     },
+     "inputFileRules": "secondary example.org {\n\t\t\t\ttransferr from 127.0.0.1\n\t\t\t}",
+     "shouldErr": true,
+     "transferFrom": "",
+     "zones": null
+    },
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": [
+       "."
+      ]
+     },
+     "inputFileRules": "secondary {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tfallthrough\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": null
+    },
+    {
+     "catalogZones": null,
+     "fall": {
+      "Zones": [
+       "example.org."
+      ]
+     },
+     "inputFileRules": "secondary example.org {\n\t\t\t\ttransfer from 127.0.0.1\n\t\t\t\tfallthrough example.org\n\t\t\t}",
+     "shouldErr": false,
+     "transferFrom": "127.0.0.1:53",
+     "zones": [
+      "example.org."
+     ]
+    }
+   ]
+  }
+ ]
+}

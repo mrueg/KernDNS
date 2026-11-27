@@ -1,0 +1,32 @@
+{
+ "plugin": "loop",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestParseServerBlockKeys",
+   "name": "tests",
+   "line": 22,
+   "value": [
+    {
+     "key": "example.org",
+     "name": "valid domain",
+     "want": "example.org.",
+     "wantOk": true
+    },
+    {
+     "key": "unix://",
+     "name": "invalid scheme",
+     "want": ".",
+     "wantOk": true
+    },
+    {
+     "key": "",
+     "name": "empty",
+     "want": ".",
+     "wantOk": true
+    }
+   ]
+  }
+ ]
+}

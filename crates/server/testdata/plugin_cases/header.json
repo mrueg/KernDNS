@@ -1,0 +1,218 @@
+{
+ "plugin": "header",
+ "strings": {
+  "authoritative": "aa",
+  "recursionAvailable": "ra",
+  "recursionDesired": "rd"
+ },
+ "tables": [
+  {
+   "file": "header_test.go",
+   "func": "TestHeaderResponseRules",
+   "name": "tests",
+   "line": 21,
+   "value": [
+    {
+     "expected": true,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func1.2"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func1.1"
+      },
+      "QueryRules": null,
+      "ResponseRules": [
+       {
+        "Flag": "ra",
+        "State": true
+       }
+      ]
+     }
+    },
+    {
+     "expected": false,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func1.3"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func1.1"
+      },
+      "QueryRules": null,
+      "ResponseRules": [
+       {
+        "Flag": "ra",
+        "State": false
+       }
+      ]
+     }
+    },
+    {
+     "expected": true,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func1.4"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func1.1"
+      },
+      "QueryRules": null,
+      "ResponseRules": [
+       {
+        "Flag": "rd",
+        "State": true
+       }
+      ]
+     }
+    },
+    {
+     "expected": true,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func1.5"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func1.1"
+      },
+      "QueryRules": null,
+      "ResponseRules": [
+       {
+        "Flag": "aa",
+        "State": true
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "file": "header_test.go",
+   "func": "TestHeaderQueryRules",
+   "name": "tests",
+   "line": 91,
+   "value": [
+    {
+     "expected": true,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func2.2"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func2.1"
+      },
+      "QueryRules": [
+       {
+        "Flag": "ra",
+        "State": true
+       }
+      ],
+      "ResponseRules": null
+     }
+    },
+    {
+     "expected": true,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func2.3"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func2.1"
+      },
+      "QueryRules": [
+       {
+        "Flag": "rd",
+        "State": true
+       }
+      ],
+      "ResponseRules": null
+     }
+    },
+    {
+     "expected": false,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func2.4"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func2.1"
+      },
+      "QueryRules": [
+       {
+        "Flag": "rd",
+        "State": false
+       }
+      ],
+      "ResponseRules": null
+     }
+    },
+    {
+     "expected": true,
+     "got": {
+      "func": "github.com/coredns/coredns/plugin/header.init.1.func2.5"
+     },
+     "handler": {
+      "Next": {
+       "func": "github.com/coredns/coredns/plugin/header.init.1.func2.1"
+      },
+      "QueryRules": [
+       {
+        "Flag": "aa",
+        "State": true
+       }
+      ],
+      "ResponseRules": null
+     }
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupHeader",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedErrContent": "Wrong argument count or unexpected line ending after",
+     "input": "header {}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "invalid selector=foo should be query or response",
+     "input": "header {\n\t\t\t\t\tfoo\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "invalid length for flags, at least one should be provided",
+     "input": "header {\n\t\t\t\t\tresponse set\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "invalid length for flags, at least one should be provided",
+     "input": "header {\n\t\t\t\t\tquery foo\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "unknown flag action=foo, should be set or clear",
+     "input": "header {\n\t\t\t\t\tquery foo rd\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "",
+     "input": "header {\n\t\t\t\t\tquery set rd\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "input": "header {\n\t\t\t\t\tresponse set aa\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "input": "header {\n\t\t\tresponse set ra aa\n\t\t\tquery clear rd\n}",
+     "shouldErr": false
+    }
+   ]
+  }
+ ]
+}

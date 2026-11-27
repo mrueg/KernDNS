@@ -1,0 +1,50 @@
+{
+ "plugin": "bufsize",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupBufsize",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedData": 1232,
+     "expectedErrContent": "",
+     "input": "bufsize",
+     "shouldErr": false
+    },
+    {
+     "expectedData": 1220,
+     "expectedErrContent": "",
+     "input": "bufsize \"1220\"",
+     "shouldErr": false
+    },
+    {
+     "expectedData": -1,
+     "expectedErrContent": "plugin",
+     "input": "bufsize \"5000\"",
+     "shouldErr": true
+    },
+    {
+     "expectedData": -1,
+     "expectedErrContent": "plugin",
+     "input": "bufsize \"512 512\"",
+     "shouldErr": true
+    },
+    {
+     "expectedData": -1,
+     "expectedErrContent": "plugin",
+     "input": "bufsize \"511\"",
+     "shouldErr": true
+    },
+    {
+     "expectedData": -1,
+     "expectedErrContent": "plugin",
+     "input": "bufsize \"abc123\"",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

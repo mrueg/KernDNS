@@ -1,0 +1,2692 @@
+{
+ "plugin": "cache",
+ "strings": {
+  "Denial": "denial",
+  "Success": "success",
+  "TestCacheSeparatesQuestionClasses/qname": "victim.cache-class.test.",
+  "TestCacheWildcardMetadata/qname": "foo.bar.example.org.",
+  "TestCacheWildcardMetadata/wildcard": "*.bar.example.org.",
+  "TestNegativeStaleMaskingPositiveCache/qname": "cached.org.",
+  "TestServeFromStaleCacheFetchVerifyTimeoutMetadataIsolation/value": ""
+ },
+ "tables": [
+  {
+   "file": "cache_test.go",
+   "func": "TestCacheInsertion",
+   "name": "cacheTestCases",
+   "line": 47,
+   "value": [
+    {
+     "in": {
+      "Answer": [
+       "miek.nl.\t3601\tIN\tMX\t1 aspmx.l.google.com.",
+       "miek.nl.\t3601\tIN\tMX\t10 aspmx2.googlemail.com."
+      ],
+      "AuthenticatedData": true,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "miek.nl.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test ad bit cache",
+     "out": {
+      "Answer": [
+       "miek.nl.\t3600\tIN\tMX\t1 aspmx.l.google.com.",
+       "miek.nl.\t3600\tIN\tMX\t10 aspmx2.googlemail.com."
+      ],
+      "AuthenticatedData": true,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "miek.nl.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "miek.nl.\t3601\tIN\tMX\t1 aspmx.l.google.com.",
+       "miek.nl.\t3601\tIN\tMX\t10 aspmx2.googlemail.com."
+      ],
+      "AuthenticatedData": true,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "mIEK.nL.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test case sensitivity cache",
+     "out": {
+      "Answer": [
+       "miek.nl.\t3600\tIN\tMX\t1 aspmx.l.google.com.",
+       "miek.nl.\t3600\tIN\tMX\t10 aspmx2.googlemail.com."
+      ],
+      "AuthenticatedData": true,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "miek.nl.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "miek.nl.\t1800\tIN\tMX\t1 aspmx.l.google.com."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "miek.nl.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": true
+     },
+     "name": "test truncated responses shouldn't cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [
+       "example.org.\t3600\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082540 7200 3600 1209600 3600"
+      ],
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 3,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test dns.RcodeNameError cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [
+       "example.org.\t3600\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082540 7200 3600 1209600 3600"
+      ],
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 3,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "1.1.168.192.in-addr.arpa.",
+      "Qtype": 12,
+      "Rcode": 3,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test dns.RcodeNameError without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [],
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 2,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test dns.RcodeServerFailure cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [],
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 2,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [],
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 4,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test dns.RcodeNotImplemented cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [],
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 4,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "miek.nl.\t3600\tIN\tMX\t1 aspmx.l.google.com.",
+       "miek.nl.\t3600\tIN\tMX\t10 aspmx2.googlemail.com.",
+       "miek.nl.\t1800\tIN\tRRSIG\tMX 8 2 1800 20160521031301 20160421031301 12051 miek.nl. lAaEzB5teQLLKyDenatmyhca7blLRg9DoGNrhe3NReBZN5C5/pMQk8Jcu25hv2fW23/SLm5IC2zaDpp2Fzgm6Jf7e90/yLcwQPuE7JjS55WMF+HELEh7Z6AEb+Iq4BWmNhUz6gPxD4d9eRMs7EAzk13o1NYi5/JhfL6IlaYyqkc="
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "miek.nl.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test expired RRSIG doesn't cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "example.org.\t3600\tIN\tMX\t1 aspmx.l.google.com.",
+       "example.org.\t3600\tIN\tMX\t10 aspmx2.googlemail.com.",
+       "example.org.\t1800\tIN\tRRSIG\tMX 8 2 1800 20170521031301 20170421031301 12051 miek.nl. lAaEzB5teQLLKyDenatmyhca7blLRg9DoGNrhe3NReBZN5C5/pMQk8Jcu25hv2fW23/SLm5IC2zaDpp2Fzgm6Jf7e90/yLcwQPuE7JjS55WMF+HELEh7Z6AEb+Iq4BWmNhUz6gPxD4d9eRMs7EAzk13o1NYi5/JhfL6IlaYyqkc="
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test DO bit with RRSIG not expired cache",
+     "out": {
+      "Answer": [
+       "example.org.\t3600\tIN\tMX\t1 aspmx.l.google.com.",
+       "example.org.\t3600\tIN\tMX\t10 aspmx2.googlemail.com.",
+       "example.org.\t3600\tIN\tRRSIG\tMX 8 2 1800 20170521031301 20170421031301 12051 miek.nl. lAaEzB5teQLLKyDenatmyhca7blLRg9DoGNrhe3NReBZN5C5/pMQk8Jcu25hv2fW23/SLm5IC2zaDpp2Fzgm6Jf7e90/yLcwQPuE7JjS55WMF+HELEh7Z6AEb+Iq4BWmNhUz6gPxD4d9eRMs7EAzk13o1NYi5/JhfL6IlaYyqkc="
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "dnssec-failed.org.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": true,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "dnssec-failed.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "test CD bit cache",
+     "out": {
+      "Answer": [
+       "dnssec-failed.org.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": true,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "dnssec-failed.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [
+       "example.org.\t3600\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082540 7200 3600 1209600 3600"
+      ],
+      "Qname": "neg-disabled.example.org.",
+      "Qtype": 1,
+      "Rcode": 3,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "test negative zone exception shouldn't cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "pos-disabled.example.org.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "pos-disabled.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "test positive zone exception shouldn't cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [
+       "example.org.\t3600\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082540 7200 3600 1209600 3600"
+      ],
+      "Qname": "pos-disabled.example.org.",
+      "Qtype": 1,
+      "Rcode": 3,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "test positive zone exception with negative answer cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": [
+       "example.org.\t3600\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082540 7200 3600 1209600 3600"
+      ],
+      "Qname": "pos-disabled.example.org.",
+      "Qtype": 1,
+      "Rcode": 3,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "neg-disabled.example.org.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "neg-disabled.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "test negative zone exception with positive answer cache",
+     "out": {
+      "Answer": [
+       "neg-disabled.example.org.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "neg-disabled.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget1.example.net.",
+       "target1.example.net.\t3600\tIN\tCNAME\ttarget2.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR dangling CNAME chain without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tAAAA\t::1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain ending in a different type without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR MX query CNAME chain without terminal MX without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tMX\t10 mail.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR MX query CNAME chain terminating in MX caches",
+     "out": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tMX\t10 mail.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "alias.example.org.\t3600\tIN\tRRSIG\tCNAME 8 2 3600 20170521031301 20170421031301 12051 example.org. lAaEzB5teQLLKyDenatmyhca7blLRg9DoGNrhe3NReBZN5C5/pMQk8Jcu25hv2fW23/SLm5IC2zaDpp2Fzgm6Jf7e90/yLcwQPuE7JjS55WMF+HELEh7Z6AEb+Iq4BWmNhUz6gPxD4d9eRMs7EAzk13o1NYi5/JhfL6IlaYyqkc="
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR DNSSEC dangling CNAME chain without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "unrelated.example.net.\t3600\tIN\tA\t192.0.2.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain with unrelated A off the chain without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 255,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR lone CNAME answer to an ANY query caches",
+     "out": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 255,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain terminating in A record caches",
+     "out": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "target.example.net.\t3600\tIN\tA\t127.0.0.1",
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain terminating in A record out of order caches",
+     "out": {
+      "Answer": [
+       "target.example.net.\t3600\tIN\tA\t127.0.0.1",
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 5,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME answer to a CNAME query caches",
+     "out": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net."
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 5,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget1.example.net.",
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget2.example.net.",
+       "target1.example.net.\t3600\tIN\tA\t192.0.2.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain with two distinct targets at one owner without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget2.example.net.",
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget1.example.net.",
+       "target1.example.net.\t3600\tIN\tA\t192.0.2.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain with two distinct targets at one owner reversed order without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tCNAME\talias.example.org.",
+       "alias.example.org.\t3600\tIN\tA\t192.0.2.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME loop with co-located A without SOA does not cache",
+     "out": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "shouldCache": false
+    },
+    {
+     "in": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "name": "test NOERROR CNAME chain with duplicate identical CNAME terminating in A caches",
+     "out": {
+      "Answer": [
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "alias.example.org.\t3600\tIN\tCNAME\ttarget.example.net.",
+       "target.example.net.\t3600\tIN\tA\t127.0.0.1"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "alias.example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": true,
+      "Truncated": false
+     },
+     "shouldCache": true
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestServeFromStaleCache",
+   "name": "tests",
+   "line": 789,
+   "value": [
+    {
+     "expectedResult": 0,
+     "futureMinutes": 30,
+     "name": "cached.org."
+    },
+    {
+     "expectedResult": 0,
+     "futureMinutes": 60,
+     "name": "cached.org."
+    },
+    {
+     "expectedResult": 255,
+     "futureMinutes": 70,
+     "name": "cached.org."
+    },
+    {
+     "expectedResult": 255,
+     "futureMinutes": 30,
+     "name": "notcached.org."
+    },
+    {
+     "expectedResult": 255,
+     "futureMinutes": 60,
+     "name": "notcached.org."
+    },
+    {
+     "expectedResult": 255,
+     "futureMinutes": 70,
+     "name": "notcached.org."
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestServeFromStaleCacheResponseTTL",
+   "name": "tests",
+   "line": 815,
+   "value": [
+    {
+     "advance": 120000000000,
+     "config": "serve_stale 1h immediate",
+     "expectedTTL": 0,
+     "name": "legacy default",
+     "primeRcode": 0
+    },
+    {
+     "advance": 120000000000,
+     "config": "serve_stale 1h immediate 30s",
+     "expectedTTL": 30,
+     "name": "immediate positive",
+     "primeRcode": 0
+    },
+    {
+     "advance": 60000000000,
+     "config": "serve_stale 1h immediate 30s",
+     "expectedTTL": 30,
+     "name": "exact expiry",
+     "primeRcode": 0
+    },
+    {
+     "advance": 120000000000,
+     "config": "serve_stale 1h immediate 25s",
+     "expectedTTL": 25,
+     "name": "immediate negative",
+     "primeRcode": 3
+    },
+    {
+     "advance": 120000000000,
+     "config": "serve_stale 1h verify 0 45s",
+     "expectedTTL": 45,
+     "name": "verify failure",
+     "primeRcode": 0
+    },
+    {
+     "advance": 120000000000,
+     "config": "serve_stale 1h immediate 17s\nkeepttl",
+     "expectedTTL": 17,
+     "name": "stale ttl overrides keepttl",
+     "primeRcode": 0
+    },
+    {
+     "advance": 10000000000,
+     "config": "serve_stale 1h immediate 30s",
+     "expectedTTL": 50,
+     "name": "fresh response is unchanged",
+     "primeRcode": 0
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestServeFromStaleCacheFetchVerify",
+   "name": "tests",
+   "line": 946,
+   "value": [
+    {
+     "expectedRCode": 0,
+     "expectedTtl": 60,
+     "futureMinutes": 1,
+     "name": "cached.org.",
+     "upstreamRCode": 0,
+     "upstreamTtl": 200
+    },
+    {
+     "expectedRCode": 0,
+     "expectedTtl": 200,
+     "futureMinutes": 3,
+     "name": "cached.org.",
+     "upstreamRCode": 0,
+     "upstreamTtl": 200
+    },
+    {
+     "expectedRCode": 0,
+     "expectedTtl": 0,
+     "futureMinutes": 7,
+     "name": "cached.org.",
+     "upstreamRCode": 2,
+     "upstreamTtl": 200
+    },
+    {
+     "expectedRCode": 3,
+     "expectedTtl": 150,
+     "futureMinutes": 8,
+     "name": "cached.org.",
+     "upstreamRCode": 3,
+     "upstreamTtl": 150
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestComputeTTL",
+   "name": "tests",
+   "line": 1315,
+   "value": [
+    {
+     "expectedTTL": 1800000000000,
+     "maxTTL": 3600000000000,
+     "minTTL": 300000000000,
+     "msgTTL": 1800000000000
+    },
+    {
+     "expectedTTL": 300000000000,
+     "maxTTL": 3600000000000,
+     "minTTL": 300000000000,
+     "msgTTL": 299000000000
+    },
+    {
+     "expectedTTL": 299000000000,
+     "maxTTL": 3600000000000,
+     "minTTL": 0,
+     "msgTTL": 299000000000
+    },
+    {
+     "expectedTTL": 3600000000000,
+     "maxTTL": 3600000000000,
+     "minTTL": 300000000000,
+     "msgTTL": 3601000000000
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestCacheKeepTTL",
+   "name": "tests",
+   "line": 1389,
+   "value": [
+    {
+     "futureSeconds": 0,
+     "name": "cached.org."
+    },
+    {
+     "futureSeconds": 30,
+     "name": "cached.org."
+    },
+    {
+     "futureSeconds": 60,
+     "name": "uncached.org."
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestCacheSeparation",
+   "name": "testCases",
+   "line": 1417,
+   "value": [
+    {
+     "expectCached": false,
+     "initial": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "query type should be unique",
+     "query": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 28,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "expectCached": false,
+     "initial": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "DO bit should be unique",
+     "query": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "expectCached": false,
+     "initial": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "CD bit should be unique",
+     "query": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": true,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "expectCached": false,
+     "initial": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "CD bit and DO bit should be unique",
+     "query": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": true,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "expectCached": false,
+     "initial": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "CD bit, DO bit, and query type should be unique",
+     "query": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": true,
+      "Do": true,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 15,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "expectCached": true,
+     "initial": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "name": "authoritative answer bit should NOT be unique",
+     "query": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": true,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "example.org.",
+      "Qtype": 1,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestAnswersQuestionStrictEligibility",
+   "name": "tests",
+   "line": 1653,
+   "dropped": "undefined: chAddress"
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestPreferPositiveRetainsLKGAcrossNonAnswerSuccessRefreshes",
+   "name": "refreshes",
+   "line": 1738,
+   "value": [
+    {
+     "Answer": null,
+     "Compress": false,
+     "Extra": null,
+     "MsgHdr": {
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Id": 0,
+      "Opcode": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "RecursionDesired": false,
+      "Response": true,
+      "Truncated": false,
+      "Zero": false
+     },
+     "Ns": null,
+     "Question": null
+    },
+    {
+     "Answer": null,
+     "Compress": false,
+     "Extra": null,
+     "MsgHdr": {
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Id": 0,
+      "Opcode": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "RecursionDesired": false,
+      "Response": true,
+      "Truncated": false,
+      "Zero": false
+     },
+     "Ns": [
+      "example.org.\t60\tIN\tNS\tns.example.org."
+     ],
+     "Question": null
+    },
+    {
+     "Answer": null,
+     "Compress": false,
+     "Extra": [
+      "ns.example.org.\t60\tIN\tA\t192.0.2.53"
+     ],
+     "MsgHdr": {
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Id": 0,
+      "Opcode": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "RecursionDesired": false,
+      "Response": true,
+      "Truncated": false,
+      "Zero": false
+     },
+     "Ns": [
+      "example.org.\t60\tIN\tNS\tns.example.org."
+     ],
+     "Question": null
+    },
+    {
+     "Answer": null,
+     "Compress": false,
+     "Extra": [
+      "cached.org.\t60\tIN\tA\t192.0.2.54"
+     ],
+     "MsgHdr": {
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Id": 0,
+      "Opcode": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "RecursionDesired": false,
+      "Response": true,
+      "Truncated": false,
+      "Zero": false
+     },
+     "Ns": null,
+     "Question": null
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestPreferPositiveVerifyKeepsStaleOnNonAnswers",
+   "name": "tests",
+   "line": 1812,
+   "value": [
+    {
+     "backend": {
+      "func": "github.com/coredns/coredns/plugin/cache.nxDomainBackend.1"
+     },
+     "name": "NXDOMAIN"
+    },
+    {
+     "backend": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.2.func9.1"
+     },
+     "name": "NODATA"
+    },
+    {
+     "backend": {
+      "func": "github.com/coredns/coredns/plugin/cache.servFailBackend.1"
+     },
+     "name": "SERVFAIL"
+    },
+    {
+     "backend": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.2.func9.2"
+     },
+     "name": "NOTIMP"
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestPreferPositiveVerifyRejectsInvalidFreshAnswers",
+   "name": "modes",
+   "line": 1866,
+   "value": [
+    {
+     "name": "blocking",
+     "timeout": 0
+    },
+    {
+     "name": "bounded",
+     "timeout": 1000000000
+    }
+   ]
+  },
+  {
+   "file": "cache_test.go",
+   "func": "TestPreferPositiveVerifyRejectsInvalidFreshAnswers",
+   "name": "invalidResponses",
+   "line": 1873,
+   "value": [
+    {
+     "build": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.2.func11.1"
+     },
+     "name": "expired RRSIG"
+    },
+    {
+     "build": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.2.func11.2"
+     },
+     "name": "truncated"
+    }
+   ]
+  },
+  {
+   "file": "dnssec_test.go",
+   "func": "TestResponseWithDNSSEC",
+   "name": "tcs",
+   "line": 17,
+   "value": [
+    {
+     "Answer": [
+      "invent.example.org.\t1781\tIN\tCNAME\tleptone.example.org.",
+      "leptone.example.org.\t1781\tIN\tA\t195.201.182.103"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "invent.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "invent.example.org.\t1781\tIN\tCNAME\tleptone.example.org.",
+      "invent.example.org.\t1781\tIN\tRRSIG\tCNAME 8 3 1800 20201012085750 20200912082613 57411 example.org. ijSv5FmsNjFviBcOFwQgqjt073lttxTTNqkno6oMa3DD3kC+",
+      "leptone.example.org.\t1781\tIN\tA\t195.201.182.103",
+      "leptone.example.org.\t1781\tIN\tRRSIG\tA 8 3 1800 20201012093630 20200912083827 57411 example.org. eLuSOkLAzm/WIOpaZD3/4TfvKP1HAFzjkis9LIJSRVpQt307dm9WY9"
+     ],
+     "AuthenticatedData": true,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "invent.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "dnssec_test.go",
+   "func": "TestFilterRRSlice",
+   "name": "rrs",
+   "line": 92,
+   "value": [
+    "invent.example.org.\t1781\tIN\tCNAME\tleptone.example.org.",
+    "invent.example.org.\t1781\tIN\tRRSIG\tCNAME 8 3 1800 20201012085750 20200912082613 57411 example.org. ijSv5FmsNjFviBcOFwQgqjt073lttxTTNqkno6oMa3DD3kC+",
+    "leptone.example.org.\t1781\tIN\tA\t195.201.182.103",
+    "leptone.example.org.\t1781\tIN\tRRSIG\tA 8 3 1800 20201012093630 20200912083827 57411 example.org. eLuSOkLAzm/WIOpaZD3/4TfvKP1HAFzjkis9LIJSRVpQt307dm9WY9"
+   ]
+  },
+  {
+   "file": "prefetch_test.go",
+   "func": "TestPrefetch",
+   "name": "tests",
+   "line": 19,
+   "value": [
+    {
+     "prefetch": 1,
+     "qname": "hits.reset.example.org.",
+     "ttl": 80,
+     "verifications": [
+      {
+       "after": 0,
+       "answer": "hits.reset.example.org. 80 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 73000000000,
+       "answer": "hits.reset.example.org.  7 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 80000000000,
+       "answer": "hits.reset.example.org. 73 IN A 127.0.0.2",
+       "cd": false,
+       "do": false,
+       "fetch": false
+      }
+     ]
+    },
+    {
+     "prefetch": 1,
+     "qname": "short.ttl.example.org.",
+     "ttl": 5,
+     "verifications": [
+      {
+       "after": 0,
+       "answer": "short.ttl.example.org. 5 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 1000000000,
+       "answer": "short.ttl.example.org. 4 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": false
+      },
+      {
+       "after": 4000000000,
+       "answer": "short.ttl.example.org. 1 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 5000000000,
+       "answer": "short.ttl.example.org. 4 IN A 127.0.0.2",
+       "cd": false,
+       "do": false,
+       "fetch": false
+      }
+     ]
+    },
+    {
+     "prefetch": 0,
+     "qname": "no.prefetch.example.org.",
+     "ttl": 30,
+     "verifications": [
+      {
+       "after": 0,
+       "answer": "no.prefetch.example.org. 30 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 15000000000,
+       "answer": "no.prefetch.example.org. 15 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": false
+      },
+      {
+       "after": 29000000000,
+       "answer": "no.prefetch.example.org.  1 IN A 127.0.0.1",
+       "cd": false,
+       "do": false,
+       "fetch": false
+      },
+      {
+       "after": 30000000000,
+       "answer": "no.prefetch.example.org. 30 IN A 127.0.0.2",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      }
+     ]
+    },
+    {
+     "prefetch": 1,
+     "qname": "do.prefetch.example.org.",
+     "ttl": 80,
+     "verifications": [
+      {
+       "after": 0,
+       "answer": "do.prefetch.example.org. 80 IN A 127.0.0.1",
+       "cd": false,
+       "do": true,
+       "fetch": true
+      },
+      {
+       "after": 73000000000,
+       "answer": "do.prefetch.example.org.  7 IN A 127.0.0.1",
+       "cd": false,
+       "do": true,
+       "fetch": true
+      },
+      {
+       "after": 80000000000,
+       "answer": "do.prefetch.example.org. 73 IN A 127.0.0.2",
+       "cd": false,
+       "do": true,
+       "fetch": false
+      },
+      {
+       "after": 80000000000,
+       "answer": "do.prefetch.example.org. 80 IN A 127.0.0.3",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      }
+     ]
+    },
+    {
+     "prefetch": 1,
+     "qname": "cd.prefetch.example.org.",
+     "ttl": 80,
+     "verifications": [
+      {
+       "after": 0,
+       "answer": "cd.prefetch.example.org. 80 IN A 127.0.0.1",
+       "cd": true,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 73000000000,
+       "answer": "cd.prefetch.example.org.  7 IN A 127.0.0.1",
+       "cd": true,
+       "do": false,
+       "fetch": true
+      },
+      {
+       "after": 80000000000,
+       "answer": "cd.prefetch.example.org. 73 IN A 127.0.0.2",
+       "cd": true,
+       "do": false,
+       "fetch": false
+      },
+      {
+       "after": 80000000000,
+       "answer": "cd.prefetch.example.org. 80 IN A 127.0.0.3",
+       "cd": false,
+       "do": false,
+       "fetch": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "file": "qclass_test.go",
+   "func": "TestCacheSeparatesQuestionClasses",
+   "name": "classes",
+   "line": 18,
+   "value": []
+  },
+  {
+   "file": "serve_stale_recheck_test.go",
+   "func": "TestServeStaleFailureRecheckImmediate",
+   "name": "tests",
+   "line": 34,
+   "value": [
+    {
+     "expectedRcode": 0,
+     "name": "positive",
+     "prime": {
+      "func": "github.com/coredns/coredns/plugin/cache.ttlBackend.1"
+     }
+    },
+    {
+     "expectedRcode": 3,
+     "name": "negative",
+     "prime": {
+      "func": "github.com/coredns/coredns/plugin/cache.nxDomainBackend.1"
+     }
+    }
+   ]
+  },
+  {
+   "file": "serve_stale_recheck_test.go",
+   "func": "TestServeStaleFailureRecheckRejectsInvalidRefresh",
+   "name": "modes",
+   "line": 153,
+   "value": [
+    {
+     "name": "immediate",
+     "verify": false
+    },
+    {
+     "name": "verify",
+     "verify": true
+    }
+   ]
+  },
+  {
+   "file": "serve_stale_recheck_test.go",
+   "func": "TestServeStaleFailureRecheckRejectsInvalidRefresh",
+   "name": "invalidResponses",
+   "line": 160,
+   "value": [
+    {
+     "build": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.10.func3.1"
+     },
+     "name": "truncated"
+    },
+    {
+     "build": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.10.func3.2"
+     },
+     "name": "mismatched question"
+    },
+    {
+     "build": {
+      "func": "github.com/coredns/coredns/plugin/cache.init.10.func3.3"
+     },
+     "name": "expired RRSIG"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 12,
+   "value": [
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 1800000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 1800000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache {}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 1800000000000,
+     "expectedPcap": 10,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache example.nl {\n\t\t\t\tsuccess 10\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 30000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 1800000000000,
+     "expectedPcap": 10,
+     "expectedPrefetch": 0,
+     "expectedPttl": 1800000000000,
+     "input": "cache example.nl {\n\t\t\t\tsuccess 10 1800 30\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10,
+     "expectedNttl": 15000000000,
+     "expectedPcap": 10,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache example.nl {\n\t\t\t\tsuccess 10\n\t\t\t\tdenial 10 15\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 2000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10,
+     "expectedNttl": 15000000000,
+     "expectedPcap": 10,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache example.nl {\n\t\t\t\tsuccess 10\n\t\t\t\tdenial 10 15 2\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10,
+     "expectedNttl": 15000000000,
+     "expectedPcap": 10,
+     "expectedPrefetch": 0,
+     "expectedPttl": 25000000000,
+     "input": "cache 25 example.nl {\n\t\t\t\tsuccess 10\n\t\t\t\tdenial 10 15\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10,
+     "expectedNttl": 15000000000,
+     "expectedPcap": 10,
+     "expectedPrefetch": 0,
+     "expectedPttl": 25000000000,
+     "input": "cache 25 example.nl {\n\t\t\t\tsuccess 10\n\t\t\t\tdenial 10 15 5\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 1800000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache aaa example.nl",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 1800000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 10,
+     "expectedPttl": 3600000000000,
+     "input": "cache\t{\n\t\t\t\tprefetch 10\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache example.nl {\n\t\t\t\tsuccess\n\t\t\t\tdenial 10 15\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache example.nl {\n\t\t\t\tsuccess 15\n\t\t\t\tdenial aaa\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache example.nl {\n\t\t\t\tpositive 15\n\t\t\t\tnegative aaa\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache 0 example.nl",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache -1 example.nl",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache 1 example.nl {\n\t\t\t\tpositive 0\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache 1 example.nl {\n\t\t\t\tpositive 0\n\t\t\t\tprefetch -1\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache 1 example.nl {\n\t\t\t\tprefetch 0 blurp\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedMinNttl": 5000000000,
+     "expectedMinPttl": 5000000000,
+     "expectedNcap": 10000,
+     "expectedNttl": 3600000000000,
+     "expectedPcap": 10000,
+     "expectedPrefetch": 0,
+     "expectedPttl": 3600000000000,
+     "input": "cache\n\t\t  cache",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestServeStale",
+   "name": "tests",
+   "line": 119,
+   "value": [
+    {
+     "input": "serve_stale",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 3600000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 20m",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 1200000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h20m",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 4800000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 0m",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 0",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 0 verify",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": true,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 0 immediate",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 0 VERIFY",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": true,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 30s",
+     "shouldErr": false,
+     "staleTTL": 30000000000,
+     "staleUpTo": 3600000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 30s 30s",
+     "shouldErr": false,
+     "staleTTL": 30000000000,
+     "staleUpTo": 3600000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 4294967295s",
+     "shouldErr": false,
+     "staleTTL": 4294967295000000000,
+     "staleUpTo": 3600000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 0",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 3600000000000,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 3600000000000,
+     "verifyStale": true,
+     "verifyStaleTimeout": 100000000
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 30s",
+     "shouldErr": false,
+     "staleTTL": 30000000000,
+     "staleUpTo": 3600000000000,
+     "verifyStale": true,
+     "verifyStaleTimeout": 100000000
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 30s 30s",
+     "shouldErr": false,
+     "staleTTL": 30000000000,
+     "staleUpTo": 3600000000000,
+     "verifyStale": true,
+     "verifyStaleTimeout": 100000000
+    },
+    {
+     "input": "serve_stale 1h verify 0",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 3600000000000,
+     "verifyStale": true,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify 0 1m",
+     "shouldErr": false,
+     "staleTTL": 60000000000,
+     "staleUpTo": 3600000000000,
+     "verifyStale": true,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h VERIFY 250ms",
+     "shouldErr": false,
+     "staleTTL": 0,
+     "staleUpTo": 3600000000000,
+     "verifyStale": true,
+     "verifyStaleTimeout": 250000000
+    },
+    {
+     "input": "serve_stale 20",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale -20m",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale aa",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1m nono",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 0 after nono",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 100ms",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 4294967296s",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate -1s",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate garbage",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 30s extra",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify -1ms",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify garbage",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 500ms",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms -1s",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms garbage",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 30s extra",
+     "shouldErr": true,
+     "staleTTL": 0,
+     "staleUpTo": 0,
+     "verifyStale": false,
+     "verifyStaleTimeout": 0
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestServeStaleFailureRecheck",
+   "name": "tests",
+   "line": 192,
+   "value": [
+    {
+     "input": "serve_stale 1h immediate 30s 30s",
+     "shouldErr": false,
+     "wantRecheck": 30000000000
+    },
+    {
+     "input": "serve_stale 1h immediate 0 0",
+     "shouldErr": false,
+     "wantRecheck": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 30s 250ms",
+     "shouldErr": false,
+     "wantRecheck": 250000000
+    },
+    {
+     "input": "serve_stale 1h verify 0 0 5m",
+     "shouldErr": false,
+     "wantRecheck": 300000000000
+    },
+    {
+     "input": "serve_stale 1h immediate 30s -1s",
+     "shouldErr": true,
+     "wantRecheck": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 30s 5m1s",
+     "shouldErr": true,
+     "wantRecheck": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 30s invalid",
+     "shouldErr": true,
+     "wantRecheck": 0
+    },
+    {
+     "input": "serve_stale 1h immediate 30s 30s extra",
+     "shouldErr": true,
+     "wantRecheck": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 30s -1s",
+     "shouldErr": true,
+     "wantRecheck": 0
+    },
+    {
+     "input": "serve_stale 1h verify 100ms 30s 30s extra",
+     "shouldErr": true,
+     "wantRecheck": 0
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestServeStalePolicy",
+   "name": "tests",
+   "line": 230,
+   "value": [
+    {
+     "input": "serve_stale\nserve_stale_policy prefer_positive",
+     "preferPositive": true,
+     "shouldErr": false
+    },
+    {
+     "input": "serve_stale_policy PREFER_POSITIVE\nserve_stale",
+     "preferPositive": true,
+     "shouldErr": false
+    },
+    {
+     "input": "serve_stale",
+     "preferPositive": false,
+     "shouldErr": false
+    },
+    {
+     "input": "serve_stale_policy prefer_positive",
+     "preferPositive": false,
+     "shouldErr": true
+    },
+    {
+     "input": "serve_stale\nserve_stale_policy",
+     "preferPositive": false,
+     "shouldErr": true
+    },
+    {
+     "input": "serve_stale\nserve_stale_policy prefer_positive extra",
+     "preferPositive": false,
+     "shouldErr": true
+    },
+    {
+     "input": "serve_stale\nserve_stale_policy invalid",
+     "preferPositive": false,
+     "shouldErr": true
+    },
+    {
+     "input": "serve_stale\nserve_stale_policy prefer_positive\nserve_stale_policy prefer_positive",
+     "preferPositive": false,
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestServfail",
+   "name": "tests",
+   "line": 265,
+   "value": [
+    {
+     "failttl": 1000000000,
+     "input": "servfail 1s",
+     "shouldErr": false
+    },
+    {
+     "failttl": 300000000000,
+     "input": "servfail 5m",
+     "shouldErr": false
+    },
+    {
+     "failttl": 0,
+     "input": "servfail 0s",
+     "shouldErr": false
+    },
+    {
+     "failttl": 0,
+     "input": "servfail 0",
+     "shouldErr": false
+    },
+    {
+     "failttl": 5000000000,
+     "input": "servfail",
+     "shouldErr": true
+    },
+    {
+     "failttl": 5000000000,
+     "input": "servfail 6m",
+     "shouldErr": true
+    },
+    {
+     "failttl": 5000000000,
+     "input": "servfail 20",
+     "shouldErr": true
+    },
+    {
+     "failttl": 5000000000,
+     "input": "servfail -1s",
+     "shouldErr": true
+    },
+    {
+     "failttl": 5000000000,
+     "input": "servfail aa",
+     "shouldErr": true
+    },
+    {
+     "failttl": 5000000000,
+     "input": "servfail 1m invalid",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestDisable",
+   "name": "tests",
+   "line": 302,
+   "value": [
+    {
+     "input": "disable denial example.com example.org",
+     "nexcept": [
+      "example.com.",
+      "example.org."
+     ],
+     "pexcept": null,
+     "shouldErr": false
+    },
+    {
+     "input": "disable success example.com example.org",
+     "nexcept": null,
+     "pexcept": [
+      "example.com.",
+      "example.org."
+     ],
+     "shouldErr": false
+    },
+    {
+     "input": "disable denial",
+     "nexcept": [
+      "."
+     ],
+     "pexcept": null,
+     "shouldErr": false
+    },
+    {
+     "input": "disable success",
+     "nexcept": null,
+     "pexcept": [
+      "."
+     ],
+     "shouldErr": false
+    },
+    {
+     "input": "disable denial example.com example.org\ndisable success example.com example.org",
+     "nexcept": [
+      "example.com.",
+      "example.org."
+     ],
+     "pexcept": [
+      "example.com.",
+      "example.org."
+     ],
+     "shouldErr": false
+    },
+    {
+     "input": "disable invalid example.com example.org",
+     "nexcept": null,
+     "pexcept": null,
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestKeepttl",
+   "name": "tests",
+   "line": 341,
+   "value": [
+    {
+     "input": "keepttl",
+     "shouldErr": false
+    },
+    {
+     "input": "keepttl arg1",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

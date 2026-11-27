@@ -1,0 +1,16 @@
+{
+ "plugin": "root",
+ "strings": {
+  "TestRoot/parseErrContent": "Error during parsing:",
+  "TestRoot/unableToAccessErrContent": "unable to access root path"
+ },
+ "tables": [
+  {
+   "file": "root_test.go",
+   "func": "TestRoot",
+   "name": "tests",
+   "line": 37,
+   "dropped": "undefined: existingDirPath"
+  }
+ ]
+}

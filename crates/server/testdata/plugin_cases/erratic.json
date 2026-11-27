@@ -1,0 +1,148 @@
+{
+ "plugin": "erratic",
+ "strings": {},
+ "tables": [
+  {
+   "file": "erratic_test.go",
+   "func": "TestErraticDrop",
+   "name": "tests",
+   "line": 16,
+   "value": [
+    {
+     "drop": true,
+     "expectedCode": 0,
+     "expectedErr": null,
+     "rrtype": 1
+    },
+    {
+     "drop": false,
+     "expectedCode": 0,
+     "expectedErr": null,
+     "rrtype": 1
+    },
+    {
+     "drop": true,
+     "expectedCode": 0,
+     "expectedErr": null,
+     "rrtype": 28
+    },
+    {
+     "drop": false,
+     "expectedCode": 2,
+     "expectedErr": null,
+     "rrtype": 13
+    }
+   ]
+  },
+  {
+   "file": "erratic_test.go",
+   "func": "TestErraticTruncate",
+   "name": "tests",
+   "line": 53,
+   "value": [
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "truncate": true
+    },
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "truncate": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParseErratic",
+   "name": "tests",
+   "line": 31,
+   "value": [
+    {
+     "delay": 0,
+     "drop": 2,
+     "input": "erratic",
+     "shouldErr": false,
+     "truncate": 0
+    },
+    {
+     "delay": 3,
+     "drop": 2,
+     "input": "erratic {\n\t\t\tdrop 2\n\t\t\tdelay 3 1ms\n\n\t\t}",
+     "shouldErr": false,
+     "truncate": 0
+    },
+    {
+     "delay": 3,
+     "drop": 0,
+     "input": "erratic {\n\t\t\ttruncate 2\n\t\t\tdelay 3 1ms\n\n\t\t}",
+     "shouldErr": false,
+     "truncate": 2
+    },
+    {
+     "delay": 2,
+     "drop": 3,
+     "input": "erraric {\n\t\t\tdrop 3\n\t\t\tdelay\n\t\t}",
+     "shouldErr": false,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 3,
+     "input": "erratic {\n\t\t\tdrop 3\n\t\t\ttruncate\n\t\t}",
+     "shouldErr": false,
+     "truncate": 2
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erratic {\n\t\t\tdrop -1\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erratic {\n\t\t\tdelay -1\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erratic {\n\t\t\tdelay 1 2 4\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erratic {\n\t\t\tdelay 15.a\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erraric {\n\t\t\tdrop 3\n\t\t\tdelay 3 bla\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erraric {\n\t\t\ttruncate 15.a\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    },
+    {
+     "delay": 0,
+     "drop": 0,
+     "input": "erraric {\n\t\t\tsomething-else\n\t\t}",
+     "shouldErr": true,
+     "truncate": 0
+    }
+   ]
+  }
+ ]
+}

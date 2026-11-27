@@ -1,0 +1,4884 @@
+{
+ "plugin": "rewrite",
+ "strings": {
+  "AnswerMatch": "answer",
+  "Append": "append",
+  "AutoMatch": "auto",
+  "Continue": "continue",
+  "ExactMatch": "exact",
+  "NameMatch": "name",
+  "PrefixMatch": "prefix",
+  "RegexMatch": "regex",
+  "Replace": "replace",
+  "Set": "set",
+  "Stop": "stop",
+  "SubstringMatch": "substring",
+  "SuffixMatch": "suffix",
+  "Unset": "unset",
+  "ValueMatch": "value",
+  "clientIP": "{client_ip}",
+  "clientPort": "{client_port}",
+  "k8sName": "my-service.my-namespace.svc.cluster.local.",
+  "protocol": "{protocol}",
+  "queryName": "{qname}",
+  "queryType": "{qtype}",
+  "remapSink": "",
+  "serverIP": "{server_ip}",
+  "serverPort": "{server_port}"
+ },
+ "tables": [
+  {
+   "file": "cname_target_test.go",
+   "func": "TestCNameTargetRewrite",
+   "name": "ruleset",
+   "line": 75,
+   "value": [
+    {
+     "args": [
+      "continue",
+      "cname",
+      "exact",
+      "def.example.com",
+      "xyz.example.com"
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    },
+    {
+     "args": [
+      "continue",
+      "cname",
+      "prefix",
+      "chat.openai.com",
+      "bard.google.com"
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    },
+    {
+     "args": [
+      "continue",
+      "cname",
+      "suffix",
+      "uvw.",
+      "xyz."
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    },
+    {
+     "args": [
+      "continue",
+      "cname",
+      "substring",
+      "efgh",
+      "zzzz.www"
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    },
+    {
+     "args": [
+      "continue",
+      "cname",
+      "regex",
+      "(.*)\\.web\\.(.*)\\.site\\.",
+      "{1}.webapp.{2}.org."
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    },
+    {
+     "args": [
+      "continue",
+      "cname",
+      "exact",
+      "music.truncated.spotify.com.",
+      "music.truncated.spotify.com."
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    },
+    {
+     "args": [
+      "continue",
+      "cname",
+      "suffix",
+      "prod.",
+      "staging."
+     ],
+     "expectedType": {
+      "type": "*rewrite.cnameTargetRule"
+     }
+    }
+   ]
+  },
+  {
+   "file": "cname_target_test.go",
+   "func": "TestCNAMETargetRewrite_upstreamFailurePaths",
+   "name": "cases",
+   "line": 250,
+   "value": [
+    {
+     "name": "nil message, no error",
+     "upstream": {}
+    },
+    {
+     "name": "nil message, with error",
+     "upstream": {}
+    }
+   ]
+  },
+  {
+   "file": "edns0_test.go",
+   "func": "TestEdns0LocalSetRevertRestoresPreexisting",
+   "name": "original",
+   "line": 106,
+   "value": {
+    "bytes": "111111"
+   }
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRewriteNamePrefixSuffix",
+   "name": "tests",
+   "line": 39,
+   "value": [
+    {
+     "args": [
+      "prefix",
+      "foo",
+      "bar"
+     ],
+     "expected": "bar.example.com.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "prefix",
+      "foo.",
+      "bar."
+     ],
+     "expected": "bar.example.com.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "suffix",
+      "com",
+      "org"
+     ],
+     "expected": "foo.example.org.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "suffix",
+      ".com",
+      ".org"
+     ],
+     "expected": "foo.example.org.",
+     "next": "stop",
+     "question": "foo.example.com."
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRewriteNameNoRewrite",
+   "name": "tests",
+   "line": 80,
+   "value": [
+    {
+     "args": [
+      "prefix",
+      "foo",
+      "bar"
+     ],
+     "expected": "coredns.foo.",
+     "next": "stop",
+     "question": "coredns.foo."
+    },
+    {
+     "args": [
+      "prefix",
+      "foo",
+      "bar."
+     ],
+     "expected": "coredns.foo.",
+     "next": "stop",
+     "question": "coredns.foo."
+    },
+    {
+     "args": [
+      "suffix",
+      "com",
+      "org"
+     ],
+     "expected": "com.coredns.",
+     "next": "stop",
+     "question": "com.coredns."
+    },
+    {
+     "args": [
+      "suffix",
+      "com",
+      "org."
+     ],
+     "expected": "com.coredns.",
+     "next": "stop",
+     "question": "com.coredns."
+    },
+    {
+     "args": [
+      "substring",
+      "service",
+      "svc"
+     ],
+     "expected": "com.coredns.",
+     "next": "stop",
+     "question": "com.coredns."
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRewriteNamePrefixSuffixNoAutoAnswer",
+   "name": "tests",
+   "line": 121,
+   "value": [
+    {
+     "args": [
+      "prefix",
+      "foo",
+      "bar"
+     ],
+     "expected": "bar.example.com.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "prefix",
+      "foo.",
+      "bar."
+     ],
+     "expected": "bar.example.com.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "suffix",
+      "com",
+      "org"
+     ],
+     "expected": "foo.example.org.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "suffix",
+      ".com",
+      ".org"
+     ],
+     "expected": "foo.example.org.",
+     "next": "stop",
+     "question": "foo.example.com."
+    },
+    {
+     "args": [
+      "suffix",
+      ".ingress.coredns.rocks",
+      "nginx.coredns.rocks"
+     ],
+     "expected": "corednsnginx.coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.ingress.coredns.rocks."
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRewriteNamePrefixSuffixAutoAnswer",
+   "name": "tests",
+   "line": 162,
+   "value": [
+    {
+     "args": [
+      "prefix",
+      "foo",
+      "bar",
+      "answer",
+      "auto"
+     ],
+     "expected": "foo.example.com.",
+     "next": "stop",
+     "question": "foo.example.com.",
+     "rewrite": "bar.example.com."
+    },
+    {
+     "args": [
+      "prefix",
+      "foo.",
+      "bar.",
+      "answer",
+      "auto"
+     ],
+     "expected": "foo.example.com.",
+     "next": "stop",
+     "question": "foo.example.com.",
+     "rewrite": "bar.example.com."
+    },
+    {
+     "args": [
+      "suffix",
+      "com",
+      "org",
+      "answer",
+      "auto"
+     ],
+     "expected": "foo.example.com.",
+     "next": "stop",
+     "question": "foo.example.com.",
+     "rewrite": "foo.example.org."
+    },
+    {
+     "args": [
+      "suffix",
+      ".com",
+      ".org",
+      "answer",
+      "auto"
+     ],
+     "expected": "foo.example.com.",
+     "next": "stop",
+     "question": "foo.example.com.",
+     "rewrite": "foo.example.org."
+    },
+    {
+     "args": [
+      "suffix",
+      ".ingress.coredns.rocks",
+      "nginx.coredns.rocks",
+      "answer",
+      "auto"
+     ],
+     "expected": "coredns.ingress.coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.ingress.coredns.rocks.",
+     "rewrite": "corednsnginx.coredns.rocks."
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRewriteNameExactAnswer",
+   "name": "tests",
+   "line": 209,
+   "value": [
+    {
+     "args": [
+      "exact",
+      "coredns.rocks",
+      "service.consul",
+      "answer",
+      "auto"
+     ],
+     "expected": "coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.rocks.",
+     "rewrite": "service.consul."
+    },
+    {
+     "args": [
+      "exact",
+      "coredns.rocks.",
+      "service.consul.",
+      "answer",
+      "auto"
+     ],
+     "expected": "coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.rocks.",
+     "rewrite": "service.consul."
+    },
+    {
+     "args": [
+      "exact",
+      "coredns.rocks",
+      "service.consul"
+     ],
+     "expected": "coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.rocks.",
+     "rewrite": "service.consul."
+    },
+    {
+     "args": [
+      "exact",
+      "coredns.rocks.",
+      "service.consul."
+     ],
+     "expected": "coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.rocks.",
+     "rewrite": "service.consul."
+    },
+    {
+     "args": [
+      "exact",
+      "coredns.org.",
+      "service.consul."
+     ],
+     "expected": "coredns.rocks.",
+     "next": "stop",
+     "question": "coredns.rocks.",
+     "rewrite": "coredns.rocks."
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRewriteNameRegexAnswer",
+   "name": "tests",
+   "line": 256,
+   "value": [
+    {
+     "args": [
+      "regex",
+      "(.*).coredns.rocks",
+      "{1}.coredns.maps",
+      "answer",
+      "auto"
+     ],
+     "expected": "foo.coredns.rocks.",
+     "next": "stop",
+     "question": "foo.coredns.rocks.",
+     "rewrite": "foo.coredns.maps."
+    },
+    {
+     "args": [
+      "regex",
+      "(.*).coredns.rocks",
+      "{1}.coredns.maps",
+      "answer",
+      "name",
+      "(.*).coredns.maps",
+      "{1}.coredns.works"
+     ],
+     "expected": "foo.coredns.works.",
+     "next": "stop",
+     "question": "foo.coredns.rocks.",
+     "rewrite": "foo.coredns.maps."
+    },
+    {
+     "args": [
+      "regex",
+      "(.*).coredns.rocks",
+      "{1}.coredns.maps"
+     ],
+     "expected": "foo.coredns.maps.",
+     "next": "stop",
+     "question": "foo.coredns.rocks.",
+     "rewrite": "foo.coredns.maps."
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestNewNameRule",
+   "name": "tests",
+   "line": 299,
+   "value": [
+    {
+     "args": [
+      "exact",
+      "srv3.coredns.rocks",
+      "srv4.coredns.rocks"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "srv1.coredns.rocks",
+      "srv2.coredns.rocks"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "coredns.rocks",
+      "coredns.rocks."
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "coredns.rocks.",
+      "coredns.rocks"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "coredns.rocks.",
+      "coredns.rocks."
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "srv1.coredns.rocks",
+      "10"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "(.*).coredns.rocks",
+      "10"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "(.*).coredns.rocks",
+      "{1}.coredns.rocks"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "(.*).coredns.rocks",
+      "{1}.{2}.coredns.rocks"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "aws-loadbalancer-id.us-east-1.elb.amazonaws.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "other"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "auto"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "auto"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "coredns.rock",
+      "staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.{2}.staging.mydomain.com"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "name",
+      "(.*).coredns.rock"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "answer",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "staging.mydomain.com",
+      "coredns.rock",
+      "answer",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "value",
+      "(.*).coredns.rock"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com.",
+      "coredns.rock.",
+      "answer",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com.",
+      "coredns.rock.",
+      "answer",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "answer",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com.",
+      "coredns.rock.",
+      "answer",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "name",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "staging.mydomain.com.",
+      "coredns.rock.",
+      "answer",
+      "value",
+      "(.*).coredns.rock",
+      "{1}.staging.mydomain.com",
+      "value",
+      "(.*).coredns.rock"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    }
+   ]
+  },
+  {
+   "file": "name_test.go",
+   "func": "TestRemapStringRewriter",
+   "name": "tests",
+   "line": 387,
+   "value": [
+    {
+     "expected": "example.org.",
+     "src": "example.com."
+    },
+    {
+     "expected": "sub.example.org.",
+     "src": "sub.example.com."
+    },
+    {
+     "expected": "a.b.example.org.",
+     "src": "a.b.example.com."
+    },
+    {
+     "expected": "notexample.com.",
+     "src": "notexample.com."
+    },
+    {
+     "expected": ".example.org.",
+     "src": ".example.com."
+    },
+    {
+     "expected": "example.net.",
+     "src": "example.net."
+    },
+    {
+     "expected": "com.",
+     "src": "com."
+    },
+    {
+     "expected": "",
+     "src": ""
+    }
+   ]
+  },
+  {
+   "file": "rcode_test.go",
+   "func": "TestNewRCodeRule",
+   "name": "tests",
+   "line": 16,
+   "value": [
+    {
+     "args": [
+      "numeric.rcode.coredns.rocks",
+      "2",
+      "0"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "too.few.rcode.coredns.rocks",
+      "2"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "exact",
+      "too.many.rcode.coredns.rocks",
+      "2",
+      "1",
+      "0"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "exact",
+      "match.string.rcode.coredns.rocks",
+      "SERVFAIL",
+      "NOERROR"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "(regex)\\.rcode\\.(coredns)\\.(rocks)",
+      "FORMERR",
+      "NOERROR"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "invalid.rcode.coredns.rocks",
+      "random",
+      "nothing"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    }
+   ]
+  },
+  {
+   "file": "reverter_test.go",
+   "name": "tests",
+   "line": 14,
+   "value": [
+    {
+     "answer": [
+      "dns.core.rocks.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "core.dns.rocks",
+     "fromType": 1,
+     "noRevert": false,
+     "to": "core.dns.rocks",
+     "toType": 1
+    },
+    {
+     "answer": [
+      "dns.core.rocks.\t5\tIN\tSRV\t0 100 100 srv1.dns.core.rocks."
+     ],
+     "from": "core.dns.rocks",
+     "fromType": 33,
+     "noRevert": false,
+     "to": "core.dns.rocks",
+     "toType": 33
+    },
+    {
+     "answer": [
+      "core.dns.rocks.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "core.dns.rocks",
+     "fromType": 1,
+     "noRevert": true,
+     "to": "dns.core.rocks.",
+     "toType": 1
+    },
+    {
+     "answer": [
+      "core.dns.rocks.\t5\tIN\tSRV\t0 100 100 srv1.dns.core.rocks."
+     ],
+     "from": "core.dns.rocks",
+     "fromType": 33,
+     "noRevert": true,
+     "to": "dns.core.rocks.",
+     "toType": 33
+    },
+    {
+     "answer": [
+      "core.dns.rocks.\t5\tIN\tHINFO\t\"INTEL-64\" \"RHEL 7.4\""
+     ],
+     "from": "core.dns.rocks",
+     "fromType": 13,
+     "noRevert": false,
+     "to": "core.dns.rocks",
+     "toType": 13
+    },
+    {
+     "answer": [
+      "dns.core.rocks.\t5\tIN\tA\t10.0.0.1",
+      "dns.core.rocks.\t5\tIN\tA\t10.0.0.2"
+     ],
+     "from": "core.dns.rocks",
+     "fromType": 1,
+     "noRevert": false,
+     "to": "core.dns.rocks",
+     "toType": 1
+    }
+   ]
+  },
+  {
+   "file": "reverter_test.go",
+   "name": "valueTests",
+   "line": 72,
+   "value": [
+    {
+     "answer": [
+      "my.cluster.local.\t5\tIN\tSRV\t0 100 100 srv1.my.cluster.local."
+     ],
+     "expectAddlName": "srv1.my.domain.uk.",
+     "expectAnswerType": 33,
+     "expectValue": "srv1.my.domain.uk.",
+     "extra": [
+      "srv1.my.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 33,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 33
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t5\tIN\tSRV\t0 100 100 srv1.my.cluster.local."
+     ],
+     "expectAddlName": "srv1.my.cluster.local.",
+     "expectAnswerType": 33,
+     "expectValue": "srv1.my.cluster.local.",
+     "extra": [
+      "srv1.my.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 33,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 33
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tCNAME\tcname.cluster.local."
+     ],
+     "expectAddlName": "cname.domain.uk.",
+     "expectAnswerType": 5,
+     "expectValue": "cname.domain.uk.",
+     "extra": [
+      "cname.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 255,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 255
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tCNAME\tcname.cluster.local."
+     ],
+     "expectAddlName": "cname.cluster.local.",
+     "expectAnswerType": 5,
+     "expectValue": "cname.cluster.local.",
+     "extra": [
+      "cname.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 255,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 255
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tDNAME\tdname.cluster.local."
+     ],
+     "expectAddlName": "dname.domain.uk.",
+     "expectAnswerType": 39,
+     "expectValue": "dname.domain.uk.",
+     "extra": [
+      "dname.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 255,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 255
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tDNAME\tdname.cluster.local."
+     ],
+     "expectAddlName": "dname.cluster.local.",
+     "expectAnswerType": 39,
+     "expectValue": "dname.cluster.local.",
+     "extra": [
+      "dname.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 255,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 255
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tMX\t1 mx1.cluster.local."
+     ],
+     "expectAddlName": "mx1.domain.uk.",
+     "expectAnswerType": 15,
+     "expectValue": "mx1.domain.uk.",
+     "extra": [
+      "mx1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 15,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 15
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tMX\t1 mx1.cluster.local."
+     ],
+     "expectAddlName": "mx1.cluster.local.",
+     "expectAnswerType": 15,
+     "expectValue": "mx1.cluster.local.",
+     "extra": [
+      "mx1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 15,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 15
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tNS\tns1.cluster.local."
+     ],
+     "expectAddlName": "ns1.domain.uk.",
+     "expectAnswerType": 2,
+     "expectValue": "ns1.domain.uk.",
+     "extra": [
+      "ns1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 255,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 255
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t3600\tIN\tNS\tns1.cluster.local."
+     ],
+     "expectAddlName": "ns1.cluster.local.",
+     "expectAnswerType": 2,
+     "expectValue": "ns1.cluster.local.",
+     "extra": [
+      "ns1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 255,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 255
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t1800\tIN\tSOA\tns1.cluster.local. admin.cluster.local. 1502165581 14400 3600 604800 14400"
+     ],
+     "expectAddlName": "ns1.domain.uk.",
+     "expectAnswerType": 6,
+     "expectValue": "ns1.domain.uk.",
+     "extra": [
+      "ns1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 6,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 6
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t1800\tIN\tSOA\tns1.cluster.local. admin.cluster.local. 1502165581 14400 3600 604800 14400"
+     ],
+     "expectAddlName": "ns1.cluster.local.",
+     "expectAnswerType": 6,
+     "expectValue": "ns1.cluster.local.",
+     "extra": [
+      "ns1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 6,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 6
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t100\tIN\tNAPTR\t100 10 \"S\" \"SIP+D2U\" \"!^.*$!sip:customer-service@example.com!\" _sip._udp.cluster.local."
+     ],
+     "expectAddlName": "ns1.domain.uk.",
+     "expectAnswerType": 35,
+     "expectValue": "_sip._udp.domain.uk.",
+     "extra": [
+      "ns1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 35,
+     "noRevert": false,
+     "to": "my.domain.uk.",
+     "toType": 35
+    },
+    {
+     "answer": [
+      "my.cluster.local.\t100\tIN\tNAPTR\t100 10 \"S\" \"SIP+D2U\" \"!^.*$!sip:customer-service@example.com!\" _sip._udp.cluster.local."
+     ],
+     "expectAddlName": "ns1.cluster.local.",
+     "expectAnswerType": 35,
+     "expectValue": "_sip._udp.cluster.local.",
+     "extra": [
+      "ns1.cluster.local.\t5\tIN\tA\t10.0.0.1"
+     ],
+     "from": "my.domain.uk.",
+     "fromType": 35,
+     "noRevert": true,
+     "to": "my.cluster.local.",
+     "toType": 35
+    }
+   ]
+  },
+  {
+   "file": "reverter_test.go",
+   "name": "edns0NoOPTRevertTests",
+   "line": 199,
+   "value": [
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "0xabcdef",
+      "revert"
+     ],
+     "name": "local_set_revert",
+     "req": {
+      "func": "github.com/coredns/coredns/plugin/rewrite.init.func1"
+     }
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "0x222222",
+      "revert"
+     ],
+     "name": "local_replace_revert",
+     "req": {
+      "func": "github.com/coredns/coredns/plugin/rewrite.init.func2"
+     }
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestNewRule",
+   "name": "tests",
+   "line": 30,
+   "value": [
+    {
+     "args": [],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "foo"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "a.com"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "a.com",
+      "b.com",
+      "c.com"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.exactNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "exact",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.exactNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "prefix",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.prefixNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "suffix",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.suffixNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "substring",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.substringNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "([a])\\.com",
+      "new-{1}.com"
+     ],
+     "expType": {
+      "type": "*rewrite.regexNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "([a]\\.com",
+      "new-{1}.com"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "(dns)\\.(core)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "answer",
+      "name",
+      "(core)\\.(dns)\\.(rocks)",
+      "{2}.{1}.{3}"
+     ],
+     "expType": {
+      "type": "*rewrite.regexNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "(adns)\\.(core)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "answer",
+      "name",
+      "(core)\\.(adns)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "too.long",
+      "way.too.long"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "(bdns)\\.(core)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "NoAnswer",
+      "name",
+      "(core)\\.(bdns)\\.(rocks)",
+      "{2}.{1}.{3}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "(cdns)\\.(core)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "answer",
+      "ttl",
+      "(core)\\.(cdns)\\.(rocks)",
+      "{2}.{1}.{3}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "(ddns)\\.(core)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "answer",
+      "name",
+      "�ore\\.(ddns)\\.(rocks)",
+      "{2}.{1}.{3}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "regex",
+      "�ns\\.(core)\\.(rocks)",
+      "{2}.{1}.{3}",
+      "answer",
+      "name",
+      "(core)\\.(edns)\\.(rocks)",
+      "{2}.{1}.{3}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "name",
+      "substring",
+      "fcore.dns.rocks",
+      "dns.fcore.rocks",
+      "answer",
+      "name",
+      "(fcore)\\.(dns)\\.(rocks)",
+      "{2}.{1}.{3}"
+     ],
+     "expType": {
+      "type": "*rewrite.substringNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "name",
+      "substring",
+      "a.com",
+      "b.com",
+      "c.com"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "type"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "type",
+      "a"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "type",
+      "any",
+      "a",
+      "a"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "type",
+      "any",
+      "a"
+     ],
+     "expType": {
+      "type": "*rewrite.typeRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "type",
+      "XY",
+      "WV"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "type",
+      "ANY",
+      "WV"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "class"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "class",
+      "IN"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "class",
+      "ch",
+      "in",
+      "in"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "class",
+      "ch",
+      "in"
+     ],
+     "expType": {
+      "type": "*rewrite.classRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "class",
+      "XY",
+      "WV"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "class",
+      "IN",
+      "WV"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "unknown-rule-type",
+      "set"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "unknown-rule-type",
+      "unset"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "invalid-uint",
+      "abcdefg"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "65518",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "abcdefg",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "abcdefg",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "abcdefg",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "unset",
+      "0xffee"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "unset",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "unset",
+      "0xffee",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "foo",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "0xabcdefg"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "set",
+      "junk"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "set"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "set",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "append"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "append",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "replace"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "replace",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "unset"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "unset",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "nsid",
+      "foo"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "invalid-uint",
+      "{qname}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{dummy}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qname}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qtype}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{client_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{client_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{protocol}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_port}",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{dummy}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{qname}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{qtype}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{client_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{client_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{protocol}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{server_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{server_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "append",
+      "0xffee",
+      "{server_port}",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{dummy}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{qname}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{qtype}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{client_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{client_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{protocol}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{server_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{server_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "local",
+      "replace",
+      "0xffee",
+      "{server_port}",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "set",
+      "-1",
+      "56"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "-56"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "set",
+      "33",
+      "56"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "129"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "56",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "append",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "append",
+      "24",
+      "56",
+      "72"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "append",
+      "24",
+      "56",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "replace",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "replace",
+      "24",
+      "56",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "unset"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "unset",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": true
+    },
+    {
+     "args": [
+      "edns0",
+      "subnet",
+      "unset",
+      "revert"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": true
+    },
+    {
+     "args": [
+      "unknown-action",
+      "name",
+      "a.com",
+      "b.com"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "name",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.exactNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "name",
+      "a.com",
+      "b.com"
+     ],
+     "expType": {
+      "type": "*rewrite.exactNameRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "unknown-action",
+      "type",
+      "any",
+      "a"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "type",
+      "any",
+      "a"
+     ],
+     "expType": {
+      "type": "*rewrite.typeRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "type",
+      "any",
+      "a"
+     ],
+     "expType": {
+      "type": "*rewrite.typeRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "unknown-action",
+      "class",
+      "ch",
+      "in"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "class",
+      "ch",
+      "in"
+     ],
+     "expType": {
+      "type": "*rewrite.classRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "class",
+      "ch",
+      "in"
+     ],
+     "expType": {
+      "type": "*rewrite.classRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "unknown-action",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "abcedef"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "abcdefg"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0LocalRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "unknown-action",
+      "edns0",
+      "nsid",
+      "set"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "nsid",
+      "set"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "nsid",
+      "set"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0NsidRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "unknown-action",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qname}"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qname}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qtype}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{client_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{client_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{protocol}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qname}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{qtype}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{client_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{client_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{protocol}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_ip}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "local",
+      "set",
+      "0xffee",
+      "{server_port}"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0VariableRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "unknown-action",
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "64"
+     ],
+     "expType": null,
+     "shouldError": true
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "subnet",
+      "append",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "subnet",
+      "replace",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "stop",
+      "edns0",
+      "subnet",
+      "unset"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "subnet",
+      "set",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "subnet",
+      "append",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "subnet",
+      "replace",
+      "24",
+      "56"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    },
+    {
+     "args": [
+      "continue",
+      "edns0",
+      "subnet",
+      "unset"
+     ],
+     "expType": {
+      "type": "*rewrite.edns0SubnetRule"
+     },
+     "shouldError": false
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteDefaultRevertPolicy",
+   "name": "tests",
+   "line": 211,
+   "value": [
+    {
+     "from": "prefix.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "to.suffix.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "from.substring.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "from.regex.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewrite",
+   "name": "tests",
+   "line": 279,
+   "value": [
+    {
+     "from": "from.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "a.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "a.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "a.nl.",
+     "fromC": 3,
+     "fromT": 1,
+     "to": "a.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "a.nl.",
+     "fromC": 1,
+     "fromT": 255,
+     "to": "a.nl.",
+     "toC": 1,
+     "toT": 13
+    },
+    {
+     "from": "from.nl.",
+     "fromC": 1,
+     "fromT": 255,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 255
+    },
+    {
+     "from": "from.exact.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "prefix.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "to.suffix.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "from.substring.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "from.regex.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "consul.rocks.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "to.nl.",
+     "toC": 1,
+     "toT": 1
+    },
+    {
+     "from": "a.nl.",
+     "fromC": 3,
+     "fromT": 255,
+     "to": "a.nl.",
+     "toC": 1,
+     "toT": 255
+    },
+    {
+     "from": "a.nl.",
+     "fromC": 4,
+     "fromT": 255,
+     "to": "a.nl.",
+     "toC": 1,
+     "toT": 255
+    },
+    {
+     "from": "core.dns.rocks.nl.",
+     "fromC": 1,
+     "fromT": 1,
+     "to": "dns.core.rocks.nl.",
+     "toC": 1,
+     "toT": 1
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteEDNS0Local",
+   "name": "tests",
+   "line": 341,
+   "value": [
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "0xabcdef"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "append",
+      "0xffee",
+      "abcdefghijklmnop"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "6162636465666768696a6b6c6d6e6f70"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "replace",
+      "0xffee",
+      "abcdefghijklmnop"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "nsid",
+      "set"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "args": [
+      "nsid",
+      "append"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "args": [
+      "nsid",
+      "replace"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": []
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestEdns0MultiRule",
+   "name": "tests",
+   "line": 418,
+   "value": [
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "abcdef"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "fedcba"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666564636261"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "abcdef"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "fedcba"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "616263646566"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "abcdef",
+       "revert"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "fedcba",
+       "revert"
+      ]
+     ],
+     "toOpts": []
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "abcdef",
+       "revert"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "fedcba",
+       "revert"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "{qname}"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "{qtype}"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "0001"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "{qname}"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "{qtype}"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "6578616d706c652e636f6d2e"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "{qname}",
+       "revert"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "{qtype}",
+       "revert"
+      ]
+     ],
+     "toOpts": []
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "local",
+       "replace",
+       "0xffee",
+       "{qname}",
+       "revert"
+      ],
+      [
+       "stop",
+       "local",
+       "set",
+       "0xffee",
+       "{qtype}",
+       "revert"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "nsid",
+       "replace"
+      ],
+      [
+       "stop",
+       "nsid",
+       "set"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "nsid",
+       "replace"
+      ],
+      [
+       "stop",
+       "nsid",
+       "set"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      },
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "nsid",
+       "replace"
+      ],
+      [
+       "stop",
+       "nsid",
+       "set"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "nsid",
+       "replace",
+       "revert"
+      ],
+      [
+       "stop",
+       "nsid",
+       "set",
+       "revert"
+      ]
+     ],
+     "toOpts": []
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "nsid",
+       "replace",
+       "revert"
+      ],
+      [
+       "stop",
+       "nsid",
+       "set",
+       "revert"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ]
+    },
+    {
+     "fromOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "nsid",
+       "replace",
+       "revert"
+      ],
+      [
+       "stop",
+       "nsid",
+       "set",
+       "revert"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "subnet",
+       "replace",
+       "32",
+       "56"
+      ],
+      [
+       "stop",
+       "subnet",
+       "set",
+       "0",
+       "56"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Address": "0.0.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ]
+    },
+    {
+     "fromOpts": [
+      {
+       "Address": "0.0.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": true
+     },
+     "rules": [
+      [
+       "stop",
+       "subnet",
+       "replace",
+       "32",
+       "56"
+      ],
+      [
+       "stop",
+       "subnet",
+       "set",
+       "0",
+       "56"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Address": "10.240.0.1",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 32,
+       "SourceScope": 0
+      }
+     ]
+    },
+    {
+     "fromOpts": null,
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "subnet",
+       "replace",
+       "32",
+       "56",
+       "revert"
+      ],
+      [
+       "stop",
+       "subnet",
+       "set",
+       "0",
+       "56",
+       "revert"
+      ]
+     ],
+     "toOpts": []
+    },
+    {
+     "fromOpts": [
+      {
+       "Address": "0.0.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ],
+     "revertPolicy": {
+      "noRestore": false,
+      "noRevert": false
+     },
+     "rules": [
+      [
+       "stop",
+       "subnet",
+       "replace",
+       "32",
+       "56",
+       "revert"
+      ],
+      [
+       "stop",
+       "subnet",
+       "set",
+       "0",
+       "56",
+       "revert"
+      ]
+     ],
+     "toOpts": [
+      {
+       "Address": "0.0.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteEDNS0LocalVariable",
+   "name": "expectedMetadata",
+   "line": 730,
+   "value": [
+    {
+     "test/label": {
+      "func": "github.com/coredns/coredns/plugin/rewrite.init.8.func6.1"
+     }
+    },
+    {
+     "test/empty": {
+      "func": "github.com/coredns/coredns/plugin/rewrite.init.8.func6.2"
+     }
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteEDNS0LocalVariable",
+   "name": "tests",
+   "line": 745,
+   "value": [
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{qname}"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "6578616d706c652e636f6d2e"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{qtype}"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "0001"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{client_ip}"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "0af00001"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{client_port}"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "9d14"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{protocol}"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "756470"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{server_port}"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "0035"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{server_ip}"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "7f000001"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{test/label}"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "6d792d76616c7565"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{test/empty}"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": null
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "{test/does-not-exist}"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": null
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteEDNS0Subnet",
+   "name": "tests",
+   "line": 852,
+   "value": [
+    {
+     "args": [
+      "subnet",
+      "set",
+      "24",
+      "56"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Address": "10.240.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 24,
+       "SourceScope": 0
+      }
+     ],
+     "writer": {
+      "RemoteIP": "",
+      "TCP": false,
+      "Zone": ""
+     }
+    },
+    {
+     "args": [
+      "subnet",
+      "set",
+      "32",
+      "56"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Address": "10.240.0.1",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 32,
+       "SourceScope": 0
+      }
+     ],
+     "writer": {
+      "RemoteIP": "",
+      "TCP": false,
+      "Zone": ""
+     }
+    },
+    {
+     "args": [
+      "subnet",
+      "set",
+      "0",
+      "56"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Address": "0.0.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ],
+     "writer": {
+      "RemoteIP": "",
+      "TCP": false,
+      "Zone": ""
+     }
+    },
+    {
+     "args": [
+      "subnet",
+      "set",
+      "24",
+      "56"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Address": "fe80::",
+       "Code": 8,
+       "Family": 2,
+       "SourceNetmask": 56,
+       "SourceScope": 0
+      }
+     ],
+     "writer": {
+      "ResponseWriter": {
+       "RemoteIP": "",
+       "TCP": false,
+       "Zone": ""
+      }
+     }
+    },
+    {
+     "args": [
+      "subnet",
+      "set",
+      "24",
+      "128"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Address": "fe80::42:ff:feca:4c65",
+       "Code": 8,
+       "Family": 2,
+       "SourceNetmask": 128,
+       "SourceScope": 0
+      }
+     ],
+     "writer": {
+      "ResponseWriter": {
+       "RemoteIP": "",
+       "TCP": false,
+       "Zone": ""
+      }
+     }
+    },
+    {
+     "args": [
+      "subnet",
+      "set",
+      "24",
+      "0"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": [
+      {
+       "Address": "::",
+       "Code": 8,
+       "Family": 2,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ],
+     "writer": {
+      "ResponseWriter": {
+       "RemoteIP": "",
+       "TCP": false,
+       "Zone": ""
+      }
+     }
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteEDNS0Revert",
+   "name": "tests",
+   "line": 972,
+   "value": [
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "0xabcdef",
+      "revert"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "local",
+      "append",
+      "0xffee",
+      "abcdefghijklmnop",
+      "revert"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "local",
+      "replace",
+      "0xffee",
+      "abcdefghijklmnop",
+      "revert"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "nsid",
+      "set",
+      "revert"
+     ],
+     "doBool": false,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "nsid",
+      "append",
+      "revert"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "nsid",
+      "replace"
+     ],
+     "doBool": true,
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "local",
+      "set",
+      "0xffee",
+      "0xabcd",
+      "revert"
+     ],
+     "doBool": false,
+     "fromOpts": [
+      {
+       "Code": 65517,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ],
+     "toOpts": [
+      {
+       "Code": 65517,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "replace",
+      "0xffee",
+      "abcdefghijklmnop"
+     ],
+     "doBool": true,
+     "fromOpts": [
+      {
+       "Code": 65519,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ],
+     "toOpts": [
+      {
+       "Code": 65519,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "file": "rewrite_test.go",
+   "func": "TestRewriteEDNS0Unset",
+   "name": "tests",
+   "line": 1070,
+   "value": [
+    {
+     "args": [
+      "local",
+      "unset",
+      "0xffee"
+     ],
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "local",
+      "unset",
+      "0xffee"
+     ],
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "local",
+      "unset",
+      "0xffed"
+     ],
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "abcdef"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "nsid",
+      "unset"
+     ],
+     "fromOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "nsid",
+      "unset"
+     ],
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "subnet",
+      "unset"
+     ],
+     "fromOpts": [
+      {
+       "Address": "0.0.0.0",
+       "Code": 8,
+       "Family": 1,
+       "SourceNetmask": 0,
+       "SourceScope": 0
+      }
+     ],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "subnet",
+      "unset"
+     ],
+     "fromOpts": [],
+     "toOpts": []
+    },
+    {
+     "args": [
+      "nsid",
+      "unset"
+     ],
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      },
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      }
+     ]
+    },
+    {
+     "args": [
+      "local",
+      "unset",
+      "0xffee"
+     ],
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      },
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ],
+     "toOpts": [
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    },
+    {
+     "args": [
+      "subnet",
+      "unset"
+     ],
+     "fromOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      },
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ],
+     "toOpts": [
+      {
+       "Code": 65518,
+       "Data": {
+        "bytes": "666f6f626172"
+       }
+      },
+      {
+       "Code": 3,
+       "Nsid": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParse",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite",
+     "shouldErr": true
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite name",
+     "shouldErr": true
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite name a.com b.com",
+     "shouldErr": false
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite stop {\n    name regex foo bar\n    answer name bar foo\n}",
+     "shouldErr": false
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite stop name regex foo bar answer name bar foo",
+     "shouldErr": false
+    },
+    {
+     "errContains": "2 arguments required",
+     "inputFileRules": "rewrite stop {\n    name regex foo bar\n    answer name bar foo\n    name baz\n}",
+     "shouldErr": true
+    },
+    {
+     "errContains": "must begin with a name rule",
+     "inputFileRules": "rewrite stop {\n    answer name bar foo\n    name regex foo bar\n}",
+     "shouldErr": true
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite stop",
+     "shouldErr": true
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite continue",
+     "shouldErr": true
+    },
+    {
+     "errContains": "",
+     "inputFileRules": "rewrite stop name regex [bad[ bar answer name bar foo",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "ttl_test.go",
+   "func": "TestNewTTLRule",
+   "name": "tests",
+   "line": 17,
+   "value": [
+    {
+     "args": [
+      "srv1.coredns.rocks",
+      "10"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "exact",
+      "srv1.coredns.rocks",
+      "15"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "prefix",
+      "coredns.rocks",
+      "20"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "suffix",
+      "srv1",
+      "25"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "substring",
+      "coredns",
+      "30"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "regex",
+      "(srv1)\\.(coredns)\\.(rocks)",
+      "35"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "srv1.coredns.rocks",
+      "10"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "exact",
+      "srv1.coredns.rocks",
+      "15"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "prefix",
+      "coredns.rocks",
+      "20"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "suffix",
+      "srv1",
+      "25"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "substring",
+      "coredns",
+      "30"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "regex",
+      "(srv1)\\.(coredns)\\.(rocks)",
+      "35"
+     ],
+     "expectedFail": false,
+     "next": "continue"
+    },
+    {
+     "args": [
+      "srv1.coredns.rocks",
+      "12345678901234567890"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "srv1.coredns.rocks",
+      "coredns.rocks"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "srv1.coredns.rocks",
+      "#1"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "range.coredns.rocks",
+      "1-2"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "ceil.coredns.rocks",
+      "-2"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "floor.coredns.rocks",
+      "1-"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "range.coredns.rocks",
+      "2-2"
+     ],
+     "expectedFail": false,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "invalid.coredns.rocks",
+      "-"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "invalid.coredns.rocks",
+      "2-1"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    },
+    {
+     "args": [
+      "invalid.coredns.rocks",
+      "5-10-20"
+     ],
+     "expectedFail": true,
+     "next": "stop"
+    }
+   ]
+  },
+  {
+   "file": "ttl_test.go",
+   "func": "TestTtlRewrite",
+   "name": "ruleset",
+   "line": 77,
+   "value": [
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "srv1.coredns.rocks",
+      "1"
+     ],
+     "expectedType": {
+      "type": "*rewrite.exactTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "exact",
+      "srv15.coredns.rocks",
+      "15"
+     ],
+     "expectedType": {
+      "type": "*rewrite.exactTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "prefix",
+      "srv30",
+      "30"
+     ],
+     "expectedType": {
+      "type": "*rewrite.prefixTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "suffix",
+      "45.coredns.rocks",
+      "45"
+     ],
+     "expectedType": {
+      "type": "*rewrite.suffixTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "substring",
+      "rv50",
+      "50"
+     ],
+     "expectedType": {
+      "type": "*rewrite.substringTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "regex",
+      "(srv10)\\.(coredns)\\.(rocks)",
+      "10"
+     ],
+     "expectedType": {
+      "type": "*rewrite.regexTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "regex",
+      "(srv20)\\.(coredns)\\.(rocks)",
+      "20"
+     ],
+     "expectedType": {
+      "type": "*rewrite.regexTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "range.example.com.",
+      "30-300"
+     ],
+     "expectedType": {
+      "type": "*rewrite.exactTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "ceil.example.com.",
+      "-11"
+     ],
+     "expectedType": {
+      "type": "*rewrite.exactTTLRule"
+     }
+    },
+    {
+     "args": [
+      "stop",
+      "ttl",
+      "floor.example.com.",
+      "5-"
+     ],
+     "expectedType": {
+      "type": "*rewrite.exactTTLRule"
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+{
+ "plugin": "timeouts",
+ "strings": {},
+ "tables": [
+  {
+   "file": "timeouts_test.go",
+   "func": "TestTimeouts",
+   "name": "tests",
+   "line": 14,
+   "dropped": "undefined: n128"
+  }
+ ]
+}

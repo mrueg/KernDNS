@@ -1,0 +1,73 @@
+{
+ "plugin": "view",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 15,
+   "value": [
+    {
+     "input": "view example {\n expr name() == 'example.com.'\n}",
+     "progCount": 1,
+     "shouldErr": false
+    },
+    {
+     "input": "view example {\n expr incidr(client_ip(), '10.0.0.0/24')\n}",
+     "progCount": 1,
+     "shouldErr": false
+    },
+    {
+     "input": "view example {\n expr name() == 'example.com.'\n expr name() == 'example2.com.'\n}",
+     "progCount": 2,
+     "shouldErr": false
+    },
+    {
+     "input": "view",
+     "progCount": 0,
+     "shouldErr": true
+    },
+    {
+     "input": "view example {\n expr invalid expression\n}",
+     "progCount": 0,
+     "shouldErr": true
+    },
+    {
+     "input": "view x {\n foo bar\n}\n",
+     "progCount": 0,
+     "shouldErr": true
+    },
+    {
+     "input": "view a { }\nview b { }\n",
+     "progCount": 0,
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "view_test.go",
+   "func": "TestFilter_ErrorPaths",
+   "name": "tests",
+   "line": 27,
+   "value": [
+    {
+     "expected": true,
+     "expr": "name() == 'example.com.'"
+    },
+    {
+     "expected": false,
+     "expr": "name() == 'notexample.com.'"
+    },
+    {
+     "expected": false,
+     "expr": "1"
+    },
+    {
+     "expected": false,
+     "expr": "incidr('invalid', '1.2.3.0/24')"
+    }
+   ]
+  }
+ ]
+}
