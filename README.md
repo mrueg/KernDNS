@@ -39,7 +39,7 @@ Milestones **M0**, **M1** and **M2** are done.
 | Server: multi-socket UDP (`SO_REUSEPORT`), TCP, DoT (`tls://`), DoH (`https://`, HTTP/1.1 and HTTP/2), CoreDNS routing and error semantics, TSIG signing of every response including multi-message transfers, hot reload without dropping listeners | done |
 | Plugins | `acl`, `any`, `auto`, `autopath`, `bind`, `bufsize`, `cache`, `cancel`, `chaos`, `debug`, `dns64`, `dynupdate`, `erratic`, `errors`, `file`, `forward` (UDP/TCP/DoT), `header`, `health`, `hosts`, `k8s_external`, `kubernetes`, `loadbalance`, `local`, `log`, `loop`, `metadata`, `minimal`, `multisocket`, `nsid`, `prometheus`, `ready`, `reload`, `rewrite`, `root`, `secondary`, `template`, `timeouts`, `tls`, `transfer`, `tsig`, `view`, `whoami` |
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
-| CoreDNS integration tests against KernDNS | 76 pass, 19 expected failures (mostly plugins and transports not ported yet), 23 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 |
+| CoreDNS integration tests against KernDNS | 77 pass, 18 expected failures (plugins not ported yet), 22 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | see below |
 | `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
