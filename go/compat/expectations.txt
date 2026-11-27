@@ -102,7 +102,7 @@ pass  TestReverseExpansion
 pass  TestReverseInAddr
 pass  TestRewrite
 pass  TestRewriteFailure
-xfail TestSIITAfterForward                            could not start CoreDNS test server: stdin:2 - Error during parsing: Directive 'siit' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestSIITAfterForward
 pass  TestSecondaryFallthrough
 pass  TestSecondaryZoneNotify
 pass  TestSecondaryZoneTransfer

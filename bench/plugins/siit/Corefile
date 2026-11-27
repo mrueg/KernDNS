@@ -1,0 +1,6 @@
+# about: A for names with only AAAA records in 64:ff9b::/96, synthesized from the AAAA lookup (3 in 4), native A otherwise
+# queries: {DIR}/queries.txt
+example.org:{PORT} {
+    siit
+    file {DIR}/db.example.org
+}

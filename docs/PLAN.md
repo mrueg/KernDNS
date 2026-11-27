@@ -264,6 +264,14 @@ test zone signed on the fly by both servers, compares the answers without
 signature bytes and times, and verifies every RRSIG of both with the same
 validator (miekg/dns).
 
+More wave 5 ports:
+
+- `siit` synthesizes A records from AAAA records in its IPv6 prefix or
+  explicit address mappings (RFC 6052, RFC 7757). Its internal AAAA lookup
+  is marked (`Context::synthesis`), and the mark travels with every
+  internal lookup made under it, so `siit` and `dns64` never re-enter each
+  other, as in CoreDNS.
+
 Performance follow-ups from the first benchmarks, done:
 
 - CPU per query for cheap chains: responses are encoded once (truncation
