@@ -1,0 +1,12 @@
+[package]
+name = "kerndns-go-bridge"
+description = "Runs CoreDNS Go plugins inside KernDNS through a c-shared Go library"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kerndns-core.workspace = true
+kerndns-corefile.workspace = true
+tokio.workspace = true
+libloading = "0.8"

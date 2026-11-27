@@ -114,6 +114,10 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
             }
         }
 
+        check_affinity(
+            &block.directives.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+            registry,
+        )?;
         let mut cfg = BlockConfig::new(keys);
         for &name in order::DIRECTIVES {
             let tokens = block.tokens_for(name);
@@ -150,6 +154,39 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
         listeners: group_by_listener(&configs),
         hooks,
     })
+}
+
+/// Plugins that work together through Go types (CoreDNS looks them up with
+/// `Config.Handler`), so in one server block they must all run on the same
+/// side of the Go bridge. A group only applies if its first plugin is there.
+const AFFINITY: &[&[&str]] = &[
+    &["k8s_external", "kubernetes"],
+    &["transfer", "file", "secondary", "auto", "kubernetes", "dynupdate"],
+    &["alternate", "forward"],
+];
+
+fn check_affinity(directives: &[&str], registry: &Registry) -> Result<(), LoadError> {
+    for group in AFFINITY {
+        if !directives.contains(&group[0]) {
+            continue;
+        }
+        let present: Vec<(&str, bool)> = group
+            .iter()
+            .filter(|n| directives.contains(n))
+            .filter_map(|n| registry.get(n).map(|f| (*n, f.bridged())))
+            .collect();
+        let go: Vec<&str> = present.iter().filter(|(_, b)| *b).map(|(n, _)| *n).collect();
+        let rust: Vec<&str> = present.iter().filter(|(_, b)| !*b).map(|(n, _)| *n).collect();
+        if !go.is_empty() && !rust.is_empty() {
+            return Err(LoadError::Other(format!(
+                "plugins {} (Go bridge) and {} (Rust) work together and must run on the same side; \
+                 use -bridge.prefer to run them all in Go",
+                go.join(", "),
+                rust.join(", ")
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// One listener per (transport, host, port), like `groupConfigsByListenAddr`.
@@ -199,6 +236,49 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
 
 #[cfg(test)]
 mod tests {
+    /// A stand-in for a plugin served by the Go bridge.
+    struct FakeGo(&'static str);
+
+    impl kerndns_core::PluginFactory for FakeGo {
+        fn name(&self) -> &'static str {
+            self.0
+        }
+        fn setup(&self, c: &mut kerndns_core::Controller<'_>) -> Result<(), SetupError> {
+            while c.next() {}
+            Ok(())
+        }
+        fn bridged(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn affinity_groups() {
+        let mut reg = kerndns_plugins::registry();
+        reg.register(FakeGo("kubernetes"));
+        // transfer (Rust) + kubernetes (Go) in one block: refused
+        let e = load(
+            ".:53 {\n transfer {\n to *\n }\n kubernetes\n}",
+            "Corefile",
+            &reg,
+            &Options::default(),
+        )
+        .err()
+        .expect("split group")
+        .to_string();
+        assert!(e.contains("kubernetes (Go bridge) and transfer (Rust)"), "{e}");
+        // the same plugins in different blocks are fine
+        assert!(
+            load(
+                ".:53 {\n kubernetes\n}\nexample.org:53 {\n transfer {\n to *\n }\n}",
+                "Corefile",
+                &reg,
+                &Options::default()
+            )
+            .is_ok()
+        );
+    }
+
     use super::*;
 
     fn load_str(s: &str) -> Result<Plan, LoadError> {

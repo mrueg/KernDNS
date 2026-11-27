@@ -3,6 +3,8 @@
 //! compat-test   Run CoreDNS's integration tests (third_party/coredns/test)
 //!               against the kerndns binary and compare with
 //!               go/compat/expectations.txt.
+//! build-bridge  Build the Go bridge library (go/bridge) with a list of
+//!               CoreDNS plugins: target/bridge/libkerndns_bridge.so.
 //! difftest      Serve the same zones from CoreDNS and kerndns and diff the
 //!               answers to generated queries (see go/difftest).
 //! bench         Benchmark CoreDNS vs kerndns per scenario with dnsperf.
@@ -21,7 +23,9 @@ mod bench;
 mod difftest;
 mod fakeapi;
 
-const USAGE: &str = "usage: cargo xtask compat-test [--release] [--run REGEX] [--update] [--target coredns]
+const USAGE: &str =
+    "usage: cargo xtask compat-test [--release] [--run REGEX] [--update] [--target coredns] [--bridge [LIB]]
+       cargo xtask build-bridge [--plugins etcd,whoami,...] [--out PATH]
        cargo xtask difftest [--release] [--zone NAME] [--show N]
        cargo xtask bench [--scenario NAME] [--duration SECONDS]
        cargo xtask k8s-cases
@@ -37,6 +41,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("compat-test") => compat_test(&args[1..]),
+        Some("build-bridge") => build_bridge_cmd(&args[1..]),
         Some("difftest") => difftest::run(&args[1..]),
         Some("bench") => bench::run(&args[1..]),
         Some("k8s-cases") => k8s_cases(),
@@ -139,12 +144,17 @@ fn compat_test(args: &[String]) -> Result<()> {
     let mut run: Option<String> = None;
     let mut update = false;
     let mut target_coredns = false;
-    let mut it = args.iter();
+    let mut bridge: Option<Option<PathBuf>> = None;
+    let mut it = args.iter().peekable();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--release" => release = true,
             "--run" => run = Some(it.next().context("--run needs a value")?.clone()),
             "--update" => update = true,
+            "--bridge" => {
+                let path = it.next_if(|a| !a.starts_with("--")).map(PathBuf::from);
+                bridge = Some(path);
+            }
             "--target" => match it.next().map(String::as_str) {
                 Some("coredns") => target_coredns = true,
                 Some("kerndns") => target_coredns = false,
@@ -174,6 +184,22 @@ fn compat_test(args: &[String]) -> Result<()> {
         .join(if release { "release" } else { "debug" })
         .join("kerndns");
 
+    // --bridge: CoreDNS's etcd tests (build tag `etcd`) with the Go etcd
+    // plugin running inside kerndns through the bridge, against a local etcd
+    let bridge_lib = match &bridge {
+        None => None,
+        Some(Some(p)) => Some(p.clone()),
+        Some(None) => Some(build_bridge(&root, DEFAULT_BRIDGE_PLUGINS, None)?),
+    };
+    let etcd_guard = match bridge_lib {
+        Some(_) => Some(EtcdGuard::start(&root.join("target/compat"))?),
+        None => None,
+    };
+    let run = match (&bridge_lib, run) {
+        (Some(_), None) => Some("Etcd".to_string()),
+        (_, r) => r,
+    };
+
     // 2. overlay: our helpers replace test/server.go and add kerndns_compat.go
     let work = root.join("target/compat");
     fs::create_dir_all(&work)?;
@@ -188,7 +214,12 @@ fn compat_test(args: &[String]) -> Result<()> {
     let trace = work.join("trace.txt");
     let _ = fs::remove_file(&trace);
 
-    let exp_path = root.join("go/compat/expectations.txt");
+    let exp_path = root.join(if bridge_lib.is_some() {
+        "go/compat/expectations-bridge.txt"
+    } else {
+        "go/compat/expectations.txt"
+    });
+    let exp_name = exp_path.strip_prefix(&root).unwrap_or(&exp_path).display().to_string();
     let expectations = read_expectations(&exp_path)?;
     let skips: Vec<&str> = expectations
         .iter()
@@ -199,11 +230,20 @@ fn compat_test(args: &[String]) -> Result<()> {
     // 3. compile the upstream test package once, then run every test in its
     //    own process: a panic in one test (e.g. calling Stop on the nil
     //    instance a failed start returns) must not hide the others.
-    let test_bin = work.join("coredns-test.test");
+    let test_bin = work.join(if bridge_lib.is_some() {
+        "coredns-test-etcd.test"
+    } else {
+        "coredns-test.test"
+    });
     let st = Command::new("go")
         .current_dir(&upstream)
         .args(["test", "-c", "-overlay"])
         .arg(&overlay)
+        .args(if bridge_lib.is_some() {
+            &["-tags", "etcd"][..]
+        } else {
+            &[][..]
+        })
         .arg("-o")
         .arg(&test_bin)
         .arg("./test/")
@@ -247,6 +287,7 @@ fn compat_test(args: &[String]) -> Result<()> {
             .arg(format!("-test.run=^{name}$"))
             .env("KERNDNS_BIN", &bin)
             .env("KERNDNS_COMPAT_TRACE", &trace)
+            .env("KERNDNS_BRIDGE", bridge_lib.as_deref().unwrap_or(Path::new("")))
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
         if target_coredns {
@@ -388,15 +429,18 @@ fn compat_test(args: &[String]) -> Result<()> {
     }
     if !unclassified.is_empty() {
         failed = true;
-        println!("\nNOT IN go/compat/expectations.txt (run with --update to add them):");
+        println!("\nNOT IN {exp_name} (run with --update to add them):");
         for (n, st, r) in &unclassified {
             println!("  {:<5} {n} {r}", st.as_str());
         }
     }
     if failed {
+        // process::exit skips destructors: stop etcd first
+        drop(etcd_guard);
         std::process::exit(1);
     }
-    println!("\nall results match go/compat/expectations.txt");
+    drop(etcd_guard);
+    println!("\nall results match {}", exp_name);
     Ok(())
 }
 
@@ -440,4 +484,105 @@ fn k8s_cases() -> Result<()> {
     }
     println!("wrote {}", out.display());
     Ok(())
+}
+
+/// Plugins in the bridge `compat-test --bridge` and the benchmarks build.
+const DEFAULT_BRIDGE_PLUGINS: &str = "etcd,whoami";
+
+/// `cargo xtask build-bridge`: generate go/bridge/plugins_gen.go and build
+/// the c-shared library. In-tree plugin names become CoreDNS import paths;
+/// anything with a `/` is used as an import path as is (third-party).
+fn build_bridge(root: &Path, plugins: &str, out: Option<PathBuf>) -> Result<PathBuf> {
+    let mut src =
+        String::from("// Code generated by `cargo xtask build-bridge`; DO NOT EDIT.\n\npackage main\n\nimport (\n");
+    for p in plugins.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        let path = if p.contains('/') {
+            p.to_string()
+        } else {
+            format!("github.com/coredns/coredns/plugin/{p}")
+        };
+        src.push_str(&format!("\t_ \"{path}\"\n"));
+    }
+    src.push_str(")\n");
+    let dir = root.join("go/bridge");
+    fs::write(dir.join("plugins_gen.go"), src)?;
+    let out = out.unwrap_or_else(|| root.join("target/bridge/libkerndns_bridge.so"));
+    if let Some(parent) = out.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    eprintln!("building the Go bridge with {plugins} ...");
+    let st = Command::new("go")
+        .current_dir(&dir)
+        .env("GOFLAGS", "-mod=mod")
+        .args(["build", "-buildmode=c-shared", "-o"])
+        .arg(&out)
+        .arg(".")
+        .status()
+        .context("running `go build` (is Go installed, with cgo and a C compiler?)")?;
+    if !st.success() {
+        bail!("building the Go bridge failed");
+    }
+    Ok(out)
+}
+
+fn build_bridge_cmd(args: &[String]) -> Result<()> {
+    let mut plugins = DEFAULT_BRIDGE_PLUGINS.to_string();
+    let mut out = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--plugins" => plugins = it.next().context("--plugins needs a list")?.clone(),
+            "--out" => out = Some(PathBuf::from(it.next().context("--out needs a path")?)),
+            other => bail!("unknown argument {other}\n{USAGE}"),
+        }
+    }
+    let p = build_bridge(&root(), &plugins, out)?;
+    println!("{}", p.display());
+    Ok(())
+}
+
+/// A throwaway etcd on 127.0.0.1:2379 for the upstream etcd tests, unless
+/// one already listens there.
+struct EtcdGuard(Option<std::process::Child>);
+
+impl EtcdGuard {
+    fn start(work: &Path) -> Result<EtcdGuard> {
+        if std::net::TcpStream::connect("127.0.0.1:2379").is_ok() {
+            eprintln!("using the etcd already listening on 127.0.0.1:2379");
+            return Ok(EtcdGuard(None));
+        }
+        let data = work.join("etcd-data");
+        let _ = fs::remove_dir_all(&data);
+        let child = Command::new("etcd")
+            .args(["--data-dir"])
+            .arg(&data)
+            .args([
+                "--listen-client-urls",
+                "http://127.0.0.1:2379",
+                "--advertise-client-urls",
+                "http://127.0.0.1:2379",
+                "--listen-peer-urls",
+                "http://127.0.0.1:2380",
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("starting etcd (is it installed?)")?;
+        for _ in 0..100 {
+            if std::net::TcpStream::connect("127.0.0.1:2379").is_ok() {
+                return Ok(EtcdGuard(Some(child)));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        bail!("etcd did not start listening on 127.0.0.1:2379")
+    }
+}
+
+impl Drop for EtcdGuard {
+    fn drop(&mut self) {
+        if let Some(c) = self.0.as_mut() {
+            let _ = c.kill();
+            let _ = c.wait();
+        }
+    }
 }
