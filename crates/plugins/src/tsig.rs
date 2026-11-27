@@ -14,7 +14,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use kerndns_core::proto::op::{OpCode, ResponseCode};
 use kerndns_core::proto::rr::RecordType;
 use kerndns_core::zones::{self, is_subdomain};
@@ -34,7 +34,7 @@ const DEFAULT_FUDGE: u16 = 300;
 fn hmac(alg: &str, key: &[u8], data: &[u8]) -> Option<Vec<u8>> {
     macro_rules! run {
         ($h:ty) => {{
-            let mut m = <Hmac<$h> as Mac>::new_from_slice(key).ok()?;
+            let mut m = <Hmac<$h> as KeyInit>::new_from_slice(key).ok()?;
             m.update(data);
             Some(m.finalize().into_bytes().to_vec())
         }};
