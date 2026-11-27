@@ -37,7 +37,7 @@ Milestones **M0**, **M1** and **M2** are done.
 | Corefile parser: server blocks, snippets, `import`, env vars, caddy-compatible dispenser | done |
 | Plugin model mirroring CoreDNS (`Handler`, `ResponseWriter`, `plugin.cfg` order, `ClientWrite` rules) | done |
 | Server: multi-socket UDP (`SO_REUSEPORT`), TCP, DoT (`tls://`), DoH (`https://`, HTTP/1.1 and HTTP/2), CoreDNS routing and error semantics, TSIG signing of every response including multi-message transfers, hot reload without dropping listeners | done |
-| Plugins | `bind`, `cache`, `chaos`, `debug`, `dynupdate`, `errors`, `file`, `forward` (UDP/TCP/DoT), `header`, `health`, `hosts`, `k8s_external`, `kubernetes`, `log`, `loop`, `prometheus`, `ready`, `reload`, `root`, `secondary`, `tls`, `transfer`, `tsig`, `whoami` |
+| Plugins | `any`, `bind`, `bufsize`, `cache`, `chaos`, `debug`, `dynupdate`, `errors`, `file`, `forward` (UDP/TCP/DoT), `header`, `health`, `hosts`, `k8s_external`, `kubernetes`, `loadbalance`, `log`, `loop`, `minimal`, `nsid`, `prometheus`, `ready`, `reload`, `root`, `secondary`, `tls`, `transfer`, `tsig`, `whoami` |
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
 | CoreDNS integration tests against KernDNS | 56 pass, 40 expected failures (plugins not ported yet), 22 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |

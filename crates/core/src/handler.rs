@@ -81,6 +81,10 @@ pub struct Context {
     /// together). `prometheus` reports its metrics here, so the response
     /// is not encoded a second time just to measure it.
     pub on_sent: Vec<SentHook>,
+    /// The EDNS UDP size to treat the request as having (set by
+    /// `bufsize`); the server echoes it and truncates UDP answers to it,
+    /// as CoreDNS does after `bufsize` rewrites the request.
+    pub bufsize: Option<u16>,
 }
 
 /// See [`Context::on_sent`].
@@ -106,6 +110,7 @@ impl Context {
             signer: None,
             tsig_key: None,
             on_sent: Vec::new(),
+            bufsize: None,
         }
     }
 }

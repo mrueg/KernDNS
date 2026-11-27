@@ -24,6 +24,8 @@ pub struct Answer {
     pub signer: Option<Arc<dyn ResponseSigner>>,
     /// Told the encoded size once the answer is on the wire.
     pub on_sent: Vec<kerndns_core::handler::SentHook>,
+    /// A smaller EDNS UDP size a plugin applied to the request (`bufsize`).
+    pub bufsize: Option<u16>,
 }
 
 impl From<Vec<Message>> for Answer {
@@ -32,7 +34,22 @@ impl From<Vec<Message>> for Answer {
             msgs,
             signer: None,
             on_sent: Vec::new(),
+            bufsize: None,
         }
+    }
+}
+
+/// `req` as the plugins left it: with the EDNS size `bufsize` applied.
+pub fn effective_request(req: &Request, bufsize: Option<u16>) -> std::borrow::Cow<'_, Request> {
+    match bufsize {
+        Some(b) if req.edns().is_some_and(|e| e.max_payload() > b) => {
+            let mut r = req.clone();
+            if let Some(e) = r.msg.edns.as_mut() {
+                e.set_max_payload(b);
+            }
+            std::borrow::Cow::Owned(r)
+        }
+        _ => std::borrow::Cow::Borrowed(req),
     }
 }
 
@@ -41,7 +58,7 @@ impl Answer {
     /// size they would have on the wire.
     fn into_msgs(self, req: &Request) -> Vec<Message> {
         let mut msgs = self.msgs;
-        scrub_truncate(req, &mut msgs);
+        scrub_truncate(&effective_request(req, self.bufsize), &mut msgs);
         if !self.on_sent.is_empty() {
             let n = msgs.iter().map(|m| to_wire(m).map_or(0, |v| v.len())).sum();
             for h in &self.on_sent {
@@ -314,13 +331,15 @@ impl Inner {
                 }
             }
         }
+        let sreq = effective_request(req, ctx.bufsize);
         for m in &mut msgs {
-            scrub(req, m);
+            scrub(&sreq, m);
         }
         Answer {
             msgs,
             signer: ctx.signer,
             on_sent: ctx.on_sent,
+            bufsize: ctx.bufsize,
         }
     }
 

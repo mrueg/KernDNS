@@ -54,3 +54,34 @@ pub async fn serve(h: &dyn Handler, req: &Request) -> (HandlerResult, CaptureWri
     let rc = h.serve_dns(&mut ctx, &mut w, req).await;
     (rc, w)
 }
+
+/// A next handler that writes the message `f` builds for the request.
+pub struct Reply<F>(pub F);
+
+#[kerndns_core::async_trait]
+impl<F> Handler for Reply<F>
+where
+    F: Fn(&Request) -> kerndns_core::proto::op::Message + Send + Sync + 'static,
+{
+    fn name(&self) -> &'static str {
+        "reply"
+    }
+
+    async fn serve_dns(
+        &self,
+        _: &mut Context,
+        w: &mut dyn kerndns_core::ResponseWriter,
+        req: &Request,
+    ) -> HandlerResult {
+        let _ = w.write_msg((self.0)(req)).await;
+        Ok(kerndns_core::proto::op::ResponseCode::NoError)
+    }
+}
+
+/// `Some(Arc<Reply>)`, ready to be a plugin's `next`.
+pub fn reply<F>(f: F) -> kerndns_core::Next
+where
+    F: Fn(&Request) -> kerndns_core::proto::op::Message + Send + Sync + 'static,
+{
+    Some(std::sync::Arc::new(Reply(f)))
+}
