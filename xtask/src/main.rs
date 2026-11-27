@@ -10,6 +10,8 @@
 //! bench         Benchmark CoreDNS vs kerndns per scenario with dnsperf
 //!               (bench/plugins: one directory per plugin; bench/setups);
 //!               --check: every registered plugin has a scenario.
+//! loadgen       DNS load generator for DoQ, DoH3 and gRPC with dnsperf's
+//!               arguments and output (bench uses it for -m doq|doh3|grpc).
 //! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_cases.json by
 //!               running CoreDNS's kubernetes handler test suites in Go.
 
@@ -24,6 +26,7 @@ use anyhow::{Context, Result, bail};
 mod bench;
 mod difftest;
 mod fakeapi;
+mod loadgen;
 
 const USAGE: &str =
     "usage: cargo xtask compat-test [--release] [--run REGEX] [--update] [--target coredns] [--bridge [LIB]]
@@ -31,6 +34,7 @@ const USAGE: &str =
        cargo xtask difftest [--release] [--zone NAME] [--show N] [--dnssec]
        cargo xtask bench [--level 2,3] [--plugin NAME,...] [--scenario CASE,...] [--duration SECONDS] [--runs N] [--coredns PATH] [--kubeconfig PATH] [--list]
        cargo xtask bench --check
+       cargo xtask loadgen -m doq|doh3|grpc -p PORT -d QUERYFILE [-s IP] [-c CLIENTS] [-T THREADS] [-q OUTSTANDING] [-l SECONDS] [-Q QPS] [-t TIMEOUT] [--ca PEM] [--tls]
        cargo xtask k8s-cases
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
        cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS] [--coredns PATH]
@@ -47,6 +51,7 @@ fn main() -> Result<()> {
         Some("build-bridge") => build_bridge_cmd(&args[1..]),
         Some("difftest") => difftest::run(&args[1..]),
         Some("bench") => bench::run(&args[1..]),
+        Some("loadgen") => loadgen::run(&args[1..]),
         Some("k8s-cases") => k8s_cases(),
         Some("k8s-difftest") => difftest::k8s(&args[1..]),
         Some("k8s-bench") => bench::k8s(&args[1..]),
