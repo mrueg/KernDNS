@@ -360,7 +360,39 @@ fn parse_type(w: &str) -> Result<RecordType, String> {
             .map(RecordType::from)
             .map_err(|_| format!("bad record type {w:?}"));
     }
-    RecordType::from_str(&up).map_err(|_| format!("unknown record type {w:?}"))
+    RecordType::from_str(&up)
+        .or_else(|_| {
+            // types miekg/dns knows by name that hickory doesn't
+            extra_type_code(&up).map(RecordType::from).ok_or(())
+        })
+        .map_err(|_| format!("unknown record type {w:?}"))
+}
+
+/// Mnemonics of types hickory has no name for (miekg/dns's `StringToType`).
+const EXTRA_TYPES: [(&str, u16); 14] = [
+    ("MD", 3),
+    ("MF", 4),
+    ("MB", 7),
+    ("MG", 8),
+    ("MR", 9),
+    ("WKS", 11),
+    ("MINFO", 14),
+    ("LOC", 29),
+    ("KX", 36),
+    ("APL", 42),
+    ("DHCID", 49),
+    ("HIP", 55),
+    ("SPF", 99),
+    ("URI", 256),
+];
+
+fn extra_type_code(up: &str) -> Option<u16> {
+    EXTRA_TYPES.iter().find(|(n, _)| *n == up).map(|(_, c)| *c)
+}
+
+/// The mnemonic of a type in [`EXTRA_TYPES`].
+pub fn extra_type_name(code: u16) -> Option<&'static str> {
+    EXTRA_TYPES.iter().find(|(_, c)| *c == code).map(|(n, _)| *n)
 }
 
 /// A name relative to `origin` unless it ends in a dot; `@` is the origin.
@@ -539,6 +571,28 @@ fn parse_rdata(rtype: RecordType, toks: &[Tok], origin: &Name) -> Result<RData, 
             wire.push(protocol);
             wire.push(algorithm);
             wire.extend(key);
+            let mut dec = BinDecoder::new(&wire);
+            RData::read(&mut dec, rtype, Restrict::new(wire.len() as u16)).map_err(|e| format!("bad {rtype}: {e}"))?
+        }
+        RecordType::DS | RecordType::CDS => {
+            // key-tag algorithm digest-type hex-digest, decoded from wire
+            // form (hickory refuses CDS text)
+            let tag: u16 = num(toks, 0, "key tag")?;
+            let algorithm: u8 = num(toks, 1, "algorithm")?;
+            let digest_type: u8 = num(toks, 2, "digest type")?;
+            let hex: String = toks
+                .get(3..)
+                .unwrap_or_default()
+                .iter()
+                .map(|t| t.text.as_str())
+                .collect();
+            let digest = data_encoding::HEXLOWER_PERMISSIVE
+                .decode(hex.to_ascii_lowercase().as_bytes())
+                .map_err(|e| format!("bad digest: {e}"))?;
+            let mut wire = tag.to_be_bytes().to_vec();
+            wire.push(algorithm);
+            wire.push(digest_type);
+            wire.extend(digest);
             let mut dec = BinDecoder::new(&wire);
             RData::read(&mut dec, rtype, Restrict::new(wire.len() as u16)).map_err(|e| format!("bad {rtype}: {e}"))?
         }
