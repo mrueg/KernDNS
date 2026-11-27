@@ -26,3 +26,7 @@ jobs:
         run: cargo xtask compat-test
       - name: Differential test against CoreDNS
         run: cargo xtask difftest
+      - name: Go bridge (CoreDNS's etcd tests with Go etcd inside KernDNS)
+        run: |
+          sudo apt-get install -y etcd-server
+          cargo xtask compat-test --bridge

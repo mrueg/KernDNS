@@ -1,0 +1,12 @@
+# Expected results of CoreDNS's integration tests (third_party/coredns/test) against KernDNS.
+# Maintained by `cargo xtask compat-test --update`; edit reasons by hand.
+#
+#   pass   must pass
+#   xfail  fails today; the run fails if it starts passing, so it gets promoted
+#   skip   not run: tests Go internals, or never starts a server through the helpers
+#
+# <status> <test> <reason>
+pass  TestEtcdCache
+pass  TestEtcdCredentials
+xfail TestEtcdStubAndProxyLookup expects example.org at 93.184.216.34 (a live internet lookup); CoreDNS fails it too
+skip  TestEtcdStubLoop           does not start a server through the test helpers

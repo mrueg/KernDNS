@@ -43,7 +43,8 @@ Milestones **M0**, **M1** and **M2** are done.
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | see below |
 | `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
-| DoQ / HTTP/3 / gRPC listeners, Go plugin bridge | planned (M3/M4) |
+| Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `etcd`) | done (M3) |
+| DoQ / HTTP/3 / gRPC listeners | planned (M4) |
 
 ### Benchmarks
 
@@ -93,17 +94,38 @@ The flags match CoreDNS: `-conf`, `-dns.port`, `-pidfile`, `-plugins`,
 `-quiet` and `-version`. With no Corefile, KernDNS serves `.:53` with
 `whoami` and `log`, like CoreDNS.
 
+### Go plugins
+
+Plugins without a Rust port can run as CoreDNS's own Go code, compiled
+into one shared library and loaded at startup:
+
+```sh
+cargo xtask build-bridge --plugins etcd,route53   # target/bridge/libkerndns_bridge.so
+./target/release/kerndns -bridge target/bridge/libkerndns_bridge.so -conf Corefile
+```
+
+They take part in the chain like any other plugin: Rust plugins before
+them see their answers, and their `fallthrough` reaches the Rust plugins
+after them. `-bridge.prefer cache` runs a plugin in Go even though a Rust
+port exists (for comparisons), and `-bridge.sync whoami` runs a CPU-only
+Go plugin on the calling thread, which is about 3x cheaper per request.
+Plugins that cooperate through Go types (`transfer` and its zone sources,
+`kubernetes` and `k8s_external`, `alternate` and `forward`) must all run on
+the same side; KernDNS checks that when it loads the Corefile.
+
 ## Layout
 
 ```
 crates/
   corefile/   Corefile lexer, parser and token dispenser (no DNS dependencies)
+  go-bridge/  loads the Go bridge and runs Go plugins in the chain
   core/       plugin model: Handler, Request, ResponseWriter, Controller, Registry, plugin order
   server/     Corefile -> plugin chains -> hickory-server listeners, request dispatch
   plugins/    Rust ports of CoreDNS plugins (and the shared service-backend lookup)
   kubernetes/ kubernetes and k8s_external
   kerndns/    the binary
 go/compat/    overlay that runs CoreDNS's integration tests against kerndns
+go/bridge/    the Go bridge library: CoreDNS plugins behind a C interface
 third_party/coredns   CoreDNS v1.15.0 (git submodule): tests and reference behaviour
 xtask/        cargo xtask commands
 docs/PLAN.md  architecture, roadmap, testing and benchmark plan

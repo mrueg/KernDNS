@@ -12,6 +12,7 @@ kerndns-corefile = { path = "crates/corefile" }
 kerndns-core = { path = "crates/core" }
 kerndns-server = { path = "crates/server" }
 kerndns-plugins = { path = "crates/plugins" }
+kerndns-go-bridge = { path = "crates/go-bridge" }
 kerndns-kubernetes = { path = "crates/kubernetes" }
 
 hickory-proto = { version = "0.26", features = ["dnssec-ring"] }

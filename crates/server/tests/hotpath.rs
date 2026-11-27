@@ -23,10 +23,14 @@ fn packet(name: &str, t: RecordType) -> Vec<u8> {
 }
 
 async fn measure(label: &str, corefile: &str, q: &[u8]) {
+    measure_with(label, corefile, q, &kerndns_plugins::registry()).await
+}
+
+async fn measure_with(label: &str, corefile: &str, q: &[u8], registry: &kerndns_core::Registry) {
     if std::env::var("HOTPATH_ONLY").is_ok_and(|o| o != label) {
         return;
     }
-    let registry = kerndns_plugins::registry();
+    let registry = registry.clone();
     let plan = load(corefile, "bench", &registry, &Options::default()).unwrap();
     let l = &plan.listeners[0];
     let local: SocketAddr = "127.0.0.1:53".parse().unwrap();
@@ -110,4 +114,42 @@ async fn hotpath() {
     .await;
     measure("cache (hit) + whoami", ".:53 {\n cache\n whoami\n}", &whoami).await;
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Cost of a request crossing into Go and back, with the bridge library
+/// from `cargo xtask build-bridge` (default plugins) in HOTPATH_BRIDGE:
+///
+/// `HOTPATH_BRIDGE=target/bridge/libkerndns_bridge.so cargo test --release
+///  -p kerndns-server --test hotpath -- --ignored --nocapture bridge`
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore]
+async fn bridge() {
+    let Ok(path) = std::env::var("HOTPATH_BRIDGE") else {
+        eprintln!("set HOTPATH_BRIDGE to the bridge library");
+        return;
+    };
+    let q = packet("example.org.", RecordType::A);
+    let rust = kerndns_plugins::registry();
+    let b = kerndns_go_bridge::Bridge::load(std::path::Path::new(&path)).unwrap();
+    let mut go = kerndns_plugins::registry();
+    b.register(&mut go, &["whoami".to_string(), "metadata".to_string()]);
+    let whoami = ".:53 {\n whoami\n}";
+    measure_with("whoami (Rust)", whoami, &q, &rust).await;
+    measure_with("whoami (Go, bridged)", whoami, &q, &go).await;
+    // a Go plugin that calls next: metadata (Go) -> whoami (Rust)
+    let mut mixed = rust.clone();
+    b.register(&mut mixed, &["metadata".to_string()]);
+    measure_with("metadata (Go) + whoami", ".:53 {\n metadata\n whoami\n}", &q, &mixed).await;
+    measure_with("metadata + whoami (Rust)", ".:53 {\n metadata\n whoami\n}", &q, &rust).await;
+    // the same through the synchronous mode; set_sync applies to plugins set
+    // up from now on
+    kerndns_go_bridge::set_sync(vec!["whoami".into(), "metadata".into()]);
+    measure_with("whoami (Go, sync)", whoami, &q, &go).await;
+    measure_with(
+        "metadata (Go, sync) + whoami",
+        ".:53 {\n metadata\n whoami\n}",
+        &q,
+        &mixed,
+    )
+    .await;
 }

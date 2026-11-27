@@ -14,5 +14,6 @@ kerndns-core.workspace = true
 kerndns-server.workspace = true
 kerndns-plugins.workspace = true
 kerndns-kubernetes.workspace = true
+kerndns-go-bridge.workspace = true
 tokio.workspace = true
 sha2.workspace = true

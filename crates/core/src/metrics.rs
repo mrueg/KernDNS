@@ -216,13 +216,37 @@ pub fn gather(accept: &str) -> (String, Vec<u8>) {
     if accept.contains("application/vnd.google.protobuf") && accept.contains("encoding=delimited") {
         let enc = prometheus::ProtobufEncoder::new();
         if enc.encode(&families, &mut buf).is_ok() {
+            append_extra(accept, enc.format_type(), &mut buf);
             return (enc.format_type().to_string(), buf);
         }
         buf.clear();
     }
     let enc = prometheus::TextEncoder::new();
     let _ = enc.encode(&families, &mut buf);
+    append_extra("text/plain", enc.format_type(), &mut buf);
     (enc.format_type().to_string(), buf)
+}
+
+/// Another metrics source (the Go bridge): given an Accept header, it
+/// returns its own metrics and their content type.
+pub type ExtraGatherer = fn(&str) -> Option<(String, Vec<u8>)>;
+
+static EXTRA: std::sync::OnceLock<ExtraGatherer> = std::sync::OnceLock::new();
+
+/// Add another source to every scrape.
+pub fn set_extra_gatherer(f: ExtraGatherer) {
+    let _ = EXTRA.set(f);
+}
+
+/// Append the extra source's output if it used the same format: both
+/// the text and the delimited protobuf formats concatenate.
+fn append_extra(accept: &str, format: &str, buf: &mut Vec<u8>) {
+    let Some(f) = EXTRA.get() else { return };
+    let Some((ct, body)) = f(accept) else { return };
+    let base = |s: &str| s.split(';').next().unwrap_or("").trim().to_string();
+    if base(&ct) == base(format) {
+        buf.extend_from_slice(&body);
+    }
 }
 
 static LISTEN_ADDRS: Mutex<Vec<String>> = Mutex::new(Vec::new());

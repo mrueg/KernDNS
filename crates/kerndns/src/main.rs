@@ -7,6 +7,13 @@ use std::process::ExitCode;
 use kerndns_server::{Instance, Options};
 
 const USAGE: &str = "Usage of kerndns:
+  -bridge string
+        Go bridge library with CoreDNS plugins (default $KERNDNS_BRIDGE)
+  -bridge.prefer string
+        Comma-separated plugins to run in Go even if a Rust port exists
+  -bridge.sync string
+        Comma-separated Go plugins to run on the calling thread (faster; for
+        plugins that don't wait on the network)
   -conf string
         Corefile to load (default \"Corefile\"), \"stdin\" reads it from standard input
   -dns.port string
@@ -26,6 +33,9 @@ const USAGE: &str = "Usage of kerndns:
 
 #[derive(Debug, Default)]
 struct Flags {
+    bridge: Option<String>,
+    bridge_prefer: Vec<String>,
+    bridge_sync: Vec<String>,
     conf: Option<String>,
     dns_port: Option<String>,
     pidfile: Option<String>,
@@ -55,6 +65,21 @@ fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<Flags, String> 
         let boolean = |v: &Option<String>| v.as_deref().map(|s| s == "true" || s == "1").unwrap_or(true);
         match name {
             "conf" => f.conf = Some(value(name)?),
+            "bridge" => f.bridge = Some(value(name)?),
+            "bridge.sync" => {
+                f.bridge_sync = value(name)?
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            }
+            "bridge.prefer" => {
+                f.bridge_prefer = value(name)?
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            }
             "dns.port" => f.dns_port = Some(value(name)?),
             "pidfile" => f.pidfile = Some(value(name)?),
             "plugins" => f.plugins = boolean(&inline),
@@ -121,6 +146,22 @@ fn main() -> ExitCode {
     let mut registry = kerndns_plugins::registry();
     registry.register(kerndns_kubernetes::Setup);
     registry.register(kerndns_kubernetes::external::Setup);
+    if let Some(path) = flags
+        .bridge
+        .clone()
+        .or_else(|| std::env::var("KERNDNS_BRIDGE").ok().filter(|s| !s.is_empty()))
+    {
+        match kerndns_go_bridge::Bridge::load(std::path::Path::new(&path)) {
+            Ok(b) => {
+                kerndns_go_bridge::set_sync(flags.bridge_sync.clone());
+                b.register(&mut registry, &flags.bridge_prefer);
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
     if flags.plugins {
         println!("Server types:\n  dns\n\nCaddyfile loaders:\n  flag\n  default\n\nOther plugins:");
         let mut names = registry.names();

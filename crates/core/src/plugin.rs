@@ -45,6 +45,11 @@ pub trait PluginFactory: Send + Sync {
     /// and register a handler with [`Controller::add_plugin`] and/or change
     /// the block configuration.
     fn setup(&self, c: &mut Controller<'_>) -> Result<(), SetupError>;
+
+    /// True for plugins that run in Go through the bridge.
+    fn bridged(&self) -> bool {
+        false
+    }
 }
 
 /// The plugins compiled into this binary.

@@ -27,6 +27,11 @@ impl Dispenser {
         }
     }
 
+    /// Every token this dispenser holds (e.g. to re-render a directive).
+    pub fn tokens(&self) -> &[Token] {
+        &self.tokens
+    }
+
     fn len(&self) -> isize {
         self.tokens.len() as isize
     }

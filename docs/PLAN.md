@@ -104,6 +104,37 @@ implements `dns.ResponseWriter` through `rust_write`.
   SERVFAIL. An optional later out-of-process mode (gRPC over a unix socket)
   gives full crash isolation.
 
+### M3 status
+
+Done: `go/bridge` (the c-shared library, plugins from `plugins_gen.go`),
+`crates/go-bridge` (loading it, `GoPlugin`, the callbacks),
+`cargo xtask build-bridge --plugins ...`, `kerndns -bridge LIB`
+(or `$KERNDNS_BRIDGE`) with `-bridge.prefer` and `-bridge.sync`, Go
+metrics appended to `/metrics` (text and protobuf), readiness for `ready`,
+and the affinity check when a Corefile loads.
+
+- `cargo xtask compat-test --bridge` runs CoreDNS's own etcd tests (build
+  tag `etcd`) against KernDNS with the Go `etcd` plugin, against a
+  throwaway local etcd: `TestEtcdCache` and `TestEtcdCredentials` pass;
+  `TestEtcdStubAndProxyLookup` needs a live internet address and fails on
+  CoreDNS too. A differential run of `log`, `cache` (Rust) + `etcd` (Go) +
+  `whoami` (Rust, via `fallthrough`) against CoreDNS shows no differences.
+- Per-request cost (`cargo test --release -p kerndns-server --test hotpath
+  -- --ignored bridge`), in-process, one query:
+
+  | Chain | Rust | Go, bridged (async) | Go, bridged (`-bridge.sync`) |
+  |---|---:|---:|---:|
+  | `whoami` | 1.2 µs | 17.8 µs | 5.4 µs |
+  | `metadata` → `whoami` (Go plugin calling next) | 1.4 µs | 32.4 µs | 8.2 µs |
+
+  The default runs each request on a goroutine and wakes the Rust task
+  from Go's callbacks (two cross-thread hand-offs). `-bridge.sync` runs
+  the Go handler on the calling thread and the Rust rest of the chain
+  inline (`block_in_place`); it blocks a runtime worker while the Go
+  plugin waits on the network, so it is meant for CPU-only plugins.
+- Not yet: third-party plugins outside plugin.cfg's order, Go metadata
+  flowing back to Rust, and the out-of-process mode (M5).
+
 **Choosing per directive:** Rust port if one exists, else the bridge if it
 provides the plugin, else an error saying how to build the bridge with it.
 `prefer go|rust` and `cache@go` override this for A/B tests and benchmarks.
@@ -252,7 +283,7 @@ dedicated machine, with a published report.
 | **M0** (done) | Workspace, Corefile parser, core traits, hickory server, first plugins | `dig` works; compat overlay runs every upstream test against `kerndns` with every result classified |
 | **M1** (done) | Wave 1 plugins, `reload`, `/metrics` | All relevant `test/` tests pass or are classified with a plugin reason; difftest in CI; bench harness with level 1/2 for wave 1 |
 | **M2** (done) | `kubernetes` + `k8s_external` | Ported unit tables, `coredns/ci` kind tests and Go difftest all pass; scale benchmarks published, with memory at or below CoreDNS |
-| **M3** | Go bridge MVP | Go `etcd` inside a Rust chain; bridge micro-benchmarks; affinity groups enforced |
+| **M3** (done) | Go bridge MVP | Go `etcd` inside a Rust chain; bridge micro-benchmarks; affinity groups enforced |
 | **M4** | Waves 3–4, DoT/DoH/DoQ/gRPC | Compat pass rate goes up; every plugin has a level 2 scenario |
 | **M5** | Wave 5, optional out-of-process bridge, packaging | Nightly level 3 report; drop-in image replacing CoreDNS in kubeadm |
 
