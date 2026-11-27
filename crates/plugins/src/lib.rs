@@ -21,10 +21,14 @@ pub mod errors;
 pub mod expr;
 pub mod file;
 pub mod forward;
+pub mod grpc_server;
 pub mod header;
 pub mod health;
 pub mod hosts;
 pub mod http;
+pub mod https;
+pub mod https3;
+mod listenopts;
 pub mod loadbalance;
 pub mod local;
 pub mod log;
@@ -35,6 +39,7 @@ pub mod minimal;
 pub mod multisocket;
 pub mod nsid;
 pub mod pluginmetrics;
+pub mod quic;
 pub mod ready;
 pub mod reload;
 pub mod rewrite;
@@ -97,5 +102,9 @@ pub fn registry() -> Registry {
     r.register(dns64::Setup);
     r.register(auto::Setup);
     r.register(multisocket::Setup);
+    r.register(https::Setup);
+    r.register(https3::Setup);
+    r.register(grpc_server::Setup);
+    r.register(quic::Setup);
     r
 }

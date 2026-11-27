@@ -66,6 +66,9 @@ pub struct ListenerPlan {
     /// `multisocket` of the first block on this address: that many UDP
     /// sockets and TCP listeners, each a server of its own. 0 if not set.
     pub num_sockets: usize,
+    /// DoH/DoH3/gRPC/DoQ limits: those of the listener's first zone, like
+    /// CoreDNS's `group[0]` (DoH's `max_streams` from any zone).
+    pub limits: kerndns_core::plugin::ListenerLimits,
 }
 
 impl ListenerPlan {
@@ -166,7 +169,7 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
     }
 
     Ok(Plan {
-        listeners: group_by_listener(&configs),
+        listeners: group_by_listener(&configs)?,
         hooks,
     })
 }
@@ -206,15 +209,19 @@ fn check_affinity(directives: &[&str], registry: &Registry) -> Result<(), LoadEr
 }
 
 /// One listener per (transport, host, port), like `groupConfigsByListenAddr`.
-fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
+fn group_by_listener(configs: &[BlockConfig]) -> Result<Vec<ListenerPlan>, LoadError> {
     let mut listeners: Vec<ListenerPlan> = Vec::new();
+    // DoH max_streams per listener, resolved across all its zones
+    let mut https_streams: Vec<Option<u64>> = Vec::new();
     for cfg in configs {
         let hosts = if cfg.listen_hosts.is_empty() {
             vec![String::new()]
         } else {
             cfg.listen_hosts.clone()
         };
-        for key in &cfg.keys {
+        for (i, key) in cfg.keys.iter().enumerate() {
+            // setup ran for the block's first key only
+            let limits = if i == 0 { cfg.limits } else { cfg.limits.propagated() };
             let handler = Arc::new(ZoneHandler {
                 zone: Arc::from(key.zone.as_str()),
                 chain: cfg.chain(),
@@ -228,8 +235,8 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
                 let pos = listeners
                     .iter()
                     .position(|l| l.transport == key.transport && &l.host == host && l.port == key.port);
-                let l = match pos {
-                    Some(i) => &mut listeners[i],
+                let idx = match pos {
+                    Some(i) => i,
                     None => {
                         listeners.push(ListenerPlan {
                             transport: key.transport,
@@ -240,10 +247,24 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
                             tls: None,
                             conn: Default::default(),
                             num_sockets: cfg.num_sockets,
+                            limits,
                         });
-                        listeners.last_mut().unwrap()
+                        https_streams.push(None);
+                        listeners.len() - 1
                     }
                 };
+                if let Some(n) = limits.https_max_streams {
+                    match https_streams[idx] {
+                        Some(prev) if prev != n => {
+                            return Err(LoadError::Other(format!(
+                                "conflicting max_streams values for shared HTTPS listener {}: {prev} and {n}",
+                                listeners[idx].label()
+                            )));
+                        }
+                        _ => https_streams[idx] = Some(n),
+                    }
+                }
+                let l = &mut listeners[idx];
                 l.class_chaos |= cfg.class_chaos || cfg.plugins.iter().any(|(n, _)| ENABLE_CHAOS.contains(n));
                 if l.tls.is_none() {
                     l.tls = cfg.tls.clone();
@@ -253,7 +274,10 @@ fn group_by_listener(configs: &[BlockConfig]) -> Vec<ListenerPlan> {
             }
         }
     }
-    listeners
+    for (l, streams) in listeners.iter_mut().zip(https_streams) {
+        l.limits.https_max_streams = streams;
+    }
+    Ok(listeners)
 }
 
 #[cfg(test)]
@@ -337,6 +361,39 @@ mod tests {
         assert_eq!(e, "cannot serve dns://.:53 - it is already defined");
         let e = load_str(".:53 {\n whoami x\n}").err().unwrap().to_string();
         assert!(e.starts_with("plugin/whoami: Corefile:2"), "{e}");
+    }
+
+    #[test]
+    fn listener_limits_follow_coredns() {
+        let limits = |corefile: &str, scheme: &str| {
+            let p = load_str(corefile).unwrap();
+            p.listeners
+                .iter()
+                .find(|l| l.label().starts_with(scheme))
+                .unwrap()
+                .limits
+        };
+        // setup runs for the first key only, so the gRPC key sees the
+        // limit only when it comes first...
+        let first = limits("grpc://.:1053 .:1054 {\n grpc_server {\n  max_streams 2\n }\n}", "grpc");
+        assert_eq!(first.grpc_max_streams, Some(2));
+        let second = limits(".:1054 grpc://.:1053 {\n grpc_server {\n  max_streams 2\n }\n}", "grpc");
+        assert_eq!(second.grpc_max_streams, None);
+        // ...except DoH's max_streams and DoQ's max_connections, which are
+        // copied to every key
+        let doq = limits(
+            ".:1054 quic://.:1053 {\n quic {\n  max_connections 3\n  max_streams 4\n }\n}",
+            "quic",
+        );
+        assert_eq!((doq.quic_max_connections, doq.quic_max_streams), (Some(3), None));
+        let doh = limits(".:1054 https://.:1053 {\n https {\n  max_streams 5\n }\n}", "https");
+        assert_eq!(doh.https_max_streams, Some(5));
+        // the listener's first zone decides
+        let two = limits(
+            "grpc://a.:1053 {\n whoami\n}\ngrpc://b.:1053 {\n grpc_server {\n  max_connections 1\n }\n}",
+            "grpc",
+        );
+        assert_eq!(two.grpc_max_connections, None);
     }
 
     #[test]
