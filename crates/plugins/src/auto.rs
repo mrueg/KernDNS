@@ -22,7 +22,7 @@ use std::time::Duration;
 use kerndns_core::duration::parse_duration;
 use kerndns_core::proto::op::ResponseCode;
 use kerndns_core::proto::rr::{Name, RecordType};
-use kerndns_core::transfer::{TransferError, TransferRegistry, Transferer};
+use kerndns_core::transfer::{TransferError, TransferRegistry, Transferer, WeakTransferRegistry};
 use kerndns_core::zones;
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
@@ -66,7 +66,7 @@ pub struct Auto {
     /// Zones from the directive or the server block.
     pub origins: Vec<String>,
     /// Transfer sources and NOTIFYs of the block.
-    pub registry: Option<TransferRegistry>,
+    pub registry: Option<WeakTransferRegistry>,
     /// The block's `prometheus` zone labels.
     pub metrics: Option<ZoneNames>,
     /// Serializes walks (startup and the reload ticker).
@@ -370,7 +370,7 @@ impl PluginFactory for Setup {
         let (loader, origins) = auto_parse(c)?;
         let registry = TransferRegistry::of(c.config);
         let mut a = Auto::new(loader, origins);
-        a.registry = Some(registry.clone());
+        a.registry = Some(registry.downgrade());
         a.metrics = Some(ZoneNames::of(c.config));
         let a = Arc::new(a);
         registry.add_source(Arc::new(AutoTransfer(a.clone())));

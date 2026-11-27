@@ -168,7 +168,7 @@ fn file_parse(c: &mut Controller<'_>, registry: &TransferRegistry) -> Result<(Zo
             let mut z = Zone::new(origin, file_name.clone(), data);
             z.reload_interval = reload;
             z.reload_by_mtime = reload_by_mtime;
-            z.registry = Some(registry.clone());
+            z.registry = Some(registry.downgrade());
             if reload_by_mtime {
                 z.set_mtime(mtime);
             }
@@ -330,5 +330,34 @@ impl Handler for File {
             .await
             .map_err(|e| PluginError::servfail("file", e.to_string()))?;
         Ok(ResponseCode::NoError)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::{TempDir, run_setup};
+
+    /// Found by `fuzz/` (corefile target, LeakSanitizer): each zone held
+    /// the block's transfer registry, which holds the zones as a transfer
+    /// source, so every load (and reload) of a Corefile with `file` leaked
+    /// its zones.
+    #[test]
+    fn setup_does_not_leak_zones() {
+        let dir = TempDir::new("file-leak");
+        let p = dir.write(
+            "db.example.org",
+            "example.org. 300 IN SOA ns.example.org. h.example.org. 1 60 60 60 60\nexample.org. 300 IN NS ns.example.org.\n",
+        );
+        let (res, mut cfg) = run_setup(&Setup, &format!("file {} example.org", p.display()));
+        res.unwrap();
+        let sources = TransferRegistry::of(&mut cfg).sources();
+        let src = Arc::downgrade(&sources[0]);
+        drop(sources);
+        drop(cfg);
+        assert!(
+            src.upgrade().is_none(),
+            "the zones and the transfer registry form a cycle"
+        );
     }
 }

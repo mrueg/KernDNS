@@ -365,7 +365,7 @@ pub struct Zone {
     mtime: Mutex<Option<SystemTime>>,
     reload_task: Mutex<Option<tokio::task::AbortHandle>>,
     /// Sends NOTIFYs after a reload (if `transfer` is configured).
-    pub registry: Option<kerndns_core::transfer::TransferRegistry>,
+    pub registry: Option<kerndns_core::transfer::WeakTransferRegistry>,
     /// Primaries (`ip:port`) of a secondary zone.
     pub transfer_from: Vec<String>,
     /// Checks each transferred-in version (catalog zones).

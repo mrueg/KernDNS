@@ -28,7 +28,7 @@ use kerndns_core::plugin::CacheBypass;
 use kerndns_core::proto::op::{OpCode, ResponseCode};
 use kerndns_core::proto::rr::{DNSClass, Name, RData, Record, RecordType};
 use kerndns_core::proto::serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder};
-use kerndns_core::transfer::{TransferError, TransferRegistry, Transferer};
+use kerndns_core::transfer::{TransferError, TransferRegistry, Transferer, WeakTransferRegistry};
 use kerndns_core::zones::{Fall, is_subdomain};
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
@@ -431,7 +431,7 @@ struct Dyn {
     /// The store once in use; for a database it is acquired on first use.
     store: Mutex<Option<Arc<Store>>>,
     closed: std::sync::atomic::AtomicBool,
-    registry: TransferRegistry,
+    registry: WeakTransferRegistry,
     /// (pending, running): at most one NOTIFY round in flight.
     notify: Mutex<(bool, bool)>,
     fall: Arc<Fall>,
@@ -964,7 +964,7 @@ impl PluginFactory for Setup {
             database,
             store: Mutex::new(None),
             closed: Default::default(),
-            registry: registry.clone(),
+            registry: registry.downgrade(),
             notify: Mutex::new((false, false)),
             fall: Arc::new(Fall::default()),
         });
@@ -1031,7 +1031,7 @@ mod tests {
             database: None,
             store: Mutex::new(None),
             closed: Default::default(),
-            registry: TransferRegistry::default(),
+            registry: WeakTransferRegistry::default(),
             notify: Mutex::new((false, false)),
             fall: Arc::default(),
         };

@@ -140,7 +140,7 @@ impl PluginFactory for Setup {
             xfrs,
             registry: TransferRegistry::of(c.config),
         });
-        core.registry.set_notifier(core.clone());
+        core.registry.set_notifier(&(core.clone() as Arc<dyn Notifier>));
         c.add_plugin(move |next| {
             Arc::new(Transfer {
                 core: core.clone(),
@@ -363,6 +363,21 @@ impl Handler for Transfer {
 mod tests {
     use super::*;
     use crate::testutil::*;
+
+    /// The registry holds the notifier weakly: the plugin holds the
+    /// registry, so a strong reference back leaked both on every load.
+    #[test]
+    fn setup_does_not_leak() {
+        let (res, mut cfg) = run_setup(&Setup, "transfer {\n to *\n}");
+        res.unwrap();
+        let registry = TransferRegistry::of(&mut cfg).downgrade();
+        assert!(registry.has_notifier());
+        drop(cfg);
+        assert!(
+            !registry.has_notifier(),
+            "the transfer plugin and its registry form a cycle"
+        );
+    }
 
     #[test]
     fn setup() {
