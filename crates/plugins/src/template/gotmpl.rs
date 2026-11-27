@@ -487,9 +487,8 @@ impl Lexer<'_> {
         let hex = s[j..].starts_with("0x") || s[j..].starts_with("0X");
         while j < b.len() {
             let c = b[j];
-            if c.is_ascii_alphanumeric() || c == b'_' || c == b'.' {
-                j += 1;
-            } else if matches!(c, b'+' | b'-') && !hex && matches!(b[j - 1], b'e' | b'E') {
+            let exponent_sign = matches!(c, b'+' | b'-') && !hex && matches!(b[j - 1], b'e' | b'E');
+            if c.is_ascii_alphanumeric() || c == b'_' || c == b'.' || exponent_sign {
                 j += 1;
             } else {
                 break;
@@ -1883,7 +1882,7 @@ fn fmt_integer(verb: char, sp: &Spec, n: i128, v: &Value) -> String {
         'q' => {
             let c = char::from_u32(abs as u32).filter(|_| !neg).unwrap_or('\u{fffd}');
             let q = go_quote(&c.to_string());
-            return sp.pad(format!("'{}'", &q[1..q.len() - 1].replace("\\\"", "\"")), false);
+            return sp.pad(format!("'{}'", q[1..q.len() - 1].replace("\\\"", "\"")), false);
         }
         _ => return bad_verb(verb, v),
     };
