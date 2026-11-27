@@ -13,7 +13,7 @@ xfail TestAutoAXFR                                    Could not get CoreDNS serv
 xfail TestAutoNonExistentZone                         Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'auto' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestAutoPathErraticNotLoaded                    Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'autopath' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestBind_FilterAll
-xfail TestCacheACLAuthorization                       start no-cache control server: stdin:7 - Error during parsing: Directive 'template' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestCacheACLAuthorization
 skip  TestChaos                                       expects the version string CoreDNS-1.15.0; KernDNS reports KernDNS-<version>
 pass  TestClasslessReverse
 xfail TestCompressScrub                               Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
@@ -38,7 +38,7 @@ pass  TestFileLoop
 skip  TestFileNameHyphen                              does not start a server through the test helpers
 pass  TestFileUpstream
 pass  TestFileUpstreamAdditional
-xfail TestFileUpstreamError                           Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'template' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestFileUpstreamError
 xfail TestGRPCConnectionLimit                         Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestGRPCTLSWithLimits                           Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestGRPCWithLimits                              Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'grpc_server' is not available in KernDNS yet (no Rust port of this plugin)
@@ -109,7 +109,7 @@ pass  TestSecondaryZoneTransfer
 xfail TestShed                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'shed' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestTLS
 skip  TestTempFile                                    does not start a server through the test helpers
-xfail TestTemplateUpstream                            Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'template' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestTemplateUpstream
 pass  TestTsig
 pass  TestTsigBadKey
 pass  TestTsigBadSig

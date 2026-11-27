@@ -35,6 +35,7 @@ pub mod reload;
 pub mod rewrite;
 pub mod root;
 pub mod secondary;
+pub mod template;
 pub mod timeouts;
 pub mod tls;
 pub mod tlsconfig;
@@ -69,6 +70,7 @@ pub fn registry() -> Registry {
     r.register(rewrite::Setup);
     r.register(root::Setup);
     r.register(secondary::Setup);
+    r.register(template::Setup);
     r.register(dynupdate::Setup);
     r.register(tls::Setup);
     r.register(transfer::Setup);

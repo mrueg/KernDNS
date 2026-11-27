@@ -186,3 +186,29 @@ pub static LOCALHOST_REQUESTS: LazyLock<IntCounter> = LazyLock::new(|| {
     )
     .unwrap()
 });
+
+// template
+pub static TEMPLATE_MATCHES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "template",
+        "matches_total",
+        "Counter of template regex matches.",
+        &["server", "zone", "view", "class", "type"],
+    )
+});
+pub static TEMPLATE_FAILURES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "template",
+        "template_failures_total",
+        "Counter of go template failures.",
+        &["server", "zone", "view", "class", "type", "section", "template"],
+    )
+});
+pub static TEMPLATE_RR_FAILURES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "template",
+        "rr_failures_total",
+        "Counter of mis-templated RRs.",
+        &["server", "zone", "view", "class", "type", "section", "template"],
+    )
+});
