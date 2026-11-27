@@ -1,7 +1,7 @@
 //! The `kerndns` binary. Flags follow CoreDNS (`-conf`, `-dns.port`, ...);
 //! both `-flag` and `--flag`, and `-flag value` and `-flag=value`, work.
 
-use std::io::Read;
+use std::io::{BufRead, Read};
 use std::process::ExitCode;
 
 use kerndns_server::{Instance, Options};
@@ -30,7 +30,14 @@ const USAGE: &str = "Usage of kerndns:
         Print one 'KERNDNS_LISTENER <label> udp=<addr> tcp=<addr>' line per server (an
         address is empty if the listener has no such socket) and
         'KERNDNS_READY' on stdout once serving, plus 'KERNDNS_METRICS <addr>' per metrics
-        endpoint (used by the CoreDNS compatibility tests)";
+        endpoint (used by the CoreDNS compatibility tests)
+  -control
+        Read Corefiles from standard input, each one preceded by a line
+        'KERNDNS_COREFILE <bytes>': the first is the configuration to start
+        with, every later one is loaded in place like a reload. With
+        -report-listeners, a reload reports the listener lines and
+        'KERNDNS_READY' again, or 'KERNDNS_RELOAD_FAILED <error>' (used by the
+        CoreDNS compatibility tests for caddy's Instance.Restart)";
 
 #[derive(Debug, Default)]
 struct Flags {
@@ -44,6 +51,7 @@ struct Flags {
     quiet: bool,
     version: bool,
     report_listeners: bool,
+    control: bool,
 }
 
 fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<Flags, String> {
@@ -87,6 +95,7 @@ fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<Flags, String> 
             "quiet" => f.quiet = boolean(&inline),
             "version" => f.version = boolean(&inline),
             "report-listeners" => f.report_listeners = boolean(&inline),
+            "control" => f.control = boolean(&inline),
             "h" | "help" => return Err(String::new()),
             other => return Err(format!("flag provided but not defined: -{other}")),
         }
@@ -103,12 +112,38 @@ fn version_string() -> String {
     )
 }
 
-/// The Corefile used when none is given, like CoreDNS's default.
-fn default_corefile(port: &str) -> String {
-    format!(".:{port} {{\n    whoami\n    log\n}}\n")
+/// Header of a Corefile frame on standard input with `-control`.
+const FRAME_HEADER: &str = "KERNDNS_COREFILE ";
+
+/// The next `-control` Corefile from `r`, or `None` at end of input.
+fn read_frame(r: &mut impl BufRead) -> Result<Option<String>, String> {
+    let mut header = String::new();
+    if r.read_line(&mut header)
+        .map_err(|e| format!("reading Corefile from stdin: {e}"))?
+        == 0
+    {
+        return Ok(None);
+    }
+    let len: usize = header
+        .trim_end()
+        .strip_prefix(FRAME_HEADER)
+        .and_then(|n| n.parse().ok())
+        .ok_or_else(|| format!("bad Corefile header on stdin: {:?}", header.trim_end()))?;
+    let mut buf = vec![0; len];
+    r.read_exact(&mut buf)
+        .map_err(|e| format!("reading Corefile from stdin: {e}"))?;
+    String::from_utf8(buf)
+        .map(Some)
+        .map_err(|_| "Corefile on stdin is not UTF-8".to_string())
 }
 
 fn read_corefile(flags: &Flags, port: &str) -> Result<(String, String), String> {
+    if flags.control {
+        return match read_frame(&mut std::io::stdin().lock())? {
+            Some(s) => Ok((s, "stdin".into())),
+            None => Err("no Corefile on stdin".into()),
+        };
+    }
     match flags.conf.as_deref() {
         Some("stdin") => {
             let mut s = String::new();
@@ -122,7 +157,9 @@ fn read_corefile(flags: &Flags, port: &str) -> Result<(String, String), String> 
             .map_err(|e| format!("unable to read Corefile {path}: {e}")),
         None => match std::fs::read_to_string("Corefile") {
             Ok(s) => Ok((s, "Corefile".into())),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok((default_corefile(port), "Corefile".into())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                Ok((kerndns_server::config::default_corefile(port), "Corefile".into()))
+            }
             Err(e) => Err(format!("unable to read Corefile: {e}")),
         },
     }
@@ -223,20 +260,27 @@ async fn run(flags: Flags, corefile: String, path: String, port: String, registr
         println!("{}", version_string());
     }
     if flags.report_listeners {
-        for l in inst.listeners() {
-            // one line per server, like CoreDNS's i.Servers() with multisocket
-            let addr = |a: Option<std::net::SocketAddr>| a.map(|a| a.to_string()).unwrap_or_default();
-            for _ in 0..l.servers {
-                println!("KERNDNS_LISTENER {} udp={} tcp={}", l.label, addr(l.udp), addr(l.tcp));
-            }
-        }
-        for addr in kerndns_core::metrics::listen_addrs() {
-            println!("KERNDNS_METRICS {addr}");
-        }
-        println!("KERNDNS_READY");
+        report_listeners(&inst);
     }
 
-    serve_until_shutdown(&mut inst, &corefile, &path, &opts, &registry).await;
+    // -control: every later Corefile on stdin is a reload
+    let control = flags.control.then(|| {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        std::thread::spawn(move || {
+            let mut stdin = std::io::stdin().lock();
+            loop {
+                let frame = read_frame(&mut stdin);
+                let last = !matches!(frame, Ok(Some(_)));
+                if tx.send(frame).is_err() || last {
+                    return;
+                }
+            }
+        });
+        rx
+    });
+
+    let report = flags.report_listeners;
+    serve_until_shutdown(&mut inst, &corefile, &path, &opts, &registry, control, report).await;
     // caddy's ShutdownEvent comes before the shutdown callbacks
     inst.emit(kerndns_core::Event::Shutdown).await;
     inst.stop().await;
@@ -244,6 +288,45 @@ async fn run(flags: Flags, corefile: String, path: String, port: String, registr
         let _ = std::fs::remove_file(pidfile);
     }
     ExitCode::SUCCESS
+}
+
+/// The `-report-listeners` lines for the running configuration.
+fn report_listeners(inst: &Instance) {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    for l in inst.listeners() {
+        // one line per server, like CoreDNS's i.Servers() with multisocket
+        let addr = |a: Option<std::net::SocketAddr>| a.map(|a| a.to_string()).unwrap_or_default();
+        for _ in 0..l.servers {
+            let _ = writeln!(
+                out,
+                "KERNDNS_LISTENER {} udp={} tcp={}",
+                l.label,
+                addr(l.udp),
+                addr(l.tcp)
+            );
+        }
+    }
+    for addr in kerndns_core::metrics::listen_addrs() {
+        let _ = writeln!(out, "KERNDNS_METRICS {addr}");
+    }
+    let _ = writeln!(out, "KERNDNS_READY");
+    let _ = out.flush();
+}
+
+/// Load `text` and switch `inst` to it; on failure the running
+/// configuration stays.
+async fn reload(
+    inst: &mut Instance,
+    text: &str,
+    path: &str,
+    opts: &Options,
+    registry: &kerndns_core::Registry,
+) -> Result<(), String> {
+    match kerndns_server::load(text, path, registry, opts) {
+        Ok(plan) => inst.reload(plan).await.map_err(|e| e.to_string()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// SHA-512 of the parsed Corefile (keys and directive tokens), so comment
@@ -276,6 +359,8 @@ async fn serve_until_shutdown(
     path: &str,
     opts: &Options,
     registry: &kerndns_core::Registry,
+    mut control: Option<tokio::sync::mpsc::UnboundedReceiver<Result<Option<String>, String>>>,
+    report: bool,
 ) {
     use tokio::signal::unix::{SignalKind, signal};
     let mut term = signal(SignalKind::terminate()).expect("SIGTERM handler");
@@ -297,6 +382,12 @@ async fn serve_until_shutdown(
                 None => std::future::pending::<()>().await,
             }
         };
+        let next_control = async {
+            match control.as_mut() {
+                Some(rx) => rx.recv().await,
+                None => std::future::pending().await,
+            }
+        };
         let force = tokio::select! {
             _ = term.recv() => {
                 kerndns_core::info!("SIGTERM: Shutting down servers then terminating");
@@ -311,6 +402,34 @@ async fn serve_until_shutdown(
                 true
             }
             _ = tick => false,
+            frame = next_control => {
+                match frame {
+                    Some(Ok(Some(text))) => {
+                        // like caddy's Instance.Restart: always load, even if unchanged
+                        kerndns_core::info!("Reloading");
+                        match reload(inst, &text, path, opts, registry).await {
+                            Ok(()) => {
+                                kerndns_core::info!("Reloading complete");
+                                if report {
+                                    report_listeners(inst);
+                                }
+                            }
+                            Err(e) => {
+                                kerndns_core::error!("Restart failed: {e}");
+                                if report {
+                                    println!("KERNDNS_RELOAD_FAILED {}", e.replace('\n', " "));
+                                }
+                            }
+                        }
+                    }
+                    Some(Err(e)) => {
+                        kerndns_core::error!("{e}");
+                        control = None;
+                    }
+                    Some(Ok(None)) | None => control = None,
+                }
+                continue;
+            }
         };
         if !reloadable {
             kerndns_core::warning!("cannot reload a Corefile read from stdin");
@@ -330,11 +449,7 @@ async fn serve_until_shutdown(
             }
             continue;
         }
-        let result = match kerndns_server::load(&text, path, registry, opts) {
-            Ok(plan) => inst.reload(plan).await.map_err(|e| e.to_string()),
-            Err(e) => Err(e.to_string()),
-        };
-        match result {
+        match reload(inst, &text, path, opts, registry).await {
             Ok(()) => {
                 hash = new_hash;
                 kerndns_core::info!("Reloading complete");
@@ -366,5 +481,18 @@ mod tests {
         assert!(p(&["-nope"]).is_err());
         assert!(p(&["-conf"]).is_err());
         assert!(!p(&["-quiet=false"]).unwrap().quiet);
+        assert!(p(&["-control"]).unwrap().control);
+    }
+
+    #[test]
+    fn frames() {
+        let mut r = std::io::Cursor::new(b"KERNDNS_COREFILE 5\n.:53\nKERNDNS_COREFILE 0\n".to_vec());
+        assert_eq!(read_frame(&mut r).unwrap().as_deref(), Some(".:53\n"));
+        assert_eq!(read_frame(&mut r).unwrap().as_deref(), Some(""));
+        assert_eq!(read_frame(&mut r).unwrap(), None);
+        let mut bad = std::io::Cursor::new(b"hello\n".to_vec());
+        assert!(read_frame(&mut bad).is_err());
+        let mut short = std::io::Cursor::new(b"KERNDNS_COREFILE 9\nabc".to_vec());
+        assert!(read_frame(&mut short).is_err());
     }
 }

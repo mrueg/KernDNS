@@ -70,6 +70,7 @@ Go installed.
 ```c
 int   kb_version(void);
 char* kb_list_plugins(void);                                   // JSON
+char* kb_directives(void);                    // JSON, the bridge's dnsserver.Directives
 long  kb_setup(const char* plugin, const char* block_json, char** err);
 int   kb_startup(long h);  int kb_shutdown(long h);  int kb_ready(long h);
 char* kb_gather_metrics(void);                                 // Prometheus text
@@ -112,7 +113,16 @@ Done: `go/bridge` (the c-shared library, plugins from `plugins_gen.go`),
 `cargo xtask build-bridge --plugins ...`, `kerndns -bridge LIB`
 (or `$KERNDNS_BRIDGE`) with `-bridge.prefer` and `-bridge.sync`, Go
 metrics appended to `/metrics` (text and protobuf), readiness for `ready`,
-and the affinity check when a Corefile loads.
+and the affinity check when a Corefile loads. Out-of-tree plugins work
+too: a directive that the bridge's `dnsserver.Directives` adds (as a
+CoreDNS build with that plugin in `plugin.cfg` would) joins KernDNS's
+execution order at the same place (interface version 2, `kb_directives`).
+
+- `cargo xtask compat-test` runs CoreDNS's `TestReloadUnreadyPlugin` and
+  `TestReloadTwoServerBlocksUnreadyPlugin`, whose never-ready plugins live
+  in the test binary, with a bridge holding copies of them
+  (`go/bridge/testplugins/unready`, built automatically): KernDNS's
+  `ready` sees their `Ready()` through the bridge, also after a reload.
 
 - `cargo xtask compat-test --bridge` runs CoreDNS's own etcd tests (build
   tag `etcd`) against KernDNS with the Go `etcd` plugin, against a
@@ -438,6 +448,12 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
    `go/compat/expectations.txt` (pass / xfail / skip, each with a reason).
    A test counts as passing only if it really started `kerndns`. CI fails on
    regressions, unclassified tests and xfails that start passing.
+   `Instance.Restart` reloads the same `kerndns` process in place: the
+   helpers' input has its own caddy server type, `kerndns -control` reads
+   each new Corefile from stdin and reports the new listeners or the
+   error, and a failed reload keeps the old configuration, as in CoreDNS.
+   `chaos` reports the test binary's `caddy.AppName-caddy.AppVersion`
+   through `$KERNDNS_CHAOS_VERSION`.
 2. **`coredns/ci` end-to-end tests** (kind-based, including Kubernetes):
    a nightly job with the KernDNS image.
 3. **Plugin unit tests:** the table tests from each plugin's `*_test.go` are
@@ -566,9 +582,9 @@ image.
 
 ## Risks
 
-- **Compat overlay blind spots:** some upstream tests check Go internals or
-  start an in-process CoreDNS (for example through `caddy.Restart`). Every
-  skip is listed with a reason, so the pass rate can't be inflated quietly.
+- **Compat overlay blind spots:** some upstream tests check Go internals,
+  CoreDNS's Go source or run CoreDNS's own `main`. Every skip is listed
+  with a reason, so the pass rate can't be inflated quietly.
 - **Kubernetes semantics:** many edge cases. Difftest against the Go plugin
   on the same cluster is the safety net.
 - **Benchmark noise:** without a dedicated machine with pinned cores, Go vs

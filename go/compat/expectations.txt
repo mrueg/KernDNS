@@ -14,17 +14,17 @@ pass  TestAutoNonExistentZone
 pass  TestAutoPathErraticNotLoaded
 pass  TestBind_FilterAll
 pass  TestCacheACLAuthorization
-skip  TestChaos                                       expects the version string CoreDNS-1.15.0; KernDNS reports KernDNS-<version>
+pass  TestChaos
 pass  TestClasslessReverse
 pass  TestCompressScrub
 pass  TestCorefileParsing
 pass  TestDNS64FallbackError
 pass  TestDynUpdateAXFRIncludesUpdatedRecord
 pass  TestDynUpdateCoalescesNotify
-skip  TestDynUpdateCorefileReload                     calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestDynUpdateCorefileReload
 pass  TestDynUpdateFailedStartupDoesNotCreateDatabase
 pass  TestDynUpdateIsNotServedFromCache
-skip  TestDynUpdateKeaLifecycle                       does not start a server through the test helpers
+skip  TestDynUpdateKeaLifecycle                       skips itself unless kea-dhcp-ddns is installed (it starts the server through the helpers, so it runs against KernDNS where Kea is)
 pass  TestDynUpdateNsupdate
 pass  TestDynUpdatePersistentWire
 pass  TestDynUpdateRejectsDuplicateDirective
@@ -35,7 +35,7 @@ pass  TestEDNS0
 pass  TestEmptySecondaryZone
 pass  TestFileCnameOrigin
 pass  TestFileLoop
-skip  TestFileNameHyphen                              does not start a server through the test helpers
+skip  TestFileNameHyphen                              presubmit check of CoreDNS's Go source tree (file names), no server
 pass  TestFileUpstream
 pass  TestFileUpstreamAdditional
 pass  TestFileUpstreamError
@@ -50,12 +50,12 @@ pass  TestHTTPSConnectionLimit
 pass  TestHTTPSMaxStreamsKeyOrder
 pass  TestHTTPSWithLimits
 pass  TestHostsInlineLookup
-skip  TestImportOrdering                              does not start a server through the test helpers
-skip  TestImportTesting                               does not start a server through the test helpers
+skip  TestImportOrdering                              presubmit check of CoreDNS's Go source tree (import grouping), no server
+skip  TestImportTesting                               presubmit check of CoreDNS's Go source tree (imports of the testing package), no server
 pass  TestIssue7630
 pass  TestIxfrResponse
-skip  TestJSONLoggingProcess                          does not start a server through the test helpers
-skip  TestJSONLoggingProcessHelper                    does not start a server through the test helpers
+skip  TestJSONLoggingProcess                          runs CoreDNS's own main (coremain.Run with -log-format=json) in a child test process
+skip  TestJSONLoggingProcessHelper                    the child process of TestJSONLoggingProcess: runs coremain.Run, CoreDNS's main
 pass  TestKubernetesAutopathCacheRefresh
 pass  TestLargeAXFR
 pass  TestLookupAutoPathErratic
@@ -65,12 +65,12 @@ pass  TestLookupCacheWithoutEdns
 pass  TestLookupDS
 pass  TestLookupProxy
 pass  TestLookupWildcard
-skip  TestLowercaseLog                                does not start a server through the test helpers
-skip  TestMetricNaming                                does not start a server through the test helpers
+skip  TestLowercaseLog                                presubmit check of CoreDNS's Go source tree (log message case), no server
+skip  TestMetricNaming                                checks the metric names declared in CoreDNS's Go source, no server
 pass  TestMetricsAuto
 pass  TestMetricsAvailable
-skip  TestMetricsAvailableAfterReload                 calls caddy.Restart, which starts an in-process CoreDNS
-skip  TestMetricsAvailableAfterReloadAndFailedReload  calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestMetricsAvailableAfterReload
+pass  TestMetricsAvailableAfterReloadAndFailedReload
 pass  TestMetricsPluginEnabled
 pass  TestMetricsRefused
 skip  TestMetricsRewriteRequestSize                   counts from two servers in one process (one shared metrics registry); KernDNS reports 5 of 5 in le=100 for each
@@ -78,23 +78,23 @@ pass  TestMetricsServer
 pass  TestMetricsSeveralBlocs
 skip  TestMultiZoneBlockConfigs                       reads dnsserver.Config through reflection on the caddy instance
 pass  TestMultisocket
-skip  TestMultisocket_Restart                         first half passes; the restart calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestMultisocket_Restart
 pass  TestMultisocket_WhoAmI
 pass  TestNoPlugins
 pass  TestProxyThreeWay
 pass  TestProxyToChaosServer
 pass  TestQUIC
 pass  TestQUICProtocolError
-skip  TestQUICReloadDoesNotPanic                      second half calls caddy.Restart, which starts an in-process CoreDNS
+pass  TestQUICReloadDoesNotPanic
 pass  TestQUICStreamLimits
-skip  TestReadme                                      does not start a server through the test helpers
-skip  TestReload                                      second half calls caddy.Restart, which starts an in-process CoreDNS
-skip  TestReloadConcurrentRestartAndStop              calls caddy.Restart, which starts an in-process CoreDNS
-skip  TestReloadHealth                                calls caddy.Restart, which starts an in-process CoreDNS
-skip  TestReloadMetricsHealth                         calls caddy.Restart, which starts an in-process CoreDNS
-skip  TestReloadSeveralTimeMetrics                    calls caddy.Restart, which starts an in-process CoreDNS
-skip  TestReloadTwoServerBlocksUnreadyPlugin          uses test-only Go plugins registered inside the test binary
-skip  TestReloadUnreadyPlugin                         uses test-only Go plugins registered inside the test binary
+xfail TestReadme                                      README examples need what KernDNS lacks: bind interface names (lo), errors consolidate, template var, forward https/quic upstreams, etcd
+pass  TestReload
+pass  TestReloadConcurrentRestartAndStop
+pass  TestReloadHealth
+pass  TestReloadMetricsHealth
+pass  TestReloadSeveralTimeMetrics
+pass  TestReloadTwoServerBlocksUnreadyPlugin
+pass  TestReloadUnreadyPlugin
 pass  TestRetryInitialTransfer
 pass  TestReverse
 pass  TestReverseCorefile
@@ -108,7 +108,7 @@ pass  TestSecondaryZoneNotify
 pass  TestSecondaryZoneTransfer
 pass  TestShed
 pass  TestTLS
-skip  TestTempFile                                    does not start a server through the test helpers
+skip  TestTempFile                                    tests the Go helper test.TempFile, no server
 pass  TestTemplateUpstream
 pass  TestTsig
 pass  TestTsigBadKey
