@@ -299,6 +299,12 @@ More wave 5 ports:
   crate, which `go tool pprof` reads, and `/debug/pprof/cmdline` the
   command line. Go-only profiles (heap, goroutine, block, mutex, trace,
   ...) answer 404; `block` is accepted and logs a warning.
+- `geoip` reads `.mmdb` files with the `maxminddb` crate, accepts the
+  database types geoip2-golang does and sets the same labels; its tests
+  use CoreDNS's fixture databases. Like Go's decoder it accepts any
+  unsigned width for numbers (the crate's own GeoIP2 structs reject the
+  fixtures), and an IPv4 `edns-subnet` is looked up in its IPv4-mapped
+  form, as CoreDNS does.
 
 Performance follow-ups from the first benchmarks, done:
 
