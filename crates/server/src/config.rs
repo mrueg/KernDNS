@@ -94,13 +94,23 @@ pub struct Plan {
     pub hooks: Hooks,
 }
 
+/// The Corefile used when there is none, or it has no server blocks, like
+/// CoreDNS's `DefaultInput`.
+pub fn default_corefile(port: &str) -> String {
+    format!(".:{port} {{\n    whoami\n    log\n}}\n")
+}
+
 /// Parse a Corefile and run every plugin's setup.
 ///
 /// Setup registers readiness checks and the `reload` interval globally; if
 /// it fails, those of the running configuration are put back, so a failed
 /// reload leaves `ready` and `reload` as they were.
 pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> Result<Plan, LoadError> {
-    let blocks = parse(corefile, path)?;
+    let mut blocks = parse(corefile, path)?;
+    if blocks.is_empty() {
+        // caddy loads the server type's DefaultInput then
+        blocks = parse(&default_corefile(&opts.dns_port), "Corefile")?;
+    }
     let saved = (kerndns_core::readiness::save(), kerndns_core::reload::interval());
     kerndns_core::readiness::reset();
     kerndns_core::reload::reset();
@@ -349,6 +359,22 @@ mod tests {
         }
         fn bridged(&self) -> bool {
             true
+        }
+    }
+
+    /// CoreDNS's import README example is a Corefile with only a snippet;
+    /// caddy serves its default Corefile then instead of failing.
+    #[test]
+    fn no_server_blocks_loads_the_default() {
+        let reg = kerndns_plugins::registry();
+        let opts = Options {
+            dns_port: "1053".into(),
+        };
+        for corefile in ["", "# nothing\n", "(mysnippet) {\n\t...\n}\n"] {
+            let plan = load(corefile, "Corefile", &reg, &opts).unwrap_or_else(|e| panic!("{corefile:?}: {e}"));
+            let labels: Vec<String> = plan.listeners.iter().map(|l| l.label()).collect();
+            assert_eq!(labels, ["dns://:1053"], "{corefile:?}");
+            assert_eq!(plan.listeners[0].zones[0].0, ".", "{corefile:?}");
         }
     }
 
