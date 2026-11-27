@@ -1,0 +1,27 @@
+# Upstream plugin table tests (crates/server/tests/plugin_cases).
+#
+# <status> <plugin> <table>[#row] <reason>
+#   skip:  the table (or row) is not run, with the reason
+#   xfail: the row fails today, with the reason; a passing xfail fails
+#          the test, so it gets removed from here
+#
+# Tables are named Func/var, or var at package level; rows are #index
+# (or #key for maps, #row.sub for nested tables). Tables that could not be
+# evaluated outside their test function are listed in the fixture with
+# the compiler's message and reported by the test, not here.
+
+# file
+skip file miekAuth records shared by other tables (checked through them)
+skip file auth records shared by other tables (checked through them)
+skip file additionalAuth records shared by other tables (checked through them)
+skip file svcbAuth records shared by other tables (checked through them)
+skip file dnssexAuth records shared by other tables (checked through them)
+skip file exampleAuth records shared by other tables (checked through them)
+skip file TestClosestEncloser/tests tests the Go Zone.ClosestEncloser method directly
+skip file TestCanonicalEscape/cases tests the Go canonicalEscape helper
+skip file TestReplaceWithAsteriskLabel/tests tests the Go replaceWithAsteriskLabel helper
+skip file TestNameFromRight/tests tests the Go Zone.nameFromRight helper
+skip file TestZoneReloadByMtime/expectedNS rewrites the zone file mid-test and waits for the reload ticker; not a query table
+
+# hosts
+skip hosts TestReplaceWithAsteriskLabel/tests tests the Go replaceWithAsteriskLabel helper
