@@ -71,6 +71,38 @@ type dumpData struct {
 	Pods              []*object.Pod                  `json:"pods"`
 	MissingNamespaces []string                       `json:"missing_namespaces"`
 	Suites            []dumpSuite                    `json:"suites"`
+	Transfers         []dumpXfr                      `json:"transfers"`
+}
+
+// dumpXfr is one Transfer call (xfr_test.go) and the records it streamed.
+type dumpXfr struct {
+	Name       string   `json:"name"`
+	Zones      []string `json:"zones"`
+	Namespaces []string `json:"namespaces"`
+	LocalIPs   []string `json:"local_ips"`
+	Zone       string   `json:"zone"`
+	Serial     uint32   `json:"serial"`
+	Error      string   `json:"error"`
+	Records    []dumpRR `json:"records"`
+}
+
+func runXfr(name string, localIPs []string, zone string, serial uint32) dumpXfr {
+	k := New([]string{"cluster.local."})
+	k.APIConn = &APIConnServeTest{}
+	k.Namespaces = map[string]struct{}{"testns": {}, "kube-system": {}}
+	for _, ip := range localIPs {
+		k.localIPs = append(k.localIPs, net.ParseIP(ip))
+	}
+	x := dumpXfr{Name: name, Zones: k.Zones, Namespaces: []string{"kube-system", "testns"}, LocalIPs: localIPs, Zone: zone, Serial: serial, Records: []dumpRR{}}
+	ch, err := k.Transfer(zone, serial)
+	if err != nil {
+		x.Error = err.Error()
+		return x
+	}
+	for rrs := range ch {
+		x.Records = append(x.Records, packRRs(rrs)...)
+	}
+	return x
 }
 
 func packRRs(rrs []dns.RR) []dumpRR {
@@ -207,6 +239,15 @@ func TestKernDNSDump(t *testing.T) {
 	k = base()
 	k.opts.ignoreEmptyService = true
 	d.Suites = append(d.Suites, runSuite("preserve_case", k, wrap(dnsPreserveCaseCases), false))
+
+	// xfr_test.go
+	d.Transfers = append(d.Transfers,
+		runXfr("non_auth_zone", []string{"10.0.0.10"}, "example.com.", 0),
+		runXfr("axfr", []string{"10.0.0.10"}, "cluster.local.", 0),
+		runXfr("ixfr_fallback", []string{"10.0.0.10"}, "cluster.local.", 1),
+		runXfr("ixfr_current", []string{"10.0.0.10"}, "cluster.local.", 3),
+		runXfr("axfr_multiple_ns_addrs", []string{"10.0.0.10", "fd00::10"}, "cluster.local.", 0),
+	)
 
 	b, err := json.MarshalIndent(d, "", " ")
 	if err != nil {

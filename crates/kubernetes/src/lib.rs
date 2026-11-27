@@ -20,13 +20,15 @@
 //! ```
 //!
 //! Not ported yet (rejected with an error): `multicluster`, `zonal` and the
-//! `apiserver_*` client limits. AXFR needs `transfer`, which isn't ported.
+//! `apiserver_*` client limits. Zone transfers go through `transfer`
+//! ([`xfr`]).
 
 mod autopath;
 pub mod controller;
 pub mod external;
 pub mod object;
 pub mod parse;
+pub mod xfr;
 
 use std::collections::HashSet;
 use std::net::IpAddr;
@@ -34,12 +36,13 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use kerndns_core::duration::parse_duration;
-use kerndns_core::proto::op::{Message, ResponseCode};
+use kerndns_core::proto::op::{Message, MessageType, OpCode, ResponseCode};
 use kerndns_core::proto::rr::{Record, RecordType};
+use kerndns_core::transfer::TransferRegistry;
 use kerndns_core::zones::{self, Fall, extract_address_from_reverse};
 use kerndns_core::{
-    Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
-    async_trait, next_or_failure,
+    Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Protocol, Request, ResponseWriter,
+    SetupError, async_trait, next_or_failure,
 };
 use kerndns_plugins::backend::{self, BackendError, BackendResult, Options, Service, ServiceBackend, State};
 
@@ -126,6 +129,16 @@ impl Kubernetes {
 
     fn has_synced(&self) -> bool {
         self.api().is_some_and(|a| a.has_synced())
+    }
+
+    /// A request-less state for `zone`, for what CoreDNS calls with an
+    /// empty `request.Request` (the SOA of a transfer).
+    pub(crate) fn dummy_state(&self, zone: &str) -> State {
+        let mut msg = Message::new(0, MessageType::Query, OpCode::Query);
+        let name = kerndns_core::proto::rr::Name::from_ascii(zone).unwrap_or_default();
+        msg.add_query(kerndns_core::proto::op::Query::query(name, RecordType::SOA));
+        let any: std::net::SocketAddr = ([0, 0, 0, 0], 0).into();
+        State::new(Request::new(msg, any, any, Protocol::Tcp), zone.to_string())
     }
 
     fn primary_zone(&self) -> &str {
@@ -797,6 +810,8 @@ impl PluginFactory for Setup {
         external::slot(c.config).set(k.clone());
         // autopath @kubernetes (set up earlier in the block) finds it here
         kerndns_plugins::autopath::AutoPathers::of(c.config).register("kubernetes", k.clone());
+        // zone transfers through `transfer`
+        TransferRegistry::of(c.config).add_source(Arc::new(xfr::KubeTransfer(k.clone())));
 
         let listen_hosts = c.config.listen_hosts.clone();
         let tasks: Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>> = Arc::default();

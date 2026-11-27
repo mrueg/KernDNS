@@ -7,8 +7,8 @@
 #   skip   result ignored: the test doesn't exercise the cluster DNS
 #
 # <status> <test> <reason>
-xfail TestAXFR                            kubernetes: zone transfers (Transferer) are not ported yet; KernDNS answers AXFR with REFUSED
-xfail TestAXFRPods                        kubernetes: zone transfers (Transferer) are not ported yet; KernDNS answers AXFR with REFUSED
+pass  TestAXFR
+pass  TestAXFRPods
 xfail TestDNSProgrammingLatencyEndpoints  kubernetes: the coredns_kubernetes_dns_programming_duration_seconds metric is not ported yet
 pass  TestKubernetesA
 xfail TestKubernetesAutopath              environment: fails on CoreDNS too (kind job, coredns target); a search domain from the GitHub runner's resolv.conf reaches forward, which has no next plugin (SERVFAIL)
