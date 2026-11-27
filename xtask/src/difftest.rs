@@ -24,8 +24,26 @@ impl Drop for Server {
     }
 }
 
+/// A port that is free for both UDP and TCP (servers bind both).
 fn free_port() -> Result<u16> {
-    Ok(UdpSocket::bind("127.0.0.1:0")?.local_addr()?.port())
+    for _ in 0..100 {
+        let port = UdpSocket::bind("127.0.0.1:0")?.local_addr()?.port();
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return Ok(port);
+        }
+    }
+    bail!("no port free for both UDP and TCP")
+}
+
+/// Two different free ports.
+fn two_ports() -> Result<(u16, u16)> {
+    let a = free_port()?;
+    loop {
+        let b = free_port()?;
+        if b != a {
+            return Ok((a, b));
+        }
+    }
 }
 
 /// A minimal query for `. SOA`; any answer means the server is up.
@@ -175,7 +193,7 @@ pub fn run(args: &[String]) -> Result<()> {
             summary.push(format!("  skip  {name}: no SOA"));
             continue;
         }
-        let (pa, pb) = (free_port()?, free_port()?);
+        let (pa, pb) = two_ports()?;
         let cf = |port: u16| {
             format!(
                 "{origin}:{port} {{\n    bind 127.0.0.1\n    file {}\n}}\n",
@@ -206,8 +224,9 @@ pub fn run(args: &[String]) -> Result<()> {
             }
             (None, Some(_)) => {
                 total_diffs += 1;
-                let err = fs::read_to_string(work.join(format!("{name}.coredns.log"))).unwrap_or_default();
-                let last = err.lines().last().unwrap_or("").to_string();
+                let mut err = fs::read_to_string(work.join(format!("{name}.coredns.log"))).unwrap_or_default();
+                err += &fs::read_to_string(work.join(format!("{name}.coredns.err"))).unwrap_or_default();
+                let last = err.lines().rfind(|l| !l.contains("maxprocs")).unwrap_or("").to_string();
                 summary.push(format!("  DIFF  {name}: kerndns loads it, CoreDNS does not: {last}"));
                 continue;
             }
@@ -484,7 +503,7 @@ pub fn k8s(args: &[String]) -> Result<()> {
     let mut total_diffs = 0;
     let mut summary = Vec::new();
     for (name, opts) in &variants {
-        let (pa, pb) = (free_port()?, free_port()?);
+        let (pa, pb) = two_ports()?;
         let cf = |port: u16| {
             format!(
                 "{zone}:{port} in-addr.arpa.:{port} ip6.arpa.:{port} example.com.:{port} {{\n    bind 127.0.0.1\n    kubernetes cluster.local in-addr.arpa ip6.arpa {{\n        {opts}\n    }}\n}}\n"
