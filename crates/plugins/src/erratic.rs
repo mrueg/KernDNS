@@ -10,8 +10,8 @@
 //! }
 //! ```
 //!
-//! Not ported: the `autopath` hook (`AutoPath`), since `autopath` itself is
-//! not ported yet.
+//! It is also an [`AutoPather`]: `autopath @erratic` gets the fixed search
+//! path `a.example.org.`, `b.example.org.`.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::num::IntErrorKind;
@@ -26,6 +26,8 @@ use kerndns_core::proto::rr::{Name, RData, Record, RecordType};
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, PluginFactory, Request, ResponseWriter, SetupError, async_trait,
 };
+
+use crate::autopath::{AutoPather, AutoPathers};
 
 const NAME: &str = "erratic";
 
@@ -111,6 +113,13 @@ impl Handler for Erratic {
         self.maybe_delay(delay).await;
         let _ = w.write_msg(m).await;
         Ok(ResponseCode::NoError)
+    }
+}
+
+impl AutoPather for Erratic {
+    /// `AutoPath`: a fixed search path, for testing.
+    fn auto_path(&self, _: &Request) -> Vec<String> {
+        vec!["a.example.org.".into(), "b.example.org.".into(), String::new()]
     }
 }
 
@@ -249,6 +258,7 @@ impl PluginFactory for Setup {
         let e = Arc::new(parse(c)?);
         let q = e.q.clone();
         kerndns_core::readiness::register(NAME, move || Erratic::ready(&q));
+        AutoPathers::of(c.config).register(NAME, e.clone());
         c.add_plugin(move |_next| e.clone());
         Ok(())
     }

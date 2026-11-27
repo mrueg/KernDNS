@@ -130,6 +130,7 @@ pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> 
             let mut c = Controller::new(name, Dispenser::new(tokens), &mut cfg, &mut hooks, corefile_dir.clone());
             factory.setup(&mut c)?;
         }
+        kerndns_core::plugin::BlockHandlers::fill(&mut cfg);
         if cfg.plugins.iter().any(|(n, _)| *n == "prometheus") {
             // coredns_plugin_enabled for every handler in the block
             let hosts = if cfg.listen_hosts.is_empty() {
@@ -174,6 +175,7 @@ const AFFINITY: &[&[&str]] = &[
     &["k8s_external", "kubernetes"],
     &["transfer", "file", "secondary", "auto", "kubernetes", "dynupdate"],
     &["alternate", "forward"],
+    &["autopath", "kubernetes", "erratic"],
 ];
 
 fn check_affinity(directives: &[&str], registry: &Registry) -> Result<(), LoadError> {

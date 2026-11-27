@@ -22,6 +22,7 @@
 //! Not ported yet (rejected with an error): `multicluster`, `zonal` and the
 //! `apiserver_*` client limits. AXFR needs `transfer`, which isn't ported.
 
+mod autopath;
 pub mod controller;
 pub mod external;
 pub mod object;
@@ -92,6 +93,8 @@ pub struct Kubernetes {
     pub local_ips: RwLock<Vec<IpAddr>>,
     api: RwLock<Option<Arc<dyn DnsController>>>,
     pub upstream_override: Option<UpstreamFn>,
+    /// The local search path from `/etc/resolv.conf`, for `autopath`.
+    pub auto_path_search: Vec<String>,
 }
 
 impl Kubernetes {
@@ -109,6 +112,7 @@ impl Kubernetes {
             local_ips: RwLock::new(Vec::new()),
             api: RwLock::new(None),
             upstream_override: None,
+            auto_path_search: Vec::new(),
         }
     }
 
@@ -684,6 +688,7 @@ impl PluginFactory for Setup {
                 return Err(err("non-reverse zone name must be used".into()));
             }
             let mut kk = Kubernetes::new(zones);
+            kk.auto_path_search = autopath::search_from_resolv_conf();
             while c.next_block() {
                 let opt = c.val().to_string();
                 let a = c.remaining_args();
@@ -790,6 +795,8 @@ impl PluginFactory for Setup {
         let k = Arc::new(k);
         // k8s_external (set up earlier in the block) reads it from here
         external::slot(c.config).set(k.clone());
+        // autopath @kubernetes (set up earlier in the block) finds it here
+        kerndns_plugins::autopath::AutoPathers::of(c.config).register("kubernetes", k.clone());
 
         let listen_hosts = c.config.listen_hosts.clone();
         let tasks: Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>> = Arc::default();

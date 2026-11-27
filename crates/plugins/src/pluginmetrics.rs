@@ -212,3 +212,23 @@ pub static TEMPLATE_RR_FAILURES: LazyLock<CounterVec> = LazyLock::new(|| {
         &["server", "zone", "view", "class", "type", "section", "template"],
     )
 });
+
+// autopath
+pub static AUTOPATH_SUCCESS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "autopath",
+        "success_total",
+        "Counter of requests that did autopath.",
+        &["server"],
+    )
+});
+
+// dns64
+pub static DNS64_REQUESTS_TRANSLATED: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "dns64",
+        "requests_translated_total",
+        "Counter of DNS requests translated by dns64.",
+        &["server"],
+    )
+});

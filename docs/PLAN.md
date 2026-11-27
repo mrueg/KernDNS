@@ -97,8 +97,9 @@ implements `dns.ResponseWriter` through `rust_write`.
 **Limits:**
 - Plugins that talk to each other through Go types form affinity groups
   that must all run on one side: `k8s_external` + `kubernetes`, `transfer` +
-  its transferers, `alternate` + `forward`. These are marked in the order
-  file and enforced when the config loads.
+  its transferers, `alternate` + `forward`, `autopath` + the plugin it
+  names (`kubernetes`, `erratic`). These are marked in the order file and
+  enforced when the config loads.
 - Metadata crosses the boundary as a string map.
 - A Go panic is recovered in every exported function and turned into
   SERVFAIL. An optional later out-of-process mode (gRPC over a unix socket)
@@ -147,7 +148,7 @@ provides the plugin, else an error saying how to build the bridge with it.
 | 1: minimal server | `file`, `health`, `ready`, `prometheus`, `forward`, `cache`, `hosts`, `reload`, `loop`, `chaos` (done) |
 | 2: Kubernetes | `kubernetes`, `k8s_external` (done) |
 | 3: authoritative | `file`, `auto`, `secondary`, `transfer`, `any`, `minimal`, `loadbalance`, `local`, `tsig` |
-| 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `nsid`, `tls` |
+| 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `autopath`, `nsid`, `tls` |
 | 5: DNSSEC and the rest | `dnssec`, `sign`, `alternate`, and the remaining in-tree plugins as needed |
 
 Through the Go bridge until someone needs a port: `etcd`, `route53`,
@@ -217,8 +218,10 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
   `k8s_external` with `headless`): no differences.
 - `cargo xtask k8s-bench`: faster sync and less memory than CoreDNS at 1k,
   10k and 50k services (see README).
-- Not ported yet: `multicluster`, `zonal`, `apiserver_*` limits, autopath
-  integration, AXFR (needs `transfer`), `coredns_kubernetes_*` DNS
+- `autopath @kubernetes` works with `pods verified`: the search path comes
+  from the client pod's namespace, like CoreDNS's `AutoPath`.
+- Not ported yet: `multicluster`, `zonal`, `apiserver_*` limits, AXFR
+  (needs `transfer`), `coredns_kubernetes_*` DNS
   programming latency metrics. The `coredns/ci` kind tests haven't been
   run yet. Resident memory after a large sync is higher than the live
   index needs because the allocator keeps freed list pages; a different
