@@ -126,6 +126,25 @@ enum RespRule {
 }
 
 impl RespRule {
+    /// `edns0 ... revert` on an OPT record: drop the added option or put
+    /// the replaced one back.
+    fn revert_edns(&self, e: &mut Edns) {
+        let opts = &mut e.options_mut().options;
+        match self {
+            RespRule::EdnsRemove(code) => {
+                if let Some(i) = opts.iter().position(|(_, o)| opt_code(o) == *code) {
+                    opts.remove(i);
+                }
+            }
+            RespRule::EdnsReplace(code, old) => {
+                if let Some((_, o)) = opts.iter_mut().find(|(_, o)| opt_code(o) == *code) {
+                    *o = old.clone();
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn apply_rr(&self, m: &mut Message, rr: &mut Record) {
         match self {
             RespRule::Name(rw) => rewrite_name(&mut rr.name, rw),
@@ -146,19 +165,9 @@ impl RespRule {
                     m.metadata.response_code = *new;
                 }
             }
-            RespRule::EdnsRemove(code) => {
+            RespRule::EdnsRemove(_) | RespRule::EdnsReplace(..) => {
                 if let Some(e) = m.edns.as_mut() {
-                    let opts = &mut e.options_mut().options;
-                    if let Some(i) = opts.iter().position(|(_, o)| opt_code(o) == *code) {
-                        opts.remove(i);
-                    }
-                }
-            }
-            RespRule::EdnsReplace(code, old) => {
-                if let Some(e) = m.edns.as_mut()
-                    && let Some((_, o)) = e.options_mut().options.iter_mut().find(|(_, o)| opt_code(o) == *code)
-                {
-                    *o = old.clone();
+                    self.revert_edns(e);
                 }
             }
             RespRule::Cname(..) => {}
@@ -1313,7 +1322,15 @@ impl Handler for Rewrite {
         // CoreDNS changes the request in place, so the server echoes the
         // rewritten OPT record
         if st.edns_changed {
-            ctx.edns = st.req.msg.edns.clone().map(Box::new);
+            let mut e = st.req.msg.edns.clone();
+            // `writeWithRevertedRequestExtra`: the server echoes the request
+            // with the `revert` rules applied
+            if let Some(e) = e.as_mut() {
+                for r in resp.iter().rev() {
+                    r.revert_edns(e);
+                }
+            }
+            ctx.edns = e.map(Box::new);
         }
         // like CoreDNS: without response rules (and no `stop` match) the
         // answer goes out as is, rewritten question included
@@ -1544,6 +1561,21 @@ mod tests {
             e.option(EdnsCode::from(0xfeed)),
             Some(&EdnsOption::Unknown(0xfeed, b"hi".to_vec()))
         );
+    }
+
+    /// With `revert` the server echoes the request with the option
+    /// reverted (`writeWithRevertedRequestExtra`), so it isn't echoed.
+    #[tokio::test]
+    async fn edns0_revert_is_not_echoed() {
+        let h = rewrite_of(&["edns0 local set 0xfeee hi revert"], reply(|r| r.reply()));
+        let mut w = kerndns_core::CaptureWriter::new();
+        let mut ctx = Context::new(".", "dns://:53");
+        let _ = h
+            .serve_dns(&mut ctx, &mut w, &query("x.example.", RecordType::A, "10.0.0.1:53"))
+            .await;
+        let e = ctx.edns.expect("OPT record added by the rule stays");
+        assert_eq!(e.max_payload(), 4096);
+        assert_eq!(e.option(EdnsCode::from(0xfeee)), None);
     }
 
     /// `revert` drops an added option from the response's OPT record and
