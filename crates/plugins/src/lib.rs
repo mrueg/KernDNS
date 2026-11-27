@@ -43,6 +43,7 @@ pub mod multisocket;
 pub mod nsid;
 pub mod on;
 pub mod pluginmetrics;
+pub mod pprof;
 pub mod proxyproto;
 pub mod quic;
 pub mod ready;
@@ -122,5 +123,6 @@ pub fn registry() -> Registry {
     r.register(shed::Setup);
     r.register(proxyproto::Setup);
     r.register(on::Setup);
+    r.register(pprof::Setup);
     r
 }

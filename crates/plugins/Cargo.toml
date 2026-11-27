@@ -27,4 +27,6 @@ sha1.workspace = true
 sha2.workspace = true
 ring.workspace = true
 md-5.workspace = true
+pprof.workspace = true
+flate2.workspace = true
 
