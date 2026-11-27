@@ -44,13 +44,18 @@ impl Endpoint {
     }
 }
 
-/// Turn Go-style `host:port` (`:8080` means all interfaces) into a socket address string.
+/// Turn Go-style `host:port` (`:8080` means all interfaces, an empty port
+/// any free one, as for Go's `net.Listen`) into a socket address string.
 pub fn listen_addr(addr: &str) -> String {
-    if let Some(port) = addr.strip_prefix(':') {
+    let mut a = if let Some(port) = addr.strip_prefix(':') {
         format!("[::]:{port}")
     } else {
         addr.to_string()
+    };
+    if a.ends_with(':') {
+        a.push('0');
     }
+    a
 }
 
 /// Check `host:port` like Go's `net.SplitHostPort`.
@@ -141,6 +146,25 @@ mod tests {
                 .block_on(async { serve(&addr.to_string(), route.clone()) })
                 .unwrap_or_else(|e| panic!("bind {addr} after stop: {e}"));
         }
+        ep.stop();
+    }
+
+    /// CoreDNS's metrics README has `prometheus localhost:{$PORT}`, which
+    /// is `localhost:` with $PORT unset: Go listens on a free port then.
+    #[test]
+    fn empty_port_is_any_port() {
+        assert_eq!(listen_addr(":9153"), "[::]:9153");
+        assert_eq!(listen_addr(":"), "[::]:0");
+        assert_eq!(listen_addr("localhost:"), "localhost:0");
+        assert_eq!(listen_addr("127.0.0.1:8080"), "127.0.0.1:8080");
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+        let route: Route = Arc::new(|_, _| text(200, "OK"));
+        let ep = rt.block_on(async { serve("localhost:", route) }).unwrap();
+        assert_ne!(ep.addr.port(), 0);
         ep.stop();
     }
 }
