@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Weak};
 
 use kerndns_core::proto::rr::{DNSClass, Name, RData, Record};
-use kerndns_core::transfer::TransferRegistry;
+use kerndns_core::transfer::{TransferRegistry, WeakTransferRegistry};
 use kerndns_core::zones::{self, Fall, is_subdomain};
 use kerndns_core::{Controller, PluginFactory, SetupError};
 
@@ -191,7 +191,7 @@ struct CatalogState {
 
 struct Secondary {
     zones: SharedZones,
-    registry: TransferRegistry,
+    registry: WeakTransferRegistry,
     /// Catalog zones and the member zones they may add (`None`: any).
     catalog_zones: HashMap<String, Option<Vec<String>>>,
     state: Mutex<CatalogState>,
@@ -499,7 +499,7 @@ impl PluginFactory for Setup {
                 let origin = Name::from_ascii(&o).map_err(|e| err(format!("invalid zone {o}: {e}")))?;
                 let mut z = Zone::new(origin, PathBuf::from("stdin"), ZoneData::default());
                 z.reload_interval = std::time::Duration::ZERO;
-                z.registry = Some(registry.clone());
+                z.registry = Some(registry.downgrade());
                 z.transfer_from = from.get(&o).cloned().unwrap_or_default();
                 if !zones.z.contains_key(&o) {
                     zones.names.push(o.clone());
@@ -522,7 +522,7 @@ impl PluginFactory for Setup {
             }
             Secondary {
                 zones: shared(zones),
-                registry: registry.clone(),
+                registry: registry.downgrade(),
                 catalog_zones,
                 state: Mutex::default(),
                 tasks: Mutex::default(),
@@ -664,7 +664,7 @@ mod tests {
         let cz = zones.z.clone();
         let s = Arc::new(Secondary {
             zones: shared(zones),
-            registry: TransferRegistry::default(),
+            registry: WeakTransferRegistry::default(),
             catalog_zones: czs,
             state: Mutex::default(),
             tasks: Mutex::default(),
