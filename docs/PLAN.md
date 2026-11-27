@@ -492,15 +492,23 @@ Each scenario runs N times and reports the median and spread.
   248 MiB (now 66 MiB peak and steady, vs 117–177 MiB for CoreDNS)
   because of over-reserved per-name record lists and a load that held
   the whole file as tokens and records.
-- **Level 3, common setups:** `bench/setups/<name>/`, same format (today
-  the caching resolver and kubeadm cluster DNS). Planned: caching forwarder,
-  authoritative server, split horizon, DoT/DoH frontend, and a mixed bridge
-  chain vs all-Go CoreDNS. `kubeadm` is kubeadm's default Corefile against
-  the fake API server (1000 Services) with what pods send through the
-  `ndots:5` search path (A and AAAA for each candidate), SRV, PTR, pod
-  names and external names forwarded to the backend. `--kubeconfig PATH`
-  points it at a live cluster instead, with `# live-queries:` for the
-  objects in `bench/k8s/workloads.yaml`.
+- **Level 3, common setups:** `bench/setups/<name>/`, same format: the
+  caching resolver, kubeadm cluster DNS, a caching forwarder (hosts
+  entries, a large cache with prefetch and `serve_stale`, forward over
+  DoT), an authoritative server (two zones sharing a snippet, transfers,
+  other zones refused), split
+  horizon (`view`, queried from an internal and from an external client
+  with dnsperf `-a`), a DoT and a DoH frontend (cache and forward behind
+  the listener), and a mixed bridge chain vs all-Go CoreDNS (CoreDNS's
+  etcd example: `etcd` in Go through the bridge, the rest in Rust, with
+  and without the cache). `# bridge: etcd` makes the harness build the
+  bridge and start KernDNS with `-bridge`; `# needs: etcd` starts a
+  throwaway etcd with 500 SkyDNS services. `kubeadm` is kubeadm's
+  default Corefile against the fake API server (1000 Services) with what
+  pods send through the `ndots:5` search path (A and AAAA for each
+  candidate), SRV, PTR, pod names and external names forwarded to the
+  backend. `--kubeconfig PATH` points it at a live cluster instead, with
+  `# live-queries:` for the objects in `bench/k8s/workloads.yaml`.
 - **Kubernetes at scale:** kind + kwok with 1k/10k/50k Services and up to
   500k endpoints, a realistic in-cluster query mix including the `ndots:5`
   search-path NXDOMAINs, memory as the cluster grows, time to sync and become
@@ -547,7 +555,9 @@ like CoreDNS's image. A copy of kubeadm's Deployment, Service, ConfigMap
 and RBAC in a kind cluster with only the image changed: probes, metrics,
 `reload` and `lameduck` work, and the answers match the cluster's
 CoreDNS. The kubeadm level 3 setup runs against the fake API server or,
-with `--kubeconfig`, a live cluster. Open: publishing the image, the
+with `--kubeconfig`, a live cluster. The other level 3 setups are in
+too: forwarder, authoritative, split horizon, DoT/DoH frontend and the
+mixed bridge chain. Open: publishing the image, the
 nightly level 3 report, and running the `coredns/ci` kind tests with the
 image.
 

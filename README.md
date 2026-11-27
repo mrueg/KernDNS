@@ -41,7 +41,7 @@ Milestones **M0**, **M1** and **M2** are done.
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
 | CoreDNS integration tests against KernDNS | 93 pass, 0 expected failures, 25 skipped (Go-only or in-process restarts), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 (`TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself) |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
-| Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin, see below |
+| Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin and level 3 common setups, see below |
 | `kubernetes` + `k8s_external` | all 74 of CoreDNS's own kubernetes handler test cases replay with identical responses; 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants) |
 | Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `etcd`) | done (M3) |
 
@@ -173,6 +173,32 @@ machine:
 |---|---|---|---|
 | fake, 1,000 Services | 12.6k → 16.3k | 84.8 → 73.6 | 76 → 25 MiB |
 | kind cluster (`--kubeconfig`) | 8.0k → 18.8k | 147.2 → 74.6 | 73 → 23 MiB |
+
+Level 3, common setups ([`bench/setups/`](bench/setups/)): whole
+Corefiles of typical deployments, run the same way (`cargo xtask bench
+--level 3`). `split/external` queries the split horizon setup from another
+source address (dnsperf `-a 127.0.0.2`), so the internal view rejects it.
+In the `bridge` setups (CoreDNS's etcd example, against a throwaway etcd
+with 500 services) KernDNS runs `etcd` in Go through the bridge and the
+rest in Rust. One `--duration 3 --runs 3` run on the same loaded laptop
+(load average 20 to 90 from other builds), so these are indicative only;
+both servers answered with the same response codes in every case.
+
+| setup | max QPS CoreDNS → KernDNS | CPU µs/q CoreDNS → KernDNS | peak RSS CoreDNS → KernDNS |
+|---|---|---|---|
+| resolver (cache, forward) | 40k → 83k | 49.8 → 31.2 | 71 → 19 MiB |
+| forwarder (hosts, cache with prefetch and serve_stale, forward over DoT) | 39k → 69k | 56.6 → 34.2 | 96 → 33 MiB |
+| authoritative (two zones, snippet, transfer, log, any) | 8k → 27k | 108.5 → 55.5 | 75 → 20 MiB |
+| split (view, internal client) | 42k → 86k | 72.3 → 37.1 | 75 → 19 MiB |
+| split/external (view rejected, public zone) | 12k → 75k | 104.4 → 41.0 | 76 → 19 MiB |
+| frontend (DoT listener, cache, forward) | 68k → 66k | 43.9 → 38.6 | 67 → 16 MiB |
+| frontend/doh (DoH over HTTP/2) | 19k → 32k | 163.5 → 74.2 | 78 → 21 MiB |
+| bridge (etcd in Go, cache, loadbalance, forward) | 13k → 15k | 87.7 → 89.1 | 77 → 52 MiB |
+| bridge/uncached (every etcd query crosses the bridge) | 3k → 3k | 231.7 → 289.5 | 80 → 61 MiB |
+
+With every query going to etcd through the bridge, KernDNS spends more
+CPU per query than CoreDNS (a second run: 169 vs 303 µs); latency in
+both is dominated by etcd and swings a lot between runs.
 
 Single laptop runs: treat them as indicative; the plan calls for a
 dedicated benchmark machine.
