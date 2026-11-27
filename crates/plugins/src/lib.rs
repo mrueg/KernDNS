@@ -48,6 +48,7 @@ pub mod reload;
 pub mod rewrite;
 pub mod root;
 pub mod secondary;
+pub mod sign;
 pub mod template;
 pub mod timeouts;
 pub mod tls;
@@ -112,5 +113,6 @@ pub fn registry() -> Registry {
     r.register(grpc_server::Setup);
     r.register(quic::Setup);
     r.register(dnssec::Setup);
+    r.register(sign::Setup);
     r
 }
