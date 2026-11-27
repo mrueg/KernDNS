@@ -441,9 +441,14 @@ Each scenario runs N times and reports the median and spread.
   because of over-reserved per-name record lists and a load that held
   the whole file as tokens and records.
 - **Level 3, common setups:** `bench/setups/<name>/`, same format (today
-  only the caching resolver). Planned: kubeadm cluster DNS, caching forwarder,
+  the caching resolver and kubeadm cluster DNS). Planned: caching forwarder,
   authoritative server, split horizon, DoT/DoH frontend, and a mixed bridge
-  chain vs all-Go CoreDNS.
+  chain vs all-Go CoreDNS. `kubeadm` is kubeadm's default Corefile against
+  the fake API server (1000 Services) with what pods send through the
+  `ndots:5` search path (A and AAAA for each candidate), SRV, PTR, pod
+  names and external names forwarded to the backend. `--kubeconfig PATH`
+  points it at a live cluster instead, with `# live-queries:` for the
+  objects in `bench/k8s/workloads.yaml`.
 - **Kubernetes at scale:** kind + kwok with 1k/10k/50k Services and up to
   500k endpoints, a realistic in-cluster query mix including the `ndots:5`
   search-path NXDOMAINs, memory as the cluster grows, time to sync and become
@@ -481,6 +486,18 @@ server still held, while CoreDNS sets `SO_REUSEPORT` on every listener
 in-place request mutation does it (and so is `revert`). Open from the
 level 2 results: cache misses under constant eviction, AXFR CPU, and
 peak memory of a 100k-name zone are behind CoreDNS (in progress).
+
+### M5 status
+
+Done: the drop-in image (`Dockerfile`, built in CI, not pushed yet):
+`/coredns` entrypoint, uid 65532, `cap_net_bind_service` on the binary,
+like CoreDNS's image. A copy of kubeadm's Deployment, Service, ConfigMap
+and RBAC in a kind cluster with only the image changed: probes, metrics,
+`reload` and `lameduck` work, and the answers match the cluster's
+CoreDNS. The kubeadm level 3 setup runs against the fake API server or,
+with `--kubeconfig`, a live cluster. Open: publishing the image, the
+nightly level 3 report, and running the `coredns/ci` kind tests with the
+image.
 
 ## Risks
 

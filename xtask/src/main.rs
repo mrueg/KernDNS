@@ -29,7 +29,7 @@ const USAGE: &str =
     "usage: cargo xtask compat-test [--release] [--run REGEX] [--update] [--target coredns] [--bridge [LIB]]
        cargo xtask build-bridge [--plugins etcd,whoami,...] [--out PATH]
        cargo xtask difftest [--release] [--zone NAME] [--show N] [--dnssec]
-       cargo xtask bench [--level 2,3] [--plugin NAME,...] [--scenario CASE,...] [--duration SECONDS] [--runs N] [--coredns PATH] [--list]
+       cargo xtask bench [--level 2,3] [--plugin NAME,...] [--scenario CASE,...] [--duration SECONDS] [--runs N] [--coredns PATH] [--kubeconfig PATH] [--list]
        cargo xtask bench --check
        cargo xtask k8s-cases
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]

@@ -1,0 +1,28 @@
+# about: kubeadm cluster DNS: kubeadm's default Corefile, 1000 Services, clients' ndots:5 search path (A+AAAA), SRV, PTR, pods and external names
+# queries: {DIR}/queries.txt
+# live-queries: {DIR}/queries-live.txt
+# needs: kubernetes
+.:{PORT} {
+    errors
+    health 127.0.0.1:0 {
+       lameduck 5s
+    }
+    ready 127.0.0.1:0
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+       kubeconfig {KUBECONFIG}
+       pods insecure
+       fallthrough in-addr.arpa ip6.arpa
+       ttl 30
+    }
+    prometheus 127.0.0.1:0
+    forward . 127.0.0.1:{BACKEND} {
+       max_concurrent 1000
+    }
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
+    loop
+    reload
+    loadbalance
+}

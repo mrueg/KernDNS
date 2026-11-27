@@ -48,3 +48,22 @@ jobs:
           cache-dependency-path: third_party/coredns/go.sum
       - run: sudo apt-get update && sudo apt-get install -y dnsperf
       - run: cargo xtask bench --level 2 --plugin cache,file,rewrite,tsig --duration 1
+
+  image:
+    # the drop-in CoreDNS replacement image (built, not pushed), started
+    # the way kubeadm's Deployment runs it
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t kerndns:ci .
+      - name: Serve with kubeadm's container settings
+        run: |
+          mkdir conf
+          printf '.:53 {\n    errors\n    health\n    ready\n    whoami\n}\n' > conf/Corefile
+          docker run -d --name kerndns -p 1053:53/udp -p 8080:8080 -p 8181:8181 \
+            --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE \
+            -v "$PWD/conf:/etc/coredns:ro" kerndns:ci -conf /etc/coredns/Corefile
+          for i in $(seq 30); do curl -sf localhost:8181/ready && break; sleep 1; done
+          curl -sf localhost:8080/health
+          dig @127.0.0.1 -p 1053 whoami.example.org | grep -q 'status: NOERROR'
+          docker logs kerndns
