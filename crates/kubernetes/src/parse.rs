@@ -1,18 +1,29 @@
 //! Query-name parsing, a port of `plugin/kubernetes/parse.go`.
 //!
-//! `[[endpoint.]service.]namespace.svc|pod.zone` and the SRV form
-//! `_port._protocol.service.namespace.svc.zone`.
+//! `[[endpoint.]service.]namespace.svc|pod.zone`, the SRV form
+//! `_port._protocol.service.namespace.svc.zone`, with `multicluster`
+//! `endpoint.cluster.service.namespace.svc.zone` and with `zonal`
+//! `topozone.pin|prefer._zone.service.namespace.svc.zone`.
 
 use crate::Error;
 
 pub const SVC: &str = "svc";
 pub const POD: &str = "pod";
 
+/// The label anchoring a zone-scoped name.
+const ZONE_LABEL: &str = "_zone";
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RecordRequest {
     pub port: String,
     pub protocol: String,
     pub endpoint: String,
+    /// The cluster of a multicluster endpoint name.
+    pub cluster: String,
+    /// The topology zone of a zone-scoped name (`zonal`).
+    pub zone: String,
+    /// `prefer` rather than `pin`: fall back to every endpoint.
+    pub zone_prefer: bool,
     pub service: String,
     pub namespace: String,
     /// "svc" or "pod" (empty for the zone itself).
@@ -36,7 +47,7 @@ fn strip_underscore(s: &str) -> String {
     s.strip_prefix('_').unwrap_or(s).to_string()
 }
 
-pub fn parse_request(name: &str, zone: &str) -> Result<RecordRequest, Error> {
+pub fn parse_request(name: &str, zone: &str, multicluster: bool, zonal: bool) -> Result<RecordRequest, Error> {
     let mut r = RecordRequest::default();
     let base = trim_zone(name, zone).unwrap_or_default();
     if base.is_empty() || base == SVC || base == POD {
@@ -61,10 +72,26 @@ pub fn parse_request(name: &str, zone: &str) -> Result<RecordRequest, Error> {
     match last {
         0 => r.endpoint = segs[0].to_string(),
         1 => {
-            r.protocol = strip_underscore(segs[1]);
-            r.port = strip_underscore(segs[0]);
+            if !multicluster || segs[1].starts_with('_') || segs[0].starts_with('_') {
+                r.protocol = strip_underscore(segs[1]);
+                r.port = strip_underscore(segs[0]);
+            } else {
+                r.cluster = segs[1].to_string();
+                r.endpoint = segs[0].to_string();
+            }
         }
-        _ => return Err(Error::InvalidRequest),
+        _ => {
+            // a zone-scoped name (the zone may span labels), or too long
+            if !zonal || multicluster || segs[last] != ZONE_LABEL || r.pod_or_svc != SVC {
+                return Err(Error::InvalidRequest);
+            }
+            match segs[last - 1] {
+                "pin" => {}
+                "prefer" => r.zone_prefer = true,
+                _ => return Err(Error::InvalidRequest),
+            }
+            r.zone = segs[..last - 1].join(".");
+        }
     }
     Ok(r)
 }
@@ -73,10 +100,11 @@ pub fn parse_request(name: &str, zone: &str) -> Result<RecordRequest, Error> {
 mod tests {
     use super::*;
 
+    /// parse_test.go.
     #[test]
     fn requests() {
         let z = "cluster.local.";
-        let p = |n: &str| parse_request(n, z);
+        let p = |n: &str| parse_request(n, z, false, false);
         assert_eq!(p("cluster.local.").unwrap(), RecordRequest::default());
         let r = p("_http._tcp.webs.mynamespace.svc.cluster.local.").unwrap();
         assert_eq!(
@@ -95,5 +123,41 @@ mod tests {
         assert_eq!(p("webs.mynamespace.foo.cluster.local."), Err(Error::InvalidRequest));
         assert_eq!(p("a.b.c.d.mynamespace.svc.cluster.local."), Err(Error::InvalidRequest));
         assert_eq!(trim_zone("A.B.Cluster.Local.", z).unwrap(), "A.B");
+    }
+
+    #[test]
+    fn multicluster_requests() {
+        let p = |n: &str| parse_request(n, "clusterset.local.", true, false);
+        let r = p("ep-1.c1.webs.mynamespace.svc.clusterset.local.").unwrap();
+        assert_eq!((r.endpoint.as_str(), r.cluster.as_str()), ("ep-1", "c1"));
+        let r = p("_http._tcp.webs.mynamespace.svc.clusterset.local.").unwrap();
+        assert_eq!(
+            (r.port.as_str(), r.protocol.as_str(), r.cluster.as_str()),
+            ("http", "tcp", "")
+        );
+    }
+
+    #[test]
+    fn zonal_requests() {
+        let p = |n: &str, zonal| parse_request(n, "cluster.local.", false, zonal);
+        let r = p("us-west-2a.pin._zone.db.prod.svc.cluster.local.", true).unwrap();
+        assert_eq!(
+            (r.zone.as_str(), r.zone_prefer, r.service.as_str()),
+            ("us-west-2a", false, "db")
+        );
+        let r = p("corp.example.com.prefer._zone.db.prod.svc.cluster.local.", true).unwrap();
+        assert_eq!((r.zone.as_str(), r.zone_prefer), ("corp.example.com", true));
+        assert_eq!(
+            p("us-west-2a.pin._zone.db.prod.svc.cluster.local.", false),
+            Err(Error::InvalidRequest)
+        );
+        assert_eq!(
+            p("us-west-2a.nope._zone.db.prod.svc.cluster.local.", true),
+            Err(Error::InvalidRequest)
+        );
+        assert_eq!(
+            p("us-west-2a.pin._zone.db.prod.pod.cluster.local.", true),
+            Err(Error::InvalidRequest)
+        );
     }
 }

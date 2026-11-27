@@ -1387,14 +1387,17 @@ version = "0.1.0"
 dependencies = [
  "data-encoding",
  "futures-util",
+ "http",
  "if-addrs",
  "k8s-openapi",
  "kerndns-core",
  "kerndns-plugins",
  "kube",
+ "prometheus",
  "serde",
  "serde_json",
  "tokio",
+ "tower",
 ]
 
 [[package]]

@@ -410,8 +410,9 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
   `kubeconfig`, `namespaces`, `labels`, `namespace_labels`,
   `pods insecure|verified|disabled`, `endpoint_pod_names`, `ttl`,
   `noendpoints`, `fallthrough`, `ignore empty_service`,
-  `apiserver_qps/burst`, `startup_timeout` and `multicluster`.
-- Records: A, AAAA, SRV, PTR, ExternalName CNAME, headless, wildcards,
+  `apiserver_qps/burst/max_inflight`, `startup_timeout`, `multicluster`
+  and `zonal`.
+- Records: A, AAAA, SRV, PTR, ExternalName CNAME, headless,
   `dns-version`, and correct NXDOMAIN vs NODATA.
 - `ready` reports not-ready until all watchers have synced. Implements
   `Transferer` for AXFR. Exposes the same `coredns_kubernetes_*` metrics.
@@ -421,26 +422,59 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
 
 ### M2 status
 
-- All 74 cases of CoreDNS's kubernetes handler suites (serve, namespaces,
-  not-synced, pod modes, empty services, apex, case preservation) are
-  extracted from the Go tests (`cargo xtask k8s-cases`) and replay with
-  identical responses (`crates/kubernetes/tests/upstream_cases.rs`).
+- CoreDNS's own kubernetes and k8s_external tests are extracted from the Go
+  tests (`cargo xtask k8s-cases`, `go/k8sdump`) and replay against the Rust
+  port with identical results: 130 handler cases (serve, namespaces,
+  not-synced, pod modes, empty services, apex, case preservation,
+  multicluster, zonal), the zone transfers of `xfr_test.go` (record for
+  record, in order), `metadata_test.go`, and k8s_external's 38 handler
+  cases and its transfers (`crates/kubernetes/tests/upstream_*.rs`).
 - `cargo xtask k8s-difftest` against a live kind cluster: 57,344 queries over
   four Corefile variants (kubeadm-like, `pods verified` +
   `endpoint_pod_names`, `namespaces` + `ignore empty_service`,
   `k8s_external` with `headless`): no differences.
+- coredns/ci's end-to-end tests (`test/kubernetes`) run in the CI job
+  `kind` against the KernDNS image; see go/compat/expectations-kind.txt.
+- `cargo xtask fake-api` serves the benchmarks' fake API server on its own,
+  to run CoreDNS and kerndns side by side (AXFRs, metadata in logs and the
+  `coredns_kubernetes_*` metrics match).
 - `cargo xtask k8s-bench`: faster sync and less memory than CoreDNS at 1k,
-  10k and 50k services (see README).
-- `autopath @kubernetes` works with `pods verified`: the search path comes
-  from the client pod's namespace, like CoreDNS's `AutoPath`.
-- Zone transfers (`transfer`) of the cluster zone and k8s_external zones;
-  CoreDNS's xfr_test.go and k8s_external's own tests replay identically.
-- Not ported yet: `multicluster`, `zonal`, `apiserver_*` limits,
-  `coredns_kubernetes_*` DNS
-  programming latency metrics. The `coredns/ci` kind tests haven't been
-  run yet. Resident memory after a large sync is higher than the live
-  index needs because the allocator keeps freed list pages; a different
-  allocator or smaller pages would trade that against sync time.
+  10k and 50k services (see README). Resident memory after a large sync is
+  higher than the live index needs because the allocator keeps freed list
+  pages; a different allocator or smaller pages would trade that against
+  sync time.
+
+#### Parity with CoreDNS 1.15.0 (`plugin/kubernetes`, `plugin/k8s_external`)
+
+| Option / behaviour | CoreDNS | KernDNS |
+|---|---|---|
+| `kubernetes [ZONES...]`, once per block, a non-reverse zone required | `setup.go` | same, same errors |
+| `endpoint URL` (several: deprecated, first used) | client-go | same (warning for several) |
+| `tls CERT KEY CACERT` (only with `endpoint`) | client-go | same |
+| `kubeconfig KUBECONFIG [CONTEXT]` | `clientcmd` | same (kube-rs kubeconfig loader) |
+| in-cluster service account | `rest.InClusterConfig` | same (`kube::Config::incluster`) |
+| `apiserver_qps`, `apiserver_burst`, `apiserver_max_inflight` | client-go rate limiter (default 5 QPS, burst 10) and an in-flight round tripper | same: a tower layer with a token bucket (same defaults) for every request but watches, like client-go, and an in-flight limit held until the response headers; same validation errors |
+| `namespaces`, `namespace_labels` (not both) | `namespace.go` | same |
+| `labels EXPRESSION` | parsed at setup (`ParseToLabelSelector`) | **passed to the API server as is**: an invalid selector is rejected by the API server (a logged watch error) instead of at setup |
+| `pods disabled\|insecure\|verified` | `findPods` | same; the pod watch uses CoreDNS's field selector (no Succeeded/Failed/Unknown pods) and keeps terminating pods until they are deleted |
+| `endpoint_pod_names` | `endpointHostname` | same (pod names of 64+ characters ignored) |
+| `ttl` (0..3600), `noendpoints`, `fallthrough [ZONES]`, `ignore empty_service`, `startup_timeout` | `setup.go` | same, same errors |
+| `multicluster [ZONES]` (MCS API: ServiceImports, EndpointSlices with `multicluster.kubernetes.io/service-name`) | `findMultiClusterServices`, own serial | same, incl. `endpoint.cluster.service...` names, the ServiceImport watch selected by `namespace_labels` (as CoreDNS does) and multicluster AXFR |
+| `zonal` (`topozone.pin\|prefer._zone.service.ns.svc.zone`), not with `noendpoints` | `parse.go`, `findServices` | same (NODATA for an empty zone, `prefer` falls back) |
+| EndpointSlices | ready condition only (nil = ready), all address types | same |
+| A, AAAA, SRV (named and unnamed ports), PTR (services, endpoints), ExternalName CNAME (+ upstream), headless + hostnames, `dns-version` TXT, NXDOMAIN vs NODATA, case preservation | handler, `plugin.A/SRV/...` | same (replayed cases) |
+| wildcard (`*`) queries | removed in CoreDNS 1.9: no special meaning | same |
+| SOA serials | `Modified` internal / external / multicluster, CoreDNS's change detection | same |
+| NS and glue: the DNS service found through the server's own addresses (`boundIPs`, `nsAddrs`), else `ns.dns.<zone>` | `ns.go`, `local.go` | same |
+| not synced: SERVFAIL for names in the zones; `ready` until synced; start waits up to `startup_timeout` | `handler.go`, `ready.go` | same |
+| lost API connection | informers retry, `HasSynced` stays true | same (kube-rs watchers retry with backoff, the index keeps serving) |
+| zone transfers (`transfer`) incl. pods' endpoint names, IXFR serial check | `xfr.go` | same (`xfr.rs`) |
+| `kubernetes/*` metadata (`client-namespace`, `client-pod-name`, `client-label/*`, `endpoint`, `kind`, `namespace`, `port-name`, `protocol`, `service`, `zone`, `parse-error`) | `metadata.go` | same. Like CoreDNS in a server, `kubernetes/cluster` is never set: the multicluster check uses the request's zone, which the server leaves empty when it collects metadata |
+| `coredns_kubernetes_dns_programming_duration_seconds{service_kind}` | `object/metrics.go` | same (from `endpoints.kubernetes.io/last-change-trigger-time`; like CoreDNS, no `headless_without_selector`) |
+| `coredns_kubernetes_rest_client_{request_duration_seconds,rate_limiter_duration_seconds,requests_total}` | client-go metrics hooks | same names, labels and buckets. CoreDNS's informers use streaming lists (WatchList), so its lists are watches and only counted; KernDNS lists with paged GETs, which are also timed |
+| `autopath @kubernetes` | `autopath.go` | same |
+| `k8s_external`: `apex`, `ttl`, `headless`, `fallthrough`, several zones, PTR of external IPs, AXFR (`Transferer`), own serial | `plugin/k8s_external` | same (replayed cases and transfers) |
+| API client details: protobuf content type, CoreDNS user agent, klog adapter | client-go | not ported: JSON, kube-rs's user agent and KernDNS's own logging; not visible in DNS |
 
 ## Testing
 

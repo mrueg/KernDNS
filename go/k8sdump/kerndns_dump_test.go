@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/coredns/coredns/plugin/kubernetes/object"
+	"github.com/coredns/coredns/plugin/metadata"
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/test"
 	"github.com/coredns/coredns/request"
@@ -62,7 +63,22 @@ type dumpSuite struct {
 	IgnoreEmptyService bool       `json:"ignore_empty_service"`
 	NotSynced          bool       `json:"not_synced"`
 	LocalIPs           []string   `json:"local_ips"`
+	MulticlusterZones  []string   `json:"multicluster_zones"`
+	Zonal              bool       `json:"zonal"`
+	API                string     `json:"api"` // "" (APIConnServeTest) or "zonal" (APIConnZonalTest)
 	Cases              []dumpCase `json:"cases"`
+}
+
+// dumpMetadata is one metadata_test.go case: the metadata the plugin
+// publishes for a request, collected the way the server does (no zone).
+type dumpMetadata struct {
+	Qname             string            `json:"qname"`
+	Qtype             uint16            `json:"qtype"`
+	RemoteIP          string            `json:"remote_ip"`
+	Zones             []string          `json:"zones"`
+	MulticlusterZones []string          `json:"multicluster_zones"`
+	PodMode           string            `json:"pod_mode"`
+	Metadata          map[string]string `json:"metadata"`
 }
 
 type dumpData struct {
@@ -72,12 +88,20 @@ type dumpData struct {
 	MissingNamespaces []string                       `json:"missing_namespaces"`
 	Suites            []dumpSuite                    `json:"suites"`
 	Transfers         []dumpXfr                      `json:"transfers"`
+	// multicluster objects of APIConnServeTest
+	ServiceImports map[string][]*object.ServiceImport         `json:"service_imports"`
+	McEndpoints    map[string][]*object.MultiClusterEndpoints `json:"mc_endpoints"`
+	// APIConnZonalTest
+	ZonalServices  map[string][]*object.Service   `json:"zonal_services"`
+	ZonalEndpoints map[string][]*object.Endpoints `json:"zonal_endpoints"`
+	Metadata       []dumpMetadata                 `json:"metadata"`
 }
 
 // dumpXfr is one Transfer call (xfr_test.go) and the records it streamed.
 type dumpXfr struct {
-	Name       string   `json:"name"`
-	Zones      []string `json:"zones"`
+	Name              string   `json:"name"`
+	Zones             []string `json:"zones"`
+	MulticlusterZones []string `json:"multicluster_zones"`
 	Namespaces []string `json:"namespaces"`
 	LocalIPs   []string `json:"local_ips"`
 	Zone       string   `json:"zone"`
@@ -87,13 +111,18 @@ type dumpXfr struct {
 }
 
 func runXfr(name string, localIPs []string, zone string, serial uint32) dumpXfr {
-	k := New([]string{"cluster.local."})
+	return runXfrIn(name, []string{"cluster.local."}, nil, localIPs, zone, serial)
+}
+
+func runXfrIn(name string, zones, mcZones []string, localIPs []string, zone string, serial uint32) dumpXfr {
+	k := New(zones)
+	k.opts.multiclusterZones = mcZones
 	k.APIConn = &APIConnServeTest{}
 	k.Namespaces = map[string]struct{}{"testns": {}, "kube-system": {}}
 	for _, ip := range localIPs {
 		k.localIPs = append(k.localIPs, net.ParseIP(ip))
 	}
-	x := dumpXfr{Name: name, Zones: k.Zones, Namespaces: []string{"kube-system", "testns"}, LocalIPs: localIPs, Zone: zone, Serial: serial, Records: []dumpRR{}}
+	x := dumpXfr{Name: name, Zones: k.Zones, MulticlusterZones: mcZones, Namespaces: []string{"kube-system", "testns"}, LocalIPs: localIPs, Zone: zone, Serial: serial, Records: []dumpRR{}}
 	ch, err := k.Transfer(zone, serial)
 	if err != nil {
 		x.Error = err.Error()
@@ -143,7 +172,10 @@ func (r *recordingUpstream) Lookup(ctx context.Context, state request.Request, n
 }
 
 func runSuite(name string, k *Kubernetes, cases []kubeTestCase, notSynced bool) dumpSuite {
-	s := dumpSuite{Name: name, Zones: k.Zones, PodMode: k.podMode, IgnoreEmptyService: k.opts.ignoreEmptyService, NotSynced: notSynced}
+	s := dumpSuite{Name: name, Zones: k.Zones, PodMode: k.podMode, IgnoreEmptyService: k.opts.ignoreEmptyService, NotSynced: notSynced, MulticlusterZones: k.opts.multiclusterZones, Zonal: k.opts.zonal}
+	if _, ok := k.APIConn.(*APIConnZonalTest); ok {
+		s.API = "zonal"
+	}
 	for ns := range k.Namespaces {
 		s.Namespaces = append(s.Namespaces, ns)
 	}
@@ -249,6 +281,43 @@ func TestKernDNSDump(t *testing.T) {
 		runXfr("axfr_multiple_ns_addrs", []string{"10.0.0.10", "fd00::10"}, "cluster.local.", 0),
 	)
 
+	// handler_test.go TestMultiClusterServeDNS
+	k = base()
+	k.opts.multiclusterZones = []string{"cluster.local."}
+	k.Namespaces = map[string]struct{}{"testns": {}}
+	d.Suites = append(d.Suites, runSuite("multicluster", k, append(commonDnsTestCases, multiclusterDnsTestCases...), false))
+	d.ServiceImports = svcImportIndex
+	d.McEndpoints = mcEpsIndex
+
+	// zonal_test.go TestServeDNSZonal
+	za := APIConnZonalTest{}
+	d.ZonalServices = map[string][]*object.Service{"hdls.testns": za.SvcIndex("hdls.testns"), "clstr.testns": za.SvcIndex("clstr.testns")}
+	d.ZonalEndpoints = map[string][]*object.Endpoints{"hdls.testns": za.EpIndex("hdls.testns")}
+	k = New([]string{"cluster.local."})
+	k.APIConn = &APIConnZonalTest{}
+	k.Namespaces = map[string]struct{}{"testns": {}}
+	k.opts.zonal = true
+	d.Suites = append(d.Suites, runSuite("zonal", k, wrap(zonalTestCases), false))
+	k.opts.zonal = false
+	d.Suites = append(d.Suites, runSuite("zonal_disabled", k, wrap(zonalDisabledTestCases), false))
+
+	// xfr_test.go TestKubernetesMultiClusterAXFR
+	d.Transfers = append(d.Transfers,
+		runXfrIn("multicluster_axfr", []string{"cluster.local.", "clusterset.local."}, []string{"clusterset.local."}, []string{"10.0.0.10"}, "clusterset.local.", 0),
+	)
+
+	// metadata_test.go
+	for _, tc := range metadataCases {
+		k := New([]string{"cluster.local.", "clusterset.local."})
+		k.opts.multiclusterZones = []string{"clusterset.local."}
+		k.APIConn = &APIConnServeTest{}
+		d.Metadata = append(d.Metadata, runMetadata(k, tc.Qname, tc.Qtype, tc.RemoteIP))
+	}
+	k = New([]string{"cluster.local."})
+	k.podMode = podModeVerified
+	k.APIConn = &APIConnServeTest{}
+	d.Metadata = append(d.Metadata, runMetadata(k, "example.com.", dns.TypeA, ""))
+
 	b, err := json.MarshalIndent(d, "", " ")
 	if err != nil {
 		t.Fatal(err)
@@ -256,4 +325,21 @@ func TestKernDNSDump(t *testing.T) {
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// runMetadata collects the plugin's metadata for a request like the server
+// does (request.Request{Req: r, W: w}: no zone).
+func runMetadata(k *Kubernetes, qname string, qtype uint16, remoteIP string) dumpMetadata {
+	ctx := metadata.ContextWithMetadata(context.Background())
+	state := request.Request{
+		Req: &dns.Msg{Question: []dns.Question{{Name: qname, Qtype: qtype}}},
+		W:   &test.ResponseWriter{RemoteIP: remoteIP},
+	}
+	ctx = k.Metadata(ctx, state)
+	md := map[string]string{}
+	for _, l := range metadata.Labels(ctx) {
+		md[l] = metadata.ValueFunc(ctx, l)()
+	}
+	ip := state.IP()
+	return dumpMetadata{Qname: qname, Qtype: qtype, RemoteIP: ip, Zones: k.Zones, MulticlusterZones: k.opts.multiclusterZones, PodMode: k.podMode, Metadata: md}
 }
