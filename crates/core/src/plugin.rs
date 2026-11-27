@@ -129,6 +129,9 @@ pub struct BlockConfig {
     /// `multisocket`: servers (UDP socket + TCP listener, `SO_REUSEPORT`)
     /// per listen address; 0 if not set.
     pub num_sockets: usize,
+    /// Connection and stream limits of the DoH, DoH3, gRPC and DoQ
+    /// listeners (`https`, `https3`, `grpc_server`, `quic`).
+    pub limits: ListenerLimits,
     /// Handlers registered by setup, with their directive names, in the
     /// order setup ran (which is the execution order).
     pub plugins: Vec<(&'static str, PluginFn)>,
@@ -153,6 +156,7 @@ impl BlockConfig {
             view_name: None,
             conn: ConnLimits::default(),
             num_sockets: 0,
+            limits: ListenerLimits::default(),
             plugins: Vec::new(),
             extensions: Extensions::default(),
         }
@@ -396,5 +400,33 @@ impl ConnLimits {
         self.write = other.write.or(self.write);
         self.idle = other.idle.or(self.idle);
         self.max_tcp_queries = other.max_tcp_queries.or(self.max_tcp_queries);
+    }
+}
+
+/// Limits set by the listener plugins, CoreDNS's `Config.Max*` fields.
+/// `None` keeps the listener's default.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ListenerLimits {
+    pub https_max_connections: Option<u64>,
+    pub https_max_streams: Option<u64>,
+    pub https3_max_connections: Option<u64>,
+    pub https3_max_streams: Option<u64>,
+    pub grpc_max_connections: Option<u64>,
+    pub grpc_max_streams: Option<u64>,
+    pub quic_max_connections: Option<u64>,
+    pub quic_max_streams: Option<u64>,
+    pub quic_worker_pool_size: Option<u64>,
+}
+
+impl ListenerLimits {
+    /// What the other keys of a server block see. CoreDNS runs setup for
+    /// the block's first key only and copies just these two settings to
+    /// the others (`propagateConfigParams`).
+    pub fn propagated(&self) -> ListenerLimits {
+        ListenerLimits {
+            https_max_streams: self.https_max_streams,
+            quic_max_connections: self.quic_max_connections,
+            ..Default::default()
+        }
     }
 }
