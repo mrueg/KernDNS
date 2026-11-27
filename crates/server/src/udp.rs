@@ -102,8 +102,9 @@ pub async fn handle(
     }
     let mut req = Request::new(msg, local, src, protocol);
     req.wire = Some(Arc::from(packet));
-    let size = req.size() as usize;
-    encode(d.answer(&req).await, size)
+    let answer = d.answer(&req).await;
+    let size = crate::dispatch::effective_request(&req, answer.bufsize).size() as usize;
+    encode(answer, size)
 }
 
 /// A FORMERR for a packet whose header parses but whose body doesn't.

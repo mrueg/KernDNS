@@ -3,8 +3,10 @@
 //! Each module is a port of the plugin with the same name in CoreDNS
 //! v1.15.0 and keeps its Corefile syntax and output format.
 
+pub mod any;
 pub mod backend;
 pub mod bind;
+pub mod bufsize;
 pub mod cache;
 pub mod chaos;
 pub mod debug;
@@ -16,9 +18,12 @@ pub mod header;
 pub mod health;
 pub mod hosts;
 pub mod http;
+pub mod loadbalance;
 pub mod log;
 pub mod loopdetect;
 pub mod metrics;
+pub mod minimal;
+pub mod nsid;
 pub mod pluginmetrics;
 pub mod ready;
 pub mod reload;
@@ -60,5 +65,10 @@ pub fn registry() -> Registry {
     r.register(transfer::Setup);
     r.register(tsig::Setup);
     r.register(whoami::Setup);
+    r.register(any::Setup);
+    r.register(bufsize::Setup);
+    r.register(loadbalance::Setup);
+    r.register(minimal::Setup);
+    r.register(nsid::Setup);
     r
 }
