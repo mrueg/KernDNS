@@ -217,6 +217,15 @@ pub fn replace(format: &str, ctx: &Context, req: &Request, rec: &Recorder<'_>, r
 }
 
 fn value(key: &str, ctx: &Context, req: &Request, rec: &Recorder<'_>, rc: ResponseCode) -> Option<String> {
+    // `{/label}`: a metadata value (e.g. `{/kubernetes/namespace}`)
+    if let Some(label) = key.strip_prefix('/') {
+        return Some(
+            ctx.metadata
+                .get(label)
+                .cloned()
+                .unwrap_or_else(|| EMPTY_VALUE.to_string()),
+        );
+    }
     let v = match key {
         "type" => req.qtype().to_string(),
         "name" => req.name(),
@@ -339,6 +348,25 @@ mod tests {
         let expected = r#"10.0.0.1:4242 - 1 "A IN example.org. udp 29 false 512" NOERROR qr,aa,rd "#;
         assert!(line.starts_with(expected), "{line}");
         assert!(line.ends_with('s'));
+    }
+
+    /// replacer_test.go TestMetadataReplace: `{/label}` is a metadata value,
+    /// `-` when it isn't set.
+    #[test]
+    fn metadata_labels() {
+        let req = query("example.org.", RecordType::A, "10.0.0.1:4242");
+        let mut inner = CaptureWriter::new();
+        let rec = Recorder::new(&mut inner);
+        let mut ctx = Context::new(".", "dns://:53");
+        ctx.metadata.insert("kubernetes/namespace".into(), "ns".into());
+        let line = replace(
+            "{/kubernetes/namespace} {/kubernetes/kind} {name}",
+            &ctx,
+            &req,
+            &rec,
+            ResponseCode::NoError,
+        );
+        assert_eq!(line, "ns - example.org.");
     }
 
     #[test]
