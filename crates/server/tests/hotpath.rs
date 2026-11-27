@@ -27,6 +27,17 @@ async fn measure(label: &str, corefile: &str, q: &[u8]) {
 }
 
 async fn measure_with(label: &str, corefile: &str, q: &[u8], registry: &kerndns_core::Registry) {
+    measure_proto(label, corefile, q, registry, Protocol::Udp, 300_000).await
+}
+
+async fn measure_proto(
+    label: &str,
+    corefile: &str,
+    q: &[u8],
+    registry: &kerndns_core::Registry,
+    proto: Protocol,
+    default_n: usize,
+) {
     if std::env::var("HOTPATH_ONLY").is_ok_and(|o| o != label) {
         return;
     }
@@ -39,17 +50,13 @@ async fn measure_with(label: &str, corefile: &str, q: &[u8], registry: &kerndns_
     let n: usize = std::env::var("HOTPATH_N")
         .ok()
         .and_then(|n| n.parse().ok())
-        .unwrap_or(300_000);
+        .map_or(default_n, |n: usize| n * default_n / 300_000);
     for _ in 0..(n / 15).max(1) {
-        assert!(
-            !handle(&d, q, src, local, Protocol::Udp, Default::default())
-                .await
-                .is_empty()
-        );
+        assert!(!handle(&d, q, src, local, proto, Default::default()).await.is_empty());
     }
     let t = Instant::now();
     for _ in 0..n {
-        std::hint::black_box(handle(&d, q, src, local, Protocol::Udp, Default::default()).await);
+        std::hint::black_box(handle(&d, q, src, local, proto, Default::default()).await);
     }
     println!("{label:<24} {:>6.0} ns/query", t.elapsed().as_nanos() as f64 / n as f64);
 }
@@ -117,6 +124,34 @@ async fn hotpath() {
     )
     .await;
     measure("cache (hit) + whoami", ".:53 {\n cache\n whoami\n}", &whoami).await;
+    // the zone of bench/plugins/transfer/axfr.Corefile: 100 names, 136 records
+    let small = dir.join("zone100");
+    let mut z = String::from(
+        "$ORIGIN example.org.\n$TTL 3600\n@ IN SOA ns1 hostmaster 2024010101 7200 3600 1209600 300\n@ IN NS ns1\nns1 IN A 192.0.2.53\n*.wild IN A 192.0.2.99\n",
+    );
+    for i in 0..100 {
+        z.push_str(&format!("www{i} IN A 10.0.0.{i}\n"));
+        if i % 4 == 0 {
+            z.push_str(&format!("www{i} IN AAAA fd00::{i:x}\n"));
+        }
+        if i % 10 == 0 {
+            z.push_str(&format!("alias{i} IN CNAME www{i}\n"));
+        }
+    }
+    std::fs::write(&small, z).unwrap();
+    let axfr = packet("example.org.", RecordType::AXFR);
+    measure_proto(
+        "axfr 100 names (tcp)",
+        &format!(
+            "example.org:53 {{\n file {}\n transfer {{\n to *\n }}\n}}",
+            small.display()
+        ),
+        &axfr,
+        &kerndns_plugins::registry(),
+        Protocol::Tcp,
+        20_000,
+    )
+    .await;
     let _ = std::fs::remove_dir_all(&dir);
 }
 

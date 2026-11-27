@@ -9,9 +9,13 @@
 //! back to hickory for anything else: other record types, EDNS options,
 //! TSIG/SIG(0) or an extended RCODE without EDNS.
 
+use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
+
 use hickory_proto::ProtoError;
 use hickory_proto::op::{Message, MessageType};
 use hickory_proto::rr::{Name, RData, Record};
+use hickory_proto::serialize::binary::{BinEncodable, BinEncoder};
 
 /// Encode `m` for the wire.
 pub fn to_wire(m: &Message) -> Result<Vec<u8>, ProtoError> {
@@ -72,10 +76,38 @@ pub fn truncate_oversized(m: &mut Message, size: usize) {
     }
 }
 
+/// The label-sequence hashes are already well mixed: use them as is.
+#[derive(Default)]
+struct IdentityHasher(u64);
+
+impl Hasher for IdentityHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0 << 8) | u64::from(b);
+        }
+    }
+
+    fn write_u64(&mut self, v: u64) {
+        self.0 = v;
+    }
+}
+
+/// Above this many compression targets, look them up by hash instead of
+/// scanning the list (large answers and zone transfers).
+const INDEX_FROM: usize = 32;
+
 /// Names already written, as (hash of the label sequence, offset).
 struct Encoder {
     buf: Vec<u8>,
     names: Vec<(u64, u16)>,
+    /// The first offset of each hash in `names`, once there are many.
+    index: HashMap<u64, u16, BuildHasherDefault<IdentityHasher>>,
+    /// Bytes that compression saved so far.
+    saved: usize,
 }
 
 const MAX_POINTER: usize = 0x3FFF;
@@ -91,6 +123,53 @@ fn mix(h: u64, label: &[u8]) -> u64 {
 }
 
 impl Encoder {
+    fn new(cap: usize) -> Self {
+        Encoder {
+            buf: Vec::with_capacity(cap),
+            names: Vec::with_capacity(16),
+            index: HashMap::default(),
+            saved: 0,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.buf.clear();
+        self.names.clear();
+        self.index.clear();
+        self.saved = 0;
+    }
+
+    /// Remember `off` as a compression target for the labels hashing to `h`.
+    fn add_target(&mut self, h: u64, off: u16) {
+        self.names.push((h, off));
+        if self.names.len() > INDEX_FROM {
+            if self.index.is_empty() {
+                for &(h, off) in &self.names {
+                    self.index.entry(h).or_insert(off);
+                }
+            } else {
+                self.index.entry(h).or_insert(off);
+            }
+        }
+    }
+
+    /// The first earlier name that spells `labels` (hashing to `h`): the
+    /// same answer as scanning `names` in order.
+    fn find(&self, h: u64, labels: &[&[u8]]) -> Option<u16> {
+        if !self.index.is_empty() {
+            match self.index.get(&h) {
+                None => return None,
+                Some(&off) if self.matches_at(usize::from(off), labels) => return Some(off),
+                // a hash collision: fall back to the scan
+                Some(_) => {}
+            }
+        }
+        self.names
+            .iter()
+            .find(|&&(hh, off)| hh == h && self.matches_at(usize::from(off), labels))
+            .map(|&(_, off)| off)
+    }
+
     fn u16(&mut self, v: u16) {
         self.buf.extend_from_slice(&v.to_be_bytes());
     }
@@ -157,13 +236,11 @@ impl Encoder {
         let mut pointer = None;
         let mut write_upto = n;
         if compress {
-            'search: for i in 0..n {
-                for &(hh, off) in &self.names {
-                    if hh == hashes[i] && self.matches_at(usize::from(off), &labels[i..]) {
-                        pointer = Some(off);
-                        write_upto = i;
-                        break 'search;
-                    }
+            for i in 0..n {
+                if let Some(off) = self.find(hashes[i], &labels[i..]) {
+                    pointer = Some(off);
+                    write_upto = i;
+                    break;
                 }
             }
         }
@@ -171,13 +248,18 @@ impl Encoder {
             let off = self.buf.len();
             // uncompressed names (SRV targets) still serve as targets
             if off <= MAX_POINTER {
-                self.names.push((hashes[i], off as u16));
+                self.add_target(hashes[i], off as u16);
             }
             self.buf.push(l.len() as u8);
             self.buf.extend_from_slice(l);
         }
         match pointer {
-            Some(p) => self.u16(0xC000 | p),
+            Some(p) => {
+                // the pointer stands for these labels and the root label
+                let replaced = labels[write_upto..].iter().map(|l| l.len() + 1).sum::<usize>() + 1;
+                self.saved += replaced - 2;
+                self.u16(0xC000 | p)
+            }
             None => self.buf.push(0),
         }
         Some(())
@@ -257,10 +339,7 @@ fn fast(m: &Message) -> Option<Vec<u8>> {
         count(ar)?,
     );
 
-    let mut e = Encoder {
-        buf: Vec::with_capacity(512),
-        names: Vec::with_capacity(16),
-    };
+    let mut e = Encoder::new(512);
     e.u16(md.id);
     let mut b0 = if md.message_type == MessageType::Response {
         0x80
@@ -311,6 +390,62 @@ fn fast(m: &Message) -> Option<Vec<u8>> {
         e.u16(0);
     }
     Some(e.buf)
+}
+
+/// Sizes of single records, for splitting many records into messages
+/// (zone transfers) without encoding each one with hickory.
+pub struct RecordSizer {
+    e: Encoder,
+    scratch: Vec<u8>,
+}
+
+impl Default for RecordSizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RecordSizer {
+    pub fn new() -> Self {
+        RecordSizer {
+            e: Encoder::new(256),
+            scratch: Vec::with_capacity(256),
+        }
+    }
+
+    /// The length of `r` encoded on its own (what hickory's `Record::emit`
+    /// writes into an empty buffer, names compressed against earlier names
+    /// of the same record), and its length without any compression: an
+    /// upper bound on what it adds to any message.
+    pub fn measure(&mut self, r: &Record) -> (usize, usize) {
+        // no names in the rdata: nothing to compress
+        let fixed = match &r.data {
+            RData::A(_) => Some(4),
+            RData::AAAA(_) => Some(16),
+            _ => None,
+        };
+        if let Some(rdlen) = fixed {
+            let n = name_len(&r.name) + 10 + rdlen;
+            return (n, n);
+        }
+        self.e.clear();
+        if self.e.record(r).is_some() {
+            return (self.e.buf.len(), self.e.buf.len() + self.e.saved);
+        }
+        let mut emit = |canonical: bool| {
+            self.scratch.clear();
+            let mut enc = BinEncoder::new(&mut self.scratch);
+            enc.set_canonical_form(canonical);
+            let _ = r.emit(&mut enc);
+            self.scratch.len()
+        };
+        (emit(false), emit(true))
+    }
+}
+
+/// The length of `name` on the wire, uncompressed.
+pub fn name_len(name: &Name) -> usize {
+    name.iter().map(|l| l.len() + 1).sum::<usize>() + 1
 }
 
 #[cfg(test)]
@@ -423,6 +558,46 @@ mod tests {
         let mut m = base();
         m.metadata.response_code = ResponseCode::BADVERS;
         assert!(fast(&m).is_none());
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn record_sizes_match_hickory() {
+        let records = [
+            rr("www.Example.org.", RData::CNAME(CNAME(n("web.example.org.")))),
+            rr("alias0.example.org.", RData::CNAME(CNAME(n("www0.example.org.")))),
+            rr("web.example.org.", RData::A(A::new(192, 0, 2, 1))),
+            rr("web.example.org.", RData::AAAA(AAAA::from_str("2001:db8::1").unwrap())),
+            rr("example.org.", RData::MX(MX::new(10, n("mail.example.org.")))),
+            rr("example.org.", RData::MX(MX::new(10, n("example.org.")))),
+            rr("1.2.0.192.in-addr.arpa.", RData::PTR(PTR(n("web.example.org.")))),
+            rr(
+                "_dns._udp.example.org.",
+                RData::SRV(SRV::new(0, 100, 53, n("ns.example.org."))),
+            ),
+            rr("example.org.", RData::TXT(TXT::new(vec!["a b".into(), "".into()]))),
+            rr("example.org.", RData::NS(NS(n("ns.example.org.")))),
+            rr("example.org.", RData::NS(NS(n("ns.example.net.")))),
+            rr(
+                "example.org.",
+                RData::SOA(SOA::new(n("ns.example.org."), n("h.example.org."), 7, 60, -1, 3600, 5)),
+            ),
+            rr(
+                "example.org.",
+                RData::NULL(hickory_proto::rr::rdata::NULL::with(vec![1, 2])),
+            ),
+        ];
+        let mut sizer = RecordSizer::new();
+        for r in &records {
+            let emit = |canonical: bool| {
+                let mut buf = Vec::new();
+                let mut enc = BinEncoder::new(&mut buf);
+                enc.set_canonical_form(canonical);
+                r.emit(&mut enc).unwrap();
+                buf.len()
+            };
+            assert_eq!(sizer.measure(r), (emit(false), emit(true)), "{r}");
+        }
     }
 
     #[test]
