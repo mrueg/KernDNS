@@ -5,6 +5,7 @@
 
 pub mod acl;
 pub mod any;
+pub mod autopath;
 pub mod backend;
 pub mod bind;
 pub mod bufsize;
@@ -12,6 +13,7 @@ pub mod cache;
 pub mod cancel;
 pub mod chaos;
 pub mod debug;
+pub mod dns64;
 pub mod dynupdate;
 pub mod erratic;
 pub mod errors;
@@ -89,5 +91,7 @@ pub fn registry() -> Registry {
     r.register(metadata::Setup);
     r.register(timeouts::Setup);
     r.register(view::Setup);
+    r.register(autopath::Setup);
+    r.register(dns64::Setup);
     r
 }

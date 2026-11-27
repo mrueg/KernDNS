@@ -285,6 +285,34 @@ impl CacheBypass {
     }
 }
 
+/// The directives of a block that added a handler, filled in once every
+/// plugin of the block is set up. Plugins that look another plugin up by
+/// name at startup (`dnsserver.GetConfig(c).Handler(name)`) check here
+/// whether it is loaded at all.
+#[derive(Clone, Default)]
+pub struct BlockHandlers(Arc<std::sync::OnceLock<Vec<&'static str>>>);
+
+impl BlockHandlers {
+    /// The list of this block (created on first use).
+    pub fn of(cfg: &mut BlockConfig) -> BlockHandlers {
+        if cfg.extensions.get::<BlockHandlers>().is_none() {
+            cfg.extensions.insert(BlockHandlers::default());
+        }
+        cfg.extensions.get::<BlockHandlers>().cloned().expect("inserted above")
+    }
+
+    /// Record the block's handlers (the server does this after setup).
+    pub fn fill(cfg: &mut BlockConfig) {
+        let names = cfg.plugins.iter().map(|(n, _)| *n).collect();
+        let _ = BlockHandlers::of(cfg).0.set(names);
+    }
+
+    /// Whether the block has a handler for `name`.
+    pub fn contains(&self, name: &str) -> bool {
+        self.0.get().is_some_and(|v| v.contains(&name))
+    }
+}
+
 /// `dnsserver.FilterFunc`: whether a server block handles a request.
 pub trait RequestFilter: Send + Sync {
     fn filter(&self, ctx: &Context, req: &Request) -> bool;
