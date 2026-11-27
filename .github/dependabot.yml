@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # the workspace (crates/*, xtask) and the cargo-fuzz targets, which are
+  # outside the workspace with their own Cargo.lock
+  - package-ecosystem: cargo
+    directories:
+      - /
+      - /fuzz
+    schedule:
+      interval: weekly
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
