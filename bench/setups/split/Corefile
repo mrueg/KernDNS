@@ -1,0 +1,13 @@
+# about: split horizon: an internal view (full zone, 10k names) and a public one (100 names); queries from an internal client
+# queries: {FIX}/q-file.txt
+example.org:{PORT} {
+    view internal {
+        expr incidr(client_ip(), '127.0.0.1/32') || incidr(client_ip(), '10.0.0.0/8')
+    }
+    errors
+    file {FIX}/db.example.org
+}
+example.org:{PORT} {
+    errors
+    file {FIX}/db.100.example.org
+}

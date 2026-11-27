@@ -17,6 +17,8 @@
 //!                                    or grpc run `cargo xtask loadgen`)
 //! # needs: kubernetes               (start the fake Kubernetes API server)
 //! # live-queries: {DIR}/q-live.txt  (dnsperf input with --kubeconfig)
+//! # needs: etcd                     (start a throwaway etcd with SkyDNS records)
+//! # bridge: etcd                    (KernDNS runs these plugins in Go, -bridge)
 //! ```
 //!
 //! Placeholders: `{PORT}` (the server's port), `{DIR}` (the case's
@@ -25,9 +27,10 @@
 //! `{BACKEND_DOT}` and `{BACKEND_GRPC}` (a shared upstream, CoreDNS serving
 //! the 10k zone over UDP/TCP, DoT and gRPC, with transfers allowed),
 //! `{DNSTAP}` (a unix socket where the harness accepts dnstap Frame
-//! Streams and counts the messages) and `{KUBECONFIG}` (the fake API
+//! Streams and counts the messages), `{KUBECONFIG}` (the fake API
 //! server, 1000 Services; with `--kubeconfig PATH`, that file instead, for
-//! a live cluster). `bench/plugins/EXEMPT` lists plugins without a
+//! a live cluster) and `{ETCD}` (the etcd client port; its queries are
+//! `{FIX}/q-etcd.txt`). `bench/plugins/EXEMPT` lists plugins without a
 //! scenario and why; `--check` fails for any other plugin in KernDNS's
 //! registry that has none.
 //!
@@ -101,6 +104,9 @@ struct Case {
     live_queries: Option<String>,
     dnsperf: Vec<String>,
     needs_k8s: bool,
+    needs_etcd: bool,
+    /// Plugins KernDNS runs in Go through the bridge.
+    bridge: Vec<String>,
     corefile: String,
 }
 
@@ -114,6 +120,7 @@ const PLACEHOLDERS: &[&str] = &[
     "BACKEND_GRPC",
     "DNSTAP",
     "KUBECONFIG",
+    "ETCD",
 ];
 
 fn parse_case(level: u8, group: &str, dir: &Path, path: &Path) -> Result<Case> {
@@ -134,6 +141,8 @@ fn parse_case(level: u8, group: &str, dir: &Path, path: &Path) -> Result<Case> {
         live_queries: None,
         dnsperf: Vec::new(),
         needs_k8s: false,
+        needs_etcd: false,
+        bridge: Vec::new(),
         corefile: text.clone(),
     };
     for line in text.lines() {
@@ -147,8 +156,10 @@ fn parse_case(level: u8, group: &str, dir: &Path, path: &Path) -> Result<Case> {
             "queries" => case.queries = value.to_string(),
             "live-queries" => case.live_queries = Some(value.to_string()),
             "dnsperf" => case.dnsperf = value.split_whitespace().map(String::from).collect(),
+            "bridge" => case.bridge = split_list(value),
             "needs" => match value {
                 "kubernetes" => case.needs_k8s = true,
+                "etcd" => case.needs_etcd = true,
                 other => bail!("{}: unknown need {other:?}", path.display()),
             },
             other => bail!("{}: unknown header {other:?}", path.display()),
@@ -317,7 +328,14 @@ fn check(bench: &Path) -> Result<()> {
                     .flat_map(|b| b.directives.iter().map(|d| d.name.as_str()))
                     .collect();
                 for u in &used {
-                    if !registered.contains(*u) {
+                    if c.bridge.iter().any(|b| b == u) {
+                        if !bridge_plugins().contains(u) {
+                            problems.push(format!(
+                                "{rel}: plugin {u} is not in the bridge the benchmarks build ({})",
+                                crate::DEFAULT_BRIDGE_PLUGINS
+                            ));
+                        }
+                    } else if !registered.contains(*u) {
                         problems.push(format!("{rel}: plugin {u} is not registered"));
                     }
                 }
@@ -525,11 +543,12 @@ fn wait_up(port: u16, child: &mut Child, probe: Probe) -> Result<()> {
     bail!("server did not start on port {port}")
 }
 
-fn start(bin: &Path, corefile: &Path, port: u16, cpus: &str, probe: Probe) -> Result<Proc> {
+fn start(bin: &Path, args: &[String], corefile: &Path, port: u16, cpus: &str, probe: Probe) -> Result<Proc> {
     let log = corefile.with_extension("log");
     let mut child = Command::new("taskset")
         .args(["-c", cpus])
         .arg(bin)
+        .args(args)
         .arg("-conf")
         .arg(corefile)
         .arg("-quiet")
@@ -677,6 +696,7 @@ struct Result1 {
 fn measure(
     cpus: &Cpus,
     bin: &Path,
+    args: &[String],
     corefile: &Path,
     port: u16,
     case: &Case,
@@ -684,7 +704,7 @@ fn measure(
     secs: u32,
     rate: Option<u32>,
 ) -> Result<(Result1, u32)> {
-    let p = start(bin, corefile, port, &cpus.server, Probe::for_args(&case.dnsperf))?;
+    let p = start(bin, args, corefile, port, &cpus.server, Probe::for_args(&case.dnsperf))?;
     let pid = p.0.id();
     dnsperf(cpus, port, q, 2, None, &case.dnsperf)?; // warm up (fills caches)
     let (cpu0, _) = proc_usage(pid);
@@ -870,7 +890,23 @@ pub fn run(args: &[String]) -> Result<()> {
             tls = tls.display()
         ),
     )?;
-    let _backend = start(&coredns, &backend_cf, backend_port, &cpus.backend, Probe::Udp)?;
+    let _backend = start(&coredns, &[], &backend_cf, backend_port, &cpus.backend, Probe::Udp)?;
+
+    // the Go bridge, for setups where KernDNS runs some plugins in Go
+    let bridge_args = if cases.iter().any(|c| !c.bridge.is_empty()) {
+        let lib = crate::build_bridge(&root, crate::DEFAULT_BRIDGE_PLUGINS, None)?;
+        vec!["-bridge".to_string(), lib.display().to_string()]
+    } else {
+        Vec::new()
+    };
+
+    // etcd with SkyDNS records, for the etcd plugin
+    let etcd_port = free_port()?;
+    let _etcd = if cases.iter().any(|c| c.needs_etcd) {
+        Some(start_etcd(&work, etcd_port, &cpus.backend, &fix)?)
+    } else {
+        None
+    };
 
     // the fake Kubernetes API server for kubernetes and k8s_external
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -917,6 +953,7 @@ pub fn run(args: &[String]) -> Result<()> {
     vars.insert("BACKEND_GRPC", backend_grpc.to_string());
     vars.insert("DNSTAP", dnstap_sock.display().to_string());
     vars.insert("KUBECONFIG", kubeconfig.display().to_string());
+    vars.insert("ETCD", etcd_port.to_string());
 
     let servers = [("CoreDNS", &coredns), ("KernDNS", &kerndns)];
     let mut results: Vec<(Case, [Option<Result1>; 2], u32)> = Vec::new();
@@ -942,8 +979,13 @@ pub fn run(args: &[String]) -> Result<()> {
             let mut runs_done = Vec::new();
             let mut err = None;
             let frames0 = dnstap_frames.load(std::sync::atomic::Ordering::Relaxed);
+            let args: &[String] = if *label == "KernDNS" && !case.bridge.is_empty() {
+                &bridge_args
+            } else {
+                &[]
+            };
             for _ in 0..runs {
-                match measure(&cpus, bin, &cf, port, case, &q, secs, rate) {
+                match measure(&cpus, bin, args, &cf, port, case, &q, secs, rate) {
                     Ok((r, used)) => {
                         rate = Some(used);
                         runs_done.push(r);
@@ -1007,6 +1049,117 @@ pub fn run(args: &[String]) -> Result<()> {
         bail!("failed: {}", failed.join(", "));
     }
     Ok(())
+}
+
+/// The plugins in the bridge the benchmarks build.
+fn bridge_plugins() -> Vec<&'static str> {
+    crate::DEFAULT_BRIDGE_PLUGINS.split(',').collect()
+}
+
+/// SkyDNS services in etcd: (key, value) pairs and queries for them.
+/// Every other service has two instances, every fifth an IPv6 address.
+fn etcd_records(n: u32) -> Result<(Vec<(String, String)>, String)> {
+    let mut kv = Vec::new();
+    for i in 0..n {
+        let key = format!("/skydns/local/skydns/svc{i}");
+        let host = |j: u32| {
+            if i % 5 == 0 {
+                format!("fd00::{j}:{i:x}")
+            } else {
+                format!("10.{j}.{}.{}", i >> 8, i & 255)
+            }
+        };
+        let val = |j: u32| format!(r#"{{"host":"{}","port":8080,"ttl":60}}"#, host(j));
+        if i % 2 == 0 {
+            kv.push((format!("{key}/a"), val(1)));
+            kv.push((format!("{key}/b"), val(2)));
+        } else {
+            kv.push((key, val(1)));
+        }
+    }
+    // services (A, AAAA, SRV), names not in etcd, and names forwarded
+    let mut q = String::new();
+    for i in 0..2000 {
+        let k = (i * 7) % n;
+        match i % 8 {
+            0..=2 => writeln!(q, "svc{k}.skydns.local A")?,
+            3 => writeln!(q, "svc{}.skydns.local AAAA", k / 5 * 5)?,
+            4 => writeln!(q, "svc{k}.skydns.local SRV")?,
+            5 => writeln!(q, "nx{k}.skydns.local A")?,
+            _ => writeln!(q, "www{k}.example.org A")?,
+        }
+    }
+    Ok((kv, q))
+}
+
+fn base64(b: &[u8]) -> String {
+    const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::new();
+    for c in b.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            if i <= c.len() {
+                s.push(A[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                s.push('=');
+            }
+        }
+    }
+    s
+}
+
+/// A throwaway etcd on `port` filled with [`etcd_records`] (through its
+/// JSON gateway); writes the queries to `{FIX}/q-etcd.txt`.
+fn start_etcd(work: &Path, port: u16, cpus: &str, fix: &Path) -> Result<Proc> {
+    use std::io::{Read, Write};
+    let data = work.join("etcd-data");
+    let _ = fs::remove_dir_all(&data);
+    let url = format!("http://127.0.0.1:{port}");
+    let child = Command::new("taskset")
+        .args(["-c", cpus, "etcd", "--data-dir"])
+        .arg(&data)
+        .args(["--listen-client-urls", &url, "--advertise-client-urls", &url])
+        .args(["--listen-peer-urls", &format!("http://127.0.0.1:{}", free_port()?)])
+        .stdout(Stdio::null())
+        .stderr(fs::File::create(work.join("etcd.log"))?)
+        .spawn()
+        .context("starting etcd (is it installed?)")?;
+    let etcd = Proc(child);
+    let (kv, queries) = etcd_records(500)?;
+    let put = |k: &str, v: &str| -> Result<bool> {
+        let body = format!(
+            r#"{{"key":"{}","value":"{}"}}"#,
+            base64(k.as_bytes()),
+            base64(v.as_bytes())
+        );
+        let mut s = std::net::TcpStream::connect(("127.0.0.1", port))?;
+        write!(
+            s,
+            "POST /v3/kv/put HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )?;
+        let mut resp = String::new();
+        s.read_to_string(&mut resp)?;
+        Ok(resp.starts_with("HTTP/1.1 200"))
+    };
+    let deadline = Instant::now() + Duration::from_secs(30);
+    // the first put also waits until etcd is up and has a leader
+    while !put(&kv[0].0, &kv[0].1).unwrap_or(false) {
+        if Instant::now() > deadline {
+            bail!(
+                "etcd did not start on port {port} (see {})",
+                work.join("etcd.log").display()
+            );
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    for (k, v) in &kv[1..] {
+        if !put(k, v)? {
+            bail!("etcd: writing {k} failed");
+        }
+    }
+    fs::write(fix.join("q-etcd.txt"), queries)?;
+    Ok(etcd)
 }
 
 fn kubeconfig_for(addr: &str) -> String {

@@ -1,0 +1,10 @@
+# about: DNS-over-TLS frontend: cache, then forward to a plain DNS server behind it; dnsperf keeps its connections open
+# queries: {FIX}/q-file.txt
+# dnsperf: -m dot
+tls://.:{PORT} {
+    tls {BENCH}/shared/tls/cert.pem {BENCH}/shared/tls/key.pem
+    errors
+    prometheus 127.0.0.1:0
+    cache 30
+    forward . 127.0.0.1:{BACKEND}
+}

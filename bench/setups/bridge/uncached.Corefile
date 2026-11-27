@@ -1,0 +1,14 @@
+# about: the bridge setup without cache: every etcd query crosses into Go (in KernDNS) and reads etcd
+# queries: {FIX}/q-etcd.txt
+# needs: etcd
+# bridge: etcd
+.:{PORT} {
+    errors
+    prometheus 127.0.0.1:0
+    etcd skydns.local {
+        path /skydns
+        endpoint http://127.0.0.1:{ETCD}
+    }
+    loadbalance
+    forward . 127.0.0.1:{BACKEND}
+}

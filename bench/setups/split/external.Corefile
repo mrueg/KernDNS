@@ -1,0 +1,14 @@
+# about: split horizon, queries from an external client (127.0.0.2): the internal view rejects them, the public zone answers
+# queries: {FIX}/q-file.txt
+# dnsperf: -a 127.0.0.2
+example.org:{PORT} {
+    view internal {
+        expr incidr(client_ip(), '127.0.0.1/32') || incidr(client_ip(), '10.0.0.0/8')
+    }
+    errors
+    file {FIX}/db.example.org
+}
+example.org:{PORT} {
+    errors
+    file {FIX}/db.100.example.org
+}

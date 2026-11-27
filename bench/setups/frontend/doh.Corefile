@@ -1,0 +1,14 @@
+# about: DNS-over-HTTPS frontend (HTTP/2): cache, then forward to a plain DNS server behind it
+# queries: {FIX}/q-file.txt
+# dnsperf: -m doh
+https://.:{PORT} {
+    tls {BENCH}/shared/tls/cert.pem {BENCH}/shared/tls/key.pem
+    https {
+        max_connections 1000
+        max_streams 256
+    }
+    errors
+    prometheus 127.0.0.1:0
+    cache 30
+    forward . 127.0.0.1:{BACKEND}
+}

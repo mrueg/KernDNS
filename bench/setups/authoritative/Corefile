@@ -1,0 +1,24 @@
+# about: authoritative server: two zones (10k names, and a small hand-written one) sharing a snippet, transfers to secondaries, other zones refused
+# queries: {DIR}/queries.txt
+(authoritative) {
+    errors
+    log . {
+        class error
+    }
+    prometheus 127.0.0.1:0
+    any
+}
+example.org:{PORT} {
+    import authoritative
+    file {FIX}/db.example.org
+    transfer {
+        to 192.0.2.53 198.51.100.53
+    }
+}
+example.net:{PORT} {
+    import authoritative
+    file {DIR}/db.example.net
+    transfer {
+        to 192.0.2.53 198.51.100.53
+    }
+}
