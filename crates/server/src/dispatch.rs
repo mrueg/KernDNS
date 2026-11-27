@@ -161,7 +161,7 @@ impl Upstream for SelfUpstream {
         let mut name = name.clone();
         name.set_fqdn(true);
         r.msg.queries = vec![Query::query(name, qtype)];
-        let msgs = inner.serve(&r, ctx.loop_count).await.into_msgs(&r);
+        let msgs = inner.serve(&r, Some(ctx)).await.into_msgs(&r);
         Ok(msgs.into_iter().last())
     }
 }
@@ -185,12 +185,12 @@ impl Dispatcher {
 
     /// Serve one request and return the messages to send.
     pub async fn serve(&self, req: &Request) -> Vec<Message> {
-        self.0.serve(req, 0).await.into_msgs(req)
+        self.0.serve(req, None).await.into_msgs(req)
     }
 
     /// Serve one request; the answer may come with a signer (TSIG).
     pub async fn answer(&self, req: &Request) -> Answer {
-        self.0.serve(req, 0).await
+        self.0.serve(req, None).await
     }
 
     /// The listener's label, e.g. `dns://:53` (the `server` metrics label).
@@ -215,9 +215,10 @@ impl DispatcherHandle {
 }
 
 impl Inner {
-    /// Serve one request and return the messages to send. `loop_count`
-    /// is non-zero for internal lookups made through `upstream`.
-    async fn serve(&self, req: &Request, loop_count: u8) -> Answer {
+    /// Serve one request and return the messages to send. `parent` is the
+    /// context that made an internal lookup through `upstream`: its loop
+    /// count and synthesis flag carry over.
+    async fn serve(&self, req: &Request, parent: Option<&Context>) -> Answer {
         let start = std::time::Instant::now();
         let op = req.msg.metadata.op_code;
         let update = op == OpCode::Update;
@@ -259,7 +260,7 @@ impl Inner {
                     if h.chain.is_none() {
                         return vec![self.dropped(req, ResponseCode::Refused, start)].into();
                     }
-                    let Some(ctx) = self.accept(h, req, loop_count) else {
+                    let Some(ctx) = self.accept(h, req, parent) else {
                         continue;
                     };
                     if update && !h.allow_update {
@@ -284,7 +285,7 @@ impl Inner {
             if h.chain.is_none() {
                 continue;
             }
-            let Some(ctx) = self.accept(h, req, loop_count) else {
+            let Some(ctx) = self.accept(h, req, parent) else {
                 continue;
             };
             if update && !h.allow_update {
@@ -297,10 +298,13 @@ impl Inner {
 
     /// The request context for `h` if the block takes the request: its
     /// metadata is collected first, then its filters run, like CoreDNS.
-    fn accept(&self, h: &ZoneHandler, req: &Request, loop_count: u8) -> Option<Context> {
+    fn accept(&self, h: &ZoneHandler, req: &Request, parent: Option<&Context>) -> Option<Context> {
         let mut ctx = Context::new(h.zone.clone(), self.label.clone());
         ctx.upstream = Some(self.upstream.clone());
-        ctx.loop_count = loop_count;
+        if let Some(p) = parent {
+            ctx.loop_count = p.loop_count;
+            ctx.synthesis = p.synthesis;
+        }
         if let Some(m) = &h.metadata {
             m.collect(&mut ctx, req);
         }

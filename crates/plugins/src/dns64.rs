@@ -53,7 +53,7 @@ impl std::fmt::Display for Prefix {
 
 /// `net.ParseCIDR`: the masked network and the address length in bits, with
 /// Go's error message.
-fn parse_cidr(s: &str) -> Result<(IpAddr, u8, u8), String> {
+pub(crate) fn parse_cidr(s: &str) -> Result<(IpAddr, u8, u8), String> {
     let err = || format!("invalid CIDR address: {s}");
     let (addr, mask) = s.split_once('/').ok_or_else(err)?;
     let ip: IpAddr = addr.parse().map_err(|_| err())?;
@@ -100,6 +100,16 @@ impl Default for Dns64 {
 }
 
 impl Dns64 {
+    /// A handler with the default prefix in front of `next`.
+    #[cfg(test)]
+    pub(crate) fn with_next(next: Next, allow_ipv4: bool) -> Self {
+        Dns64 {
+            next,
+            allow_ipv4,
+            ..Default::default()
+        }
+    }
+
     /// `requestShouldIntercept`: an AAAA query of class IN, over IPv6
     /// unless `allow_ipv4` is set.
     fn request_should_intercept(&self, req: &Request) -> bool {

@@ -72,6 +72,10 @@ pub struct Context {
     /// How many times this request has been re-resolved internally (CNAME
     /// chasing through `upstream`); see [`crate::upstream::MAX_LOOP`].
     pub loop_count: u8,
+    /// Set on the internal lookups a translation plugin (`siit`) makes
+    /// while synthesizing an answer, and inherited by every lookup made
+    /// under them, so translation plugins don't re-enter each other.
+    pub synthesis: bool,
     /// Signs every encoded response (set by `tsig`).
     pub signer: Option<Arc<dyn ResponseSigner>>,
     /// The normalized name of the TSIG key that `tsig` validated for this
@@ -112,6 +116,7 @@ impl Context {
             start: Instant::now(),
             upstream: None,
             loop_count: 0,
+            synthesis: false,
             signer: None,
             tsig_key: None,
             on_sent: Vec::new(),

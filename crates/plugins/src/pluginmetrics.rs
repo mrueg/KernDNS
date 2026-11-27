@@ -280,3 +280,13 @@ pub static DNS64_REQUESTS_TRANSLATED: LazyLock<CounterVec> = LazyLock::new(|| {
         &["server"],
     )
 });
+
+// siit
+pub static SIIT_REQUESTS_TRANSLATED: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "siit",
+        "requests_translated_total",
+        "Counter of DNS requests translated by siit.",
+        &["server"],
+    )
+});

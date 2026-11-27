@@ -49,6 +49,7 @@ pub mod rewrite;
 pub mod root;
 pub mod secondary;
 pub mod sign;
+pub mod siit;
 pub mod template;
 pub mod timeouts;
 pub mod tls;
@@ -114,5 +115,6 @@ pub fn registry() -> Registry {
     r.register(quic::Setup);
     r.register(dnssec::Setup);
     r.register(sign::Setup);
+    r.register(siit::Setup);
     r
 }
