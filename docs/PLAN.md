@@ -199,8 +199,8 @@ reloads like the plain DNS ones:
 | 1: minimal server | `file`, `health`, `ready`, `prometheus`, `forward`, `cache`, `hosts`, `reload`, `loop`, `chaos` (done) |
 | 2: Kubernetes | `kubernetes`, `k8s_external` (done) |
 | 3: authoritative | `file`, `auto`, `secondary`, `transfer`, `any`, `minimal`, `loadbalance`, `local`, `tsig` (done) |
-| 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `autopath`, `nsid`, `tls` |
-| 5: DNSSEC and the rest | `dnssec`, `sign`, `alternate`, and the remaining in-tree plugins as needed |
+| 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `autopath`, `nsid`, `tls` (done) |
+| 5: DNSSEC and the rest | `dnssec`, `sign`, `siit`, `shed`, `proxyproto`, `on`, `pprof`, `geoip`, `trace`, `dnstap`, `grpc` |
 
 Through the Go bridge until someone needs a port: `etcd`, `route53`,
 `clouddns`, `azure`, third-party plugins.
@@ -359,8 +359,24 @@ dedicated machine, with a published report.
 | **M1** (done) | Wave 1 plugins, `reload`, `/metrics` | All relevant `test/` tests pass or are classified with a plugin reason; difftest in CI; bench harness with level 1/2 for wave 1 |
 | **M2** (done) | `kubernetes` + `k8s_external` | Ported unit tables, `coredns/ci` kind tests and Go difftest all pass; scale benchmarks published, with memory at or below CoreDNS |
 | **M3** (done) | Go bridge MVP | Go `etcd` inside a Rust chain; bridge micro-benchmarks; affinity groups enforced |
-| **M4** | Waves 3–4, DoT/DoH/DoQ/gRPC | Compat pass rate goes up; every plugin has a level 2 scenario (enforced by `bench --check` since the level 2 harness landed) |
+| **M4** (done) | Waves 3–4, DoT/DoH/DoQ/gRPC | Compat pass rate goes up; every plugin has a level 2 scenario (enforced by `bench --check` since the level 2 harness landed) |
 | **M5** | Wave 5, optional out-of-process bridge, packaging | Nightly level 3 report; drop-in image replacing CoreDNS in kubeadm |
+
+### M4 status
+
+Done: waves 3 and 4, `erratic`, `multisocket`, and DoQ, DoH3 and gRPC
+listeners with the `https`, `https3`, `quic` and `grpc_server` limits.
+CoreDNS's integration tests went from 56 to 89 passing; the 4 still
+failing need wave 5 plugins (`dnssec`, `siit`, `shed`) or ACME. Every
+plugin has a level 2 benchmark scenario or a stated exemption, checked
+by `cargo xtask bench --check` in CI.
+
+Found while doing it: KernDNS refused to share a port that another
+server still held, while CoreDNS sets `SO_REUSEPORT` on every listener
+(now matched); `rewrite edns0` options are echoed the way CoreDNS's
+in-place request mutation does it (and so is `revert`). Open from the
+level 2 results: cache misses under constant eviction, AXFR CPU, and
+peak memory of a 100k-name zone are behind CoreDNS (in progress).
 
 ## Risks
 
