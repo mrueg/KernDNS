@@ -9,7 +9,7 @@
 //! }
 //! ```
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr, SocketAddrV6};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -45,7 +45,10 @@ impl Xfr {
         self.to.iter().any(|t| {
             t == "*"
                 || t.parse::<SocketAddr>()
-                    .is_ok_and(|sa| sa.ip().to_canonical() == ip.to_canonical())
+                    .ok()
+                    .map(|sa| sa.ip())
+                    .or_else(|| split_zone(t).map(|z| IpAddr::V6(z.0)))
+                    .is_some_and(|a| a.to_canonical() == ip.to_canonical())
         })
     }
 }
@@ -67,10 +70,15 @@ fn longest_match<'a>(xfrs: &'a [Xfr], name: &str) -> Option<&'a Xfr> {
     best.map(|(_, x)| x)
 }
 
-/// `ip`, `ip:port`, `[v6]:port` → `ip:port` (port 53 by default).
+/// `ip`, `ip:port`, `[v6]:port` → `ip:port` (port 53 by default). An IPv6
+/// address may carry a zone (`[fe80::1%eth0]:53`), which is kept, like
+/// `parse.HostPort`.
 fn host_port(s: &str) -> Result<String, String> {
     if let Ok(sa) = s.parse::<SocketAddr>() {
         return Ok(sa.to_string());
+    }
+    if let Some((ip, zone, port)) = split_zone(s) {
+        return Ok(format!("[{ip}%{zone}]:{}", port.unwrap_or(53)));
     }
     let ip: IpAddr = s
         .trim_start_matches('[')
@@ -78,6 +86,44 @@ fn host_port(s: &str) -> Result<String, String> {
         .parse()
         .map_err(|_| format!("not an IP address: {s:?}"))?;
     Ok(SocketAddr::new(ip, 53).to_string())
+}
+
+/// An IPv6 address with a zone: `fe80::1%eth0`, `[fe80::1%eth0]` or
+/// `[fe80::1%eth0]:53`.
+fn split_zone(s: &str) -> Option<(Ipv6Addr, &str, Option<u16>)> {
+    let (host, port) = match s.strip_prefix('[') {
+        Some(rest) => {
+            let (host, after) = rest.split_once(']')?;
+            let port = match after {
+                "" => None,
+                p => Some(p.strip_prefix(':')?.parse().ok()?),
+            };
+            (host, port)
+        }
+        None => (s, None),
+    };
+    let (ip, zone) = host.split_once('%')?;
+    if zone.is_empty() {
+        return None;
+    }
+    Some((ip.parse().ok()?, zone, port))
+}
+
+/// A `to` address as a socket address; a zone becomes the scope id (a
+/// number, or an interface's index).
+fn to_socket_addr(s: &str) -> Option<SocketAddr> {
+    if let Ok(sa) = s.parse::<SocketAddr>() {
+        return Some(sa);
+    }
+    let (ip, zone, port) = split_zone(s)?;
+    let scope = zone.parse::<u32>().ok().or_else(|| {
+        std::fs::read_to_string(format!("/sys/class/net/{zone}/ifindex"))
+            .ok()?
+            .trim()
+            .parse()
+            .ok()
+    })?;
+    Some(SocketAddr::V6(SocketAddrV6::new(ip, port.unwrap_or(53), 0, scope)))
 }
 
 pub struct Setup;
@@ -180,7 +226,7 @@ async fn send_notify(zone: &str, to: &str, source: Option<IpAddr>) -> Result<(),
         RecordType::SOA,
     ));
     let wire = m.to_vec().map_err(|e| e.to_string())?;
-    let dst: SocketAddr = to.parse().map_err(|e| format!("{to}: {e}"))?;
+    let dst = to_socket_addr(to).ok_or_else(|| format!("{to}: invalid socket address"))?;
     let bind = match (source, dst) {
         (Some(ip), _) => SocketAddr::new(ip, 0),
         (None, SocketAddr::V4(_)) => "0.0.0.0:0".parse().unwrap(),
@@ -385,6 +431,34 @@ mod tests {
         assert!(setup_err(&Setup, "transfer").contains("'to' is required"));
         assert!(setup_err(&Setup, "transfer {\n to example.org\n}").contains("not an IP address"));
         assert!(setup_err(&Setup, "transfer {\n to *\n bogus\n}").contains("unknown property"));
+    }
+
+    /// An IPv6 zone is accepted and kept, like parse.HostPort (CoreDNS's
+    /// transfer TestParse).
+    #[test]
+    fn zone_identifier() {
+        assert!(setup_ok(&Setup, "transfer {\n to [fe80::1%eth0]:53 fe80::2%3\n}"));
+        assert_eq!(host_port("[fe80::1%eth0]:53").unwrap(), "[fe80::1%eth0]:53");
+        assert_eq!(host_port("fe80::2%3").unwrap(), "[fe80::2%3]:53");
+        let sa = to_socket_addr("[fe80::2%3]:5300").unwrap();
+        assert_eq!(
+            sa,
+            "[fe80::2]:5300"
+                .parse::<SocketAddr>()
+                .map(|s| match s {
+                    SocketAddr::V6(v) => SocketAddr::V6(SocketAddrV6::new(*v.ip(), 5300, 0, 3)),
+                    v4 => v4,
+                })
+                .unwrap()
+        );
+        let x = Xfr {
+            zones: vec![".".into()],
+            to: vec![host_port("[fe80::1%eth0]:53").unwrap()],
+            source: None,
+        };
+        assert!(x.allowed("fe80::1".parse().unwrap()));
+        assert!(!x.allowed("fe80::2".parse().unwrap()));
+        assert!(setup_err(&Setup, "transfer {\n to [fe80::1%]:53\n}").contains("not an IP address"));
     }
 
     #[test]
