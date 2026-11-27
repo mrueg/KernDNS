@@ -1,0 +1,11 @@
+# about: DNS over HTTPS listener (HTTP/2) with connection and stream limits + whoami
+# queries: {FIX}/q-example.txt
+# dnsperf: -m doh
+https://.:{PORT} {
+    tls {BENCH}/shared/tls/cert.pem {BENCH}/shared/tls/key.pem
+    https {
+        max_connections 1000
+        max_streams 256
+    }
+    whoami
+}

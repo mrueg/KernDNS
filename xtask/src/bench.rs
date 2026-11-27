@@ -615,7 +615,10 @@ fn measure(
     secs: u32,
     rate: Option<u32>,
 ) -> Result<(Result1, u32)> {
-    let tcp_only = case.dnsperf.windows(2).any(|w| w[0] == "-m" && w[1] == "dot");
+    let tcp_only = case
+        .dnsperf
+        .windows(2)
+        .any(|w| w[0] == "-m" && matches!(w[1].as_str(), "dot" | "doh"));
     let p = start(bin, corefile, port, &cpus.server, tcp_only)?;
     let pid = p.0.id();
     dnsperf(cpus, port, q, 2, None, &case.dnsperf)?; // warm up (fills caches)
