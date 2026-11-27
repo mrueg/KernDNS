@@ -9,7 +9,7 @@ KernDNS aims to:
 1. **Run a Rust port of CoreDNS and selected plugins.** The same Corefile
    gives the same answers.
 2. **Load CoreDNS Go plugins** when no Rust port exists yet, through a Go
-   bridge library (planned, see [docs/PLAN.md](docs/PLAN.md)).
+   bridge library (see [docs/PLAN.md](docs/PLAN.md)).
 3. **Prove it**: CoreDNS's own integration tests run against KernDNS, and
    benchmarks compare the two plugin by plugin.
 
@@ -36,7 +36,19 @@ name says what the project is: a hickory core inside a CoreDNS-shaped trunk.
 
 ## Status
 
-Milestones **M0**, **M1** and **M2** are done.
+Milestones **M0** to **M4** are done; **M5** is mostly done (see
+[docs/PLAN.md](docs/PLAN.md) for the plan and each milestone's status).
+
+| Milestone | What it delivered |
+|---|---|
+| **M0** | Workspace, Corefile parser, core traits, the server on hickory-proto, first plugins; CoreDNS's integration tests run against `kerndns` with every result classified |
+| **M1** | The minimal server (`file`, `forward`, `cache`, `hosts`, `health`, `ready`, `prometheus`, `reload`, `loop`, `chaos`, ...), `/metrics` with CoreDNS's names, the differential test and the benchmark harness |
+| **M2** | `kubernetes` and `k8s_external`; since then at parity with CoreDNS 1.15.0, including zone transfers, `multicluster` and `zonal` |
+| **M3** | The Go bridge: CoreDNS plugins without a Rust port run in Go inside the Rust chain |
+| **M4** | Authoritative and policy plugins, DoT, DoH, DoH3, DoQ and gRPC listeners, a level 2 benchmark for every plugin |
+| **M5** | DNSSEC and the remaining plugins (every plugin in CoreDNS's `plugin.cfg` except the cloud backends `route53`, `clouddns`, `azure` and `nomad`, which run through the bridge), `etcd` in Rust, ACME certificates, a drop-in container image (`ghcr.io/mrueg/kerndns`), CoreDNS's end-to-end Kubernetes tests in CI, level 3 benchmarks of common setups, fuzzing. Open: a nightly level 3 report on a dedicated machine, and the optional out-of-process bridge |
+
+In detail:
 
 | Part | State |
 |---|---|
@@ -48,6 +60,9 @@ Milestones **M0**, **M1** and **M2** are done.
 | CoreDNS integration tests against KernDNS | 108 pass, 2 expected failures, 12 skipped (Go internals, checks of the Go source, a shared in-process metrics registry), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 120 of 122 (`TestDynUpdateKeaLifecycle` skips without Kea; `TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself; `TestEtcdStubAndProxyLookup` expects an outdated address for example.com) |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
 | Differential test of `etcd` against CoreDNS (one throwaway etcd: 500 services plus the unit tests' records, leases, weights, out-of-zone targets, broken JSON; 2 Corefiles, 32k queries) | no differences |
+| CoreDNS's plugin table tests: 51 plugins' test tables extracted from the Go source (`cargo xtask plugin-cases`) and replayed through KernDNS | 1,197 of 1,962 rows pass, 73 expected failures (features not ported yet), the rest skipped with a reason; see [docs/plugin-cases.md](docs/plugin-cases.md) |
+| CoreDNS's end-to-end Kubernetes tests ([coredns/ci](https://github.com/coredns/ci) `test/kubernetes`) with the KernDNS image as a kind cluster's DNS (CI job `kind`, with CoreDNS's own image as a control) | all 13 that exercise the cluster DNS pass; 2 skipped (one depends on the CI runner's resolv.conf and fails for CoreDNS too, one tests an in-process Go CoreDNS), see [expectations](go/compat/expectations-kind.txt) |
+| Fuzzing (`fuzz/`: Corefile setup, the request path, the Go bridge's messages; CI runs each target for a minute) | done; the crashes found are fixed with regression tests |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin and level 3 common setups, see below |
 | `kubernetes` + `k8s_external` | every option of CoreDNS 1.15.0 incl. `multicluster`, `zonal`, `apiserver_*` limits, zone transfers, `kubernetes/*` metadata and `coredns_kubernetes_*` metrics ([parity table](docs/PLAN.md#parity-with-coredns-1150-pluginkubernetes-plugink8s_external)); CoreDNS's own tests replay with identical results (130 kubernetes and 38 k8s_external handler cases, transfers, metadata); 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants); coredns/ci's end-to-end tests run in CI ([expectations](go/compat/expectations-kind.txt)) |
 | Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `route53`; `-bridge.prefer etcd` runs `etcd` in Go instead of its Rust port) | done (M3) |
@@ -61,7 +76,8 @@ UDP/TCP/DoT, zone sizes, regex rewrites, AXFR, TSIG, ...). `cargo xtask
 bench` runs each case against CoreDNS 1.15.0 and KernDNS with the same
 Corefile and fixtures, servers pinned to 2 cores (4 threads) of a 4-core
 laptop (i7-1065G7) and dnsperf on others, and reports the CPU time per query
-each case adds over a `whoami`-only server, next to max QPS and peak RSS.
+(also as the part each case adds over a `whoami`-only server), max QPS and
+peak RSS.
 Plugins without per-query work are listed in
 [`bench/plugins/EXEMPT`](bench/plugins/EXEMPT); `cargo xtask bench --check`
 (in CI) fails for any other plugin without a scenario. DoQ, DoH3 and gRPC
@@ -69,76 +85,100 @@ cases (`quic`, `https3`, `grpc_server`) use `cargo xtask loadgen`, a small
 load generator with dnsperf's arguments and output, since dnsperf can't
 speak those transports.
 
-**These numbers are indicative only.** They come from one `cargo xtask bench
---level 2 --duration 3 --runs 3` (median of 3 runs per case) on a laptop
-where other builds were running at the same time, so differences of a few
-µs, and all negative values, are noise. `whoami` itself costs 29.0 µs
-(CoreDNS) and 23.9 µs (KernDNS) of CPU per query at max load.
+**How to read these numbers.** They come from one `cargo xtask bench
+--level 2,3 --duration 3 --runs 3` (median of 3 runs per case) on
+2026-11-27, on a laptop where four parallel builds were running at the
+same time. Under that load **max QPS is not reliable**: CoreDNS's `whoami`
+reached only 14k QPS where it reaches about 110k on the quiet machine, so
+the QPS column mostly measures the noise. **CPU time per query and peak
+memory** hold up much better under load and are the numbers to compare.
+Each cell is CoreDNS → KernDNS, with KernDNS's change relative to CoreDNS
+(negative is better for CPU and memory, positive for QPS). CPU is the whole
+server's CPU time per query at max load, including the `whoami`-only
+baseline of 48.5 µs (CoreDNS) and 29.3 µs (KernDNS).
 
-| case | CoreDNS +µs/q | KernDNS +µs/q | max QPS CoreDNS → KernDNS | peak RSS CoreDNS → KernDNS |
-|---|---:|---:|---|---|
-| whoami | 29.0 (base) | 23.9 (base) | 90k → 141k | 59 → 9 MiB |
-| acl | +15.0 | -6.1 | 76k → 195k | 60 → 9 MiB |
-| acl/block | -6.8 | -0.8 | 112k → 145k | 60 → 10 MiB |
-| any | -8.9 | -5.7 | 121k → 178k | 58 → 10 MiB |
-| bufsize | +4.2 | +3.3 | 82k → 125k | 59 → 10 MiB |
-| cache¹ | -9.2 | -5.8 | 121k → 195k | 69 → 16 MiB |
-| cache/miss² | +66.7 | +56.9 | 17k → 6k | 67 → 16 MiB |
-| cancel | +17.9 | -4.0 | 39k → 161k | 62 → 10 MiB |
-| chaos | +32.2 | +1.6 | 42k → 114k | 59 → 10 MiB |
-| dynupdate | +24.4 | +14.0 | 66k → 101k | 61 → 11 MiB |
-| dynupdate/update | +1361.1 | +494.3 | 1k → 2k | 66 → 33 MiB |
-| erratic | +3.2 | -7.4 | 75k → 196k | 60 → 9 MiB |
-| errors | +5.1 | +1.8 | 78k → 128k | 61 → 9 MiB |
-| etcd⁴ | +139.2 | +85.6 | 7k → 9k | 78 → 25 MiB |
-| etcd/bridge⁴ (KernDNS: Go etcd through the bridge) | +144.1 | +194.9 | 8k → 8k | 80 → 63 MiB |
-| file | +12.6 | +8.3 | 96k → 124k | 71 → 31 MiB |
-| file/100k² | +53.8 | +17.6 | 14k → 35k | 145 → 63 MiB |
-| file/8a | +3.6 | -2.2 | 106k → 183k | 62 → 11 MiB |
-| file/small | +10.3 | +6.3 | 87k → 131k | 62 → 10 MiB |
-| forward¹ | +31.8 | +23.5 | 27k → 30k | 64 → 14 MiB |
-| forward/dot¹ | +40.4 | +60.6 | 41k → 32k | 78 → 20 MiB |
-| forward/tcp¹ | +25.0 | +28.1 | 53k → 50k | 64 → 14 MiB |
-| header | -6.4 | -6.1 | 116k → 196k | 60 → 9 MiB |
-| hosts | -5.6 | -5.3 | 118k → 191k | 69 → 20 MiB |
-| hosts/miss | +15.0 | +2.3 | 76k → 134k | 71 → 20 MiB |
-| k8s_external | +1.5 | -1.9 | 108k → 181k | 77 → 21 MiB |
-| kubernetes | +20.4 | +2.9 | 71k → 149k | 77 → 22 MiB |
-| loadbalance | +10.1 | -0.6 | 96k → 171k | 63 → 12 MiB |
-| local | -2.3 | -5.2 | 111k → 182k | 62 → 10 MiB |
-| log | +8.6 | +0.1 | 69k → 165k | 65 → 10 MiB |
-| log/class-denial | +2.5 | +7.3 | 100k → 127k | 62 → 10 MiB |
-| loop | -6.6 | -6.3 | 117k → 193k | 59 → 10 MiB |
-| metadata | +1.5 | +1.2 | 87k → 138k | 60 → 9 MiB |
-| minimal | +14.4 | -0.6 | 92k → 171k | 71 → 32 MiB |
-| nsid | +4.8 | +1.2 | 102k → 150k | 62 → 10 MiB |
-| prometheus | +15.3 | -5.0 | 66k → 193k | 64 → 10 MiB |
-| rewrite | +3.9 | +2.5 | 102k → 140k | 62 → 10 MiB |
-| rewrite/chain | +12.5 | -1.9 | 86k → 181k | 62 → 11 MiB |
-| rewrite/regex | +7.3 | +7.7 | 98k → 126k | 63 → 12 MiB |
-| rewrite/suffix | +10.8 | -2.6 | 85k → 184k | 64 → 9 MiB |
-| secondary | +15.2 | +3.8 | 90k → 144k | 72 → 32 MiB |
-| template | +15.4 | +5.5 | 88k → 135k | 61 → 12 MiB |
-| template/rcode | +23.9 | +1.4 | 74k → 158k | 61 → 12 MiB |
-| timeouts | -7.3 | -6.8 | 119k → 197k | 62 → 9 MiB |
-| tls | +2.2 | -2.4 | 124k → 138k | 59 → 10 MiB |
-| transfer | +13.7 | -0.8 | 93k → 173k | 71 → 32 MiB |
-| transfer/axfr² | +411.3 | +175.6 | 5k → 8k | 24 → 9 MiB |
-| tsig | +31.5 | +4.2 | 65k → 115k | 62 → 9 MiB |
-| view | +28.7 | -5.0 | 68k → 193k | 62 → 10 MiB |
+| case | CPU µs per query | peak RSS | max QPS (unreliable) |
+|---|---|---|---|
+| whoami | 48.5 → 29.3 (-40%) | 58 → 13 MiB (-78%) | 14k → 25k (+76%) |
+| acl | 63.5 → 29.0 (-54%) | 61 → 13 MiB (-79%) | 32k → 43k (+31%) |
+| acl/block | 46.0 → 30.4 (-34%) | 60 → 12 MiB (-80%) | 21k → 30k (+38%) |
+| any | 50.8 → 27.4 (-46%) | 60 → 12 MiB (-80%) | 36k → 68k (+88%) |
+| auto | 86.1 → 41.0 (-52%) | 74 → 20 MiB (-73%) | 12k → 63k (+423%) |
+| autopath | 132.8 → 73.4 (-45%) | 72 → 20 MiB (-73%) | 25k → 41k (+63%) |
+| bufsize | 47.1 → 28.0 (-41%) | 61 → 12 MiB (-81%) | 39k → 91k (+131%) |
+| cache | 41.0 → 30.9 (-24%) | 67 → 18 MiB (-73%) | 62k → 53k (-14%) |
+| cache/miss | 105.7 → 72.0 (-32%) | 67 → 18 MiB (-73%) | 28k → 14k (-49%) |
+| cancel | 51.5 → 29.0 (-44%) | 62 → 11 MiB (-82%) | 23k → 50k (+113%) |
+| chaos | 64.7 → 30.1 (-53%) | 60 → 12 MiB (-81%) | 15k → 34k (+121%) |
+| dns64 | 126.5 → 72.0 (-43%) | 73 → 19 MiB (-74%) | 13k → 17k (+33%) |
+| dnssec | 117.2 → 88.8 (-24%) | 79 → 28 MiB (-65%) | 27k → 21k (-21%) |
+| dnssec/cache | 59.3 → 48.6 (-18%) | 91 → 30 MiB (-67%) | 29k → 41k (+40%) |
+| dnssec/cold | 520.2 → 196.4 (-62%) | 79 → 22 MiB (-73%) | 2k → 7k (+296%) |
+| dnstap | 84.6 → 39.9 (-53%) | 61 → 20 MiB (-68%) | 9k → 30k (+232%) |
+| dnstap/forward | 153.3 → 103.2 (-33%) | 65 → 20 MiB (-69%) | 6k → 6k (+6%) |
+| dynupdate | 83.3 → 70.1 (-16%) | 59 → 13 MiB (-78%) | 14k → 8k (-41%) |
+| dynupdate/update | 1709.2 → 1098.4 (-36%) | 66 → 37 MiB (-43%) | 0k → 1k (+119%) |
+| erratic | 43.3 → 27.6 (-36%) | 58 → 11 MiB (-80%) | 25k → 106k (+325%) |
+| errors | 51.6 → 27.8 (-46%) | 59 → 11 MiB (-81%) | 41k → 77k (+87%) |
+| file | 76.3 → 51.7 (-32%) | 72 → 18 MiB (-74%) | 46k → 57k (+23%) |
+| file/100k | 149.5 → 73.5 (-51%) | 180 → 70 MiB (-61%) | 7k → 20k (+167%) |
+| file/8a | 109.2 → 60.6 (-45%) | 60 → 12 MiB (-80%) | 10k → 36k (+267%) |
+| file/small | 99.6 → 60.8 (-39%) | 59 → 12 MiB (-80%) | 19k → 26k (+37%) |
+| forward | 169.8 → 113.3 (-33%) | 64 → 15 MiB (-77%) | 9k → 4k (-51%) |
+| forward/dot | 154.3 → 129.2 (-16%) | 78 → 20 MiB (-74%) | 17k → 14k (-13%) |
+| forward/tcp | 195.9 → 135.6 (-31%) | 62 → 14 MiB (-77%) | 6k → 8k (+31%) |
+| geoip | 180.3 → 83.8 (-53%) | 62 → 12 MiB (-80%) | 10k → 11k (+3%) |
+| grpc | 157.0 → 100.1 (-36%) | 66 → 23 MiB (-66%) | 4k → 5k (+21%) |
+| grpc_server | 93.7 → 82.7 (-12%) | 68 → 15 MiB (-78%) | 9k → 8k (-12%) |
+| header | 53.1 → 33.8 (-36%) | 60 → 10 MiB (-83%) | 16k → 23k (+43%) |
+| hosts | 65.5 → 47.2 (-28%) | 70 → 22 MiB (-68%) | 12k → 21k (+84%) |
+| hosts/miss | 69.9 → 31.9 (-54%) | 70 → 23 MiB (-68%) | 15k → 34k (+132%) |
+| https | 184.7 → 74.4 (-60%) | 71 → 15 MiB (-78%) | 7k → 13k (+89%) |
+| https3 | 156.0 → 82.8 (-47%) | 78 → 29 MiB (-63%) | 8k → 12k (+40%) |
+| k8s_external | 69.3 → 41.2 (-41%) | 75 → 24 MiB (-68%) | 17k → 35k (+108%) |
+| kubernetes | 70.3 → 40.4 (-43%) | 75 → 24 MiB (-68%) | 33k → 68k (+105%) |
+| loadbalance | 65.5 → 32.8 (-50%) | 59 → 13 MiB (-77%) | 38k → 91k (+139%) |
+| local | 46.1 → 27.3 (-41%) | 61 → 11 MiB (-81%) | 50k → 81k (+62%) |
+| log | 64.1 → 25.2 (-61%) | 61 → 12 MiB (-80%) | 28k → 92k (+223%) |
+| log/class-denial | 59.9 → 38.9 (-35%) | 59 → 12 MiB (-80%) | 31k → 75k (+140%) |
+| loop | 35.8 → 24.1 (-33%) | 61 → 11 MiB (-82%) | 68k → 144k (+113%) |
+| metadata | 22.1 → 23.7 (+7%) | 58 → 10 MiB (-82%) | 121k → 146k (+21%) |
+| minimal | 42.7 → 38.0 (-11%) | 71 → 19 MiB (-73%) | 93k → 101k (+9%) |
+| multisocket | 44.0 → 22.9 (-48%) | 60 → 10 MiB (-83%) | 50k → 144k (+189%) |
+| nsid | 63.5 → 33.6 (-47%) | 62 → 11 MiB (-82%) | 29k → 45k (+53%) |
+| prometheus | 74.8 → 30.7 (-59%) | 59 → 12 MiB (-79%) | 19k → 60k (+210%) |
+| proxyproto | 41.3 → 25.5 (-38%) | 65 → 11 MiB (-83%) | 63k → 56k (-11%) |
+| quic | 83.6 → 43.3 (-48%) | 78 → 24 MiB (-70%) | 26k → 30k (+18%) |
+| rewrite | 63.4 → 31.0 (-51%) | 62 → 13 MiB (-79%) | 23k → 69k (+198%) |
+| rewrite/chain | 75.4 → 46.0 (-39%) | 63 → 13 MiB (-80%) | 20k → 46k (+133%) |
+| rewrite/regex | 70.9 → 58.9 (-17%) | 62 → 13 MiB (-80%) | 25k → 35k (+42%) |
+| rewrite/suffix | 62.1 → 28.1 (-55%) | 61 → 11 MiB (-82%) | 41k → 130k (+221%) |
+| secondary | 66.3 → 30.5 (-54%) | 72 → 21 MiB (-71%) | 40k → 122k (+208%) |
+| shed | 30.3 → 18.4 (-39%) | 62 → 12 MiB (-81%) | 80k → 160k (+100%) |
+| siit | 46.6 → 30.7 (-34%) | 62 → 14 MiB (-77%) | 61k → 113k (+87%) |
+| template | 66.0 → 51.2 (-22%) | 59 → 14 MiB (-77%) | 59k → 74k (+26%) |
+| template/rcode | 72.7 → 39.8 (-45%) | 62 → 14 MiB (-78%) | 52k → 93k (+80%) |
+| timeouts | 32.0 → 30.5 (-5%) | 60 → 11 MiB (-82%) | 82k → 98k (+19%) |
+| tls | 35.9 → 29.4 (-18%) | 60 → 11 MiB (-81%) | 100k → 115k (+14%) |
+| trace | 111.0 → 70.6 (-36%) | 82 → 15 MiB (-81%) | 34k → 30k (-11%) |
+| transfer | 80.9 → 46.6 (-42%) | 73 → 18 MiB (-75%) | 42k → 51k (+23%) |
+| transfer/axfr | 352.9 → 137.9 (-61%) | 60 → 11 MiB (-82%) | 11k → 29k (+165%) |
+| tsig | 81.0 → 40.1 (-50%) | 61 → 10 MiB (-84%) | 48k → 84k (+75%) |
+| view | 84.6 → 29.7 (-65%) | 62 → 11 MiB (-82%) | 44k → 117k (+165%) |
+| etcd⁴ | 184.5 → 110.2 (-40%) | 78 → 25 MiB (-68%) | 7k → 9k (+29%) |
+| etcd/bridge⁴ (KernDNS: Go etcd through the bridge) | 189.4 → 219.5 (+16%) | 80 → 63 MiB (-21%) | 8k → 8k (+0%) |
 
-¹ From a second run of only the cache and forward cases (with its own
-`whoami` baseline): in the full run, a burst of load from other processes cut
-KernDNS's cache throughput in half.
+⁴ From a separate run of only the etcd cases against a throwaway etcd with
+500 services (the full run predates the Rust `etcd` port). etcd's latency
+dominates and max QPS swings with it.
 
-² After the fixes for the three follow-ups below, from a separate run of
-only these cases on a heavily loaded machine (`whoami` reached only 67k →
-59k QPS), so only the relative CPU and memory numbers mean much.
-
-⁴ From a later run of only the etcd cases against a throwaway etcd with
-500 services (its own `whoami` baseline: 45.3 and 24.6 µs). etcd's
-latency dominates and max QPS swings with it: an earlier run had 12k →
-7k (CoreDNS → KernDNS) for `etcd` at +122.5 vs +110.6 µs.
+KernDNS uses less CPU per query than CoreDNS in every level 2 case except
+`metadata` (+7%, within the noise of a 22 µs case) and `etcd` through the
+Go bridge. It needs a sixth to a third of CoreDNS's peak memory in most
+cases, and about 40-60% in the heaviest ones (signed dynamic updates, the
+100k-name zone, DoH3). The detailed report
+(`target/bench/report.md`) also has latency at a fixed rate (half of
+CoreDNS's max) per case.
 
 What stood out in the first full run, and what it was:
 
@@ -165,64 +205,50 @@ What stood out in the first full run, and what it was:
   inserted as they are parsed: peak 248 → 66 MiB, steady state 213 → 66
   MiB (CoreDNS: 117 MiB after loading, 177 MiB after 3 s of queries).
 
-Forward over DoT went either way between runs. Signed dynamic
-updates (`dynupdate`) cost KernDNS about a third of CoreDNS's CPU. Latency at a fixed rate (half of CoreDNS's
-max) is in the detailed report (`target/bench/report.md`).
-
 Kubernetes at scale (`cargo xtask k8s-bench`, a fake API server serving N
 Services with 3 endpoints each; both servers watch it via kubeconfig):
 
 | Services | Sync time CoreDNS → KernDNS | RSS after sync | Peak RSS | Max QPS |
 |---:|---|---|---|---|
-| 1,000 | 0.69 s → 0.23 s | 66 → 19 MiB | 78 → 21 MiB | 18k → 30k |
-| 10,000 | 5.6 s → 0.64 s | 121 → 77 MiB | 148 → 77 MiB | 33k → 108k |
-| 50,000 | 7.8 s → 1.9 s | 352 → 178 MiB | 495 → 254 MiB | 66k → 125k |
-
-Level 3, kubeadm cluster DNS (`bench/setups/kubeadm`: kubeadm's default
-Corefile, the queries pods send through the `ndots:5` search path, SRV,
-PTR, pod names and external names), one 5 s run on a heavily loaded
-machine:
-
-| API server | Max QPS CoreDNS → KernDNS | CPU µs/query | Peak RSS |
-|---|---|---|---|
-| fake, 1,000 Services | 12.6k → 16.3k | 84.8 → 73.6 | 76 → 25 MiB |
-| kind cluster (`--kubeconfig`) | 8.0k → 18.8k | 147.2 → 74.6 | 73 → 23 MiB |
+| 1,000 | 0.69 s → 0.23 s (-67%) | 66 → 19 MiB (-71%) | 78 → 21 MiB (-73%) | 18k → 30k (+67%) |
+| 10,000 | 5.6 s → 0.64 s (-89%) | 121 → 77 MiB (-36%) | 148 → 77 MiB (-48%) | 33k → 108k (+227%) |
+| 50,000 | 7.8 s → 1.9 s (-76%) | 352 → 178 MiB (-49%) | 495 → 254 MiB (-49%) | 66k → 125k (+89%) |
 
 Level 3, common setups ([`bench/setups/`](bench/setups/)): whole
-Corefiles of typical deployments, run the same way (`cargo xtask bench
---level 3`). `split/external` queries the split horizon setup from another
-source address (dnsperf `-a 127.0.0.2`), so the internal view rejects it.
-The `etcd` setups are CoreDNS's etcd example against a throwaway etcd
-with 500 services, all in Rust in KernDNS; the `bridge` setups are the
-same Corefiles with KernDNS running `etcd` in Go through the bridge
-(`-bridge.prefer etcd`) and the rest in Rust. One `--duration 3 --runs 3` run on the same loaded laptop
-(load average 20 to 90 from other builds), so these are indicative only;
-both servers answered with the same response codes in every case.
+Corefiles of typical deployments, run the same way and in the same run as
+level 2 above (`cargo xtask bench --level 3`), so the same caveat about max
+QPS applies. `kubeadm` is kubeadm's default Corefile against a fake API
+server with 1,000 Services and the queries pods send through the `ndots:5`
+search path. `split/external` queries the split horizon setup from
+another source address (dnsperf `-a 127.0.0.2`), so the internal view
+rejects it. The `bridge` setups are CoreDNS's etcd example against a
+throwaway etcd with 500 services, with KernDNS running `etcd` in Go
+through the bridge and the rest in Rust; the `etcd` setups⁵ are the same
+Corefiles with the Rust `etcd` port. Both servers answered with the same
+response codes in every case.
 
-| setup | max QPS CoreDNS → KernDNS | CPU µs/q CoreDNS → KernDNS | peak RSS CoreDNS → KernDNS |
+| setup | CPU µs per query | peak RSS | max QPS (unreliable) |
 |---|---|---|---|
-| resolver (cache, forward) | 40k → 83k | 49.8 → 31.2 | 71 → 19 MiB |
-| forwarder (hosts, cache with prefetch and serve_stale, forward over DoT) | 39k → 69k | 56.6 → 34.2 | 96 → 33 MiB |
-| authoritative (two zones, snippet, transfer, log, any) | 8k → 27k | 108.5 → 55.5 | 75 → 20 MiB |
-| split (view, internal client) | 42k → 86k | 72.3 → 37.1 | 75 → 19 MiB |
-| split/external (view rejected, public zone) | 12k → 75k | 104.4 → 41.0 | 76 → 19 MiB |
-| frontend (DoT listener, cache, forward) | 68k → 66k | 43.9 → 38.6 | 67 → 16 MiB |
-| frontend/doh (DoH over HTTP/2) | 19k → 32k | 163.5 → 74.2 | 78 → 21 MiB |
-| bridge (etcd in Go, cache, loadbalance, forward) | 13k → 15k | 87.7 → 89.1 | 77 → 52 MiB |
-| bridge/uncached (every etcd query crosses the bridge) | 3k → 3k | 231.7 → 289.5 | 80 → 61 MiB |
-| etcd³ (etcd in Rust, cache, loadbalance, forward) | 25k → 65k | 78.5 → 44.8 | 72 → 22 MiB |
-| etcd/uncached³ (every query reads etcd) | 13k → 22k | 170.7 → 101.2 | 84 → 26 MiB |
-| bridge³ | 31k → 63k | 76.9 → 61.2 | 82 → 54 MiB |
-| bridge/uncached³ | 14k → 18k | 154.5 → 144.5 | 88 → 63 MiB |
+| authoritative | 74.2 → 53.5 (-28%) | 81 → 21 MiB (-75%) | 45k → 73k (+62%) |
+| bridge | 70.5 → 74.8 (+6%) | 75 → 57 MiB (-24%) | 44k → 41k (-6%) |
+| bridge/uncached | 222.0 → 227.1 (+2%) | 81 → 66 MiB (-19%) | 10k → 7k (-32%) |
+| forwarder | 72.2 → 40.2 (-44%) | 90 → 35 MiB (-61%) | 24k → 58k (+146%) |
+| frontend | 50.6 → 29.6 (-41%) | 68 → 15 MiB (-78%) | 48k → 110k (+130%) |
+| frontend/doh | 191.4 → 77.1 (-60%) | 76 → 22 MiB (-71%) | 12k → 24k (+103%) |
+| kubeadm | 111.7 → 67.3 (-40%) | 77 → 27 MiB (-64%) | 35k → 40k (+14%) |
+| resolver | 65.3 → 33.4 (-49%) | 73 → 19 MiB (-74%) | 24k → 114k (+375%) |
+| split | 95.8 → 26.5 (-72%) | 76 → 19 MiB (-75%) | 21k → 127k (+490%) |
+| split/external | 88.3 → 32.9 (-63%) | 75 → 20 MiB (-74%) | 37k → 121k (+224%) |
+| etcd⁵ | 78.5 → 44.8 (-43%) | 72 → 22 MiB (-69%) | 25k → 65k (+160%) |
+| etcd/uncached⁵ | 170.7 → 101.2 (-41%) | 84 → 26 MiB (-69%) | 13k → 22k (+69%) |
 
-With every query going to etcd through the bridge, KernDNS spent more
-CPU per query than CoreDNS in the first runs (169 vs 303 µs in a second
-one); latency in both is dominated by etcd and swings a lot between runs.
+⁵ From the separate etcd run (see ⁴). With every query reading etcd, the
+Rust port needs about 40% less CPU per query than CoreDNS. Through the
+bridge, KernDNS uses about as much CPU per query as all-Go CoreDNS: the
+Go plugin's cost plus the bridge's hand-offs.
 
-³ A later run of only the etcd and bridge setups (with the Rust `etcd`
-port; the bridge rows run Go's etcd through `-bridge.prefer etcd`). With
-every query reading etcd, the Rust port needs about 40% less CPU per
-query than CoreDNS and 30% less than the bridge.
+On a live kind cluster (`--kubeconfig`), an earlier `kubeadm` run gave
+147.2 → 74.6 µs per query (-49%) and 73 → 23 MiB (-68%).
 
 Single laptop runs: treat them as indicative; the plan calls for a
 dedicated benchmark machine.
