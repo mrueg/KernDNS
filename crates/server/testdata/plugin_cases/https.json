@@ -1,0 +1,15 @@
+{
+ "plugin": "https",
+ "strings": {
+  "TestSetup/overMaxUint32ErrContent": "must not exceed"
+ },
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 29,
+   "dropped": "undefined: maxUint32Err"
+  }
+ ]
+}

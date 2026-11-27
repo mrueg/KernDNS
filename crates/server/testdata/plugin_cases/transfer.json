@@ -1,0 +1,105 @@
+{
+ "plugin": "transfer",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestParse",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "exp": {
+      "Next": null,
+      "Transferers": null,
+      "tsigSecret": null,
+      "xfrs": [
+       {
+        "Zones": [
+         "example.net.",
+         "example.org."
+        ],
+        "source": "2001:db8::53",
+        "to": [
+         "1.2.3.4:53",
+         "5.6.7.8:1053",
+         "[1::2]:34",
+         "[fe80::1%eth0]:53"
+        ]
+       },
+       {
+        "Zones": [
+         "example.com.",
+         "example.edu."
+        ],
+        "source": "\u003cnil\u003e",
+        "to": [
+         "*",
+         "1.2.3.4:53"
+        ]
+       }
+      ]
+     },
+     "input": "transfer example.net example.org {\n\t\t\tto 1.2.3.4 5.6.7.8:1053 [1::2]:34 [fe80::1%eth0]:53\n\t\t\tsource 2001:db8::53\n\t\t }\n         transfer example.com example.edu {\n            to * 1.2.3.4\n         }",
+     "shouldErr": false,
+     "zones": null
+    },
+    {
+     "exp": null,
+     "input": "transfer example.net example.org {\n\t\t }",
+     "shouldErr": true,
+     "zones": null
+    },
+    {
+     "exp": null,
+     "input": "transfer example.net example.org {\n           invalid option\n\t\t }",
+     "shouldErr": true,
+     "zones": null
+    },
+    {
+     "exp": null,
+     "input": "transfer example.net example.org {\n\t\t\tto 1.2.3.4\n\t\t\tsource example.org\n\t\t }",
+     "shouldErr": true,
+     "zones": null
+    },
+    {
+     "exp": null,
+     "input": "transfer example.net example.org {\n\t\t\tto 1.2.3.4\n\t\t\tsource 192.0.2.53\n\t\t\tsource 2001:db8::53\n\t\t }",
+     "shouldErr": true,
+     "zones": null
+    },
+    {
+     "exp": null,
+     "input": "\n         transfer example.com example.edu {\n            to example.com 1.2.3.4\n         }",
+     "shouldErr": true,
+     "zones": null
+    },
+    {
+     "exp": {
+      "Next": null,
+      "Transferers": null,
+      "tsigSecret": null,
+      "xfrs": [
+       {
+        "Zones": [
+         "."
+        ],
+        "source": "\u003cnil\u003e",
+        "to": [
+         "1.2.3.4:53",
+         "5.6.7.8:1053",
+         "[1::2]:34"
+        ]
+       }
+      ]
+     },
+     "input": "transfer {\n\t\t\tto 1.2.3.4 5.6.7.8:1053 [1::2]:34\n\t\t }",
+     "shouldErr": false,
+     "zones": [
+      "."
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,45 @@
+{
+ "plugin": "nsid",
+ "strings": {},
+ "tables": [
+  {
+   "file": "nsid_test.go",
+   "func": "TestNsid",
+   "name": "tests",
+   "line": 22,
+   "value": [
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": "4e534944",
+     "next": {},
+     "qname": ".",
+     "qtype": 0
+    }
+   ]
+  },
+  {
+   "file": "nsid_test.go",
+   "func": "TestNsidCache",
+   "name": "tests",
+   "line": 82,
+   "value": [
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": "4e534944",
+     "next": {},
+     "qname": ".",
+     "qtype": 0
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupNsid",
+   "name": "tests",
+   "line": 16,
+   "dropped": "undefined: defaultNsid"
+  }
+ ]
+}

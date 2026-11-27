@@ -1,0 +1,418 @@
+{
+ "plugin": "dynupdate",
+ "strings": {
+  "TestParseRejectsDuplicateDirective/database": "",
+  "allNames": "*",
+  "allTypes": "*",
+  "pluginName": "dynupdate",
+  "testKey": "update-key.example.org.",
+  "testZone": "example.org."
+ },
+ "tables": [
+  {
+   "file": "dynupdate_test.go",
+   "func": "TestSerialArithmetic",
+   "name": "tests",
+   "line": 111,
+   "value": [
+    {
+     "a": 10,
+     "b": 10,
+     "greater": false,
+     "name": "equal"
+    },
+    {
+     "a": 11,
+     "b": 10,
+     "greater": true,
+     "name": "forward"
+    },
+    {
+     "a": 1,
+     "b": 4294967295,
+     "greater": true,
+     "name": "wrap"
+    },
+    {
+     "a": 10,
+     "b": 11,
+     "greater": false,
+     "name": "backward"
+    },
+    {
+     "a": 2147483658,
+     "b": 10,
+     "greater": false,
+     "name": "half-space"
+    }
+   ]
+  },
+  {
+   "file": "dynupdate_test.go",
+   "func": "TestPrerequisites",
+   "name": "tests",
+   "line": 177,
+   "value": [
+    {
+     "name": "name in use",
+     "prereq": [
+      "www.example.org.\t0\tCLASS255\tTYPE255\t\\# 0 "
+     ],
+     "wantRcode": 0
+    },
+    {
+     "name": "name not in use",
+     "prereq": [
+      "missing.example.org.\t0\tCLASS254\tTYPE255\t\\# 0 "
+     ],
+     "wantRcode": 0
+    },
+    {
+     "name": "rrset exists",
+     "prereq": [
+      "www.example.org.\t0\tCLASS255\tA\t"
+     ],
+     "wantRcode": 0
+    },
+    {
+     "name": "rrset missing",
+     "prereq": [
+      "missing.example.org.\t0\tCLASS255\tA\t"
+     ],
+     "wantRcode": 8
+    },
+    {
+     "name": "rrset does not exist",
+     "prereq": [
+      "missing.example.org.\t0\tNONE\tA\t"
+     ],
+     "wantRcode": 0
+    },
+    {
+     "name": "rrset exists unexpectedly",
+     "prereq": [
+      "www.example.org.\t0\tNONE\tA\t"
+     ],
+     "wantRcode": 7
+    },
+    {
+     "name": "value dependent",
+     "prereq": [
+      "www.example.org.\t0\tIN\tA\t192.0.2.1"
+     ],
+     "wantRcode": 0
+    },
+    {
+     "name": "value mismatch",
+     "prereq": [
+      "www.example.org.\t0\tIN\tA\t192.0.2.99"
+     ],
+     "wantRcode": 8
+    }
+   ]
+  },
+  {
+   "file": "dynupdate_test.go",
+   "func": "TestParseRejectsUnsafeConfiguration",
+   "name": "tests",
+   "line": 544,
+   "value": [
+    {
+     "body": "dynupdate {\n\t\t\t\tallow update-key.example.org. * A\n\t\t\t}",
+     "name": "missing file"
+    },
+    {
+     "body": "dynupdate {\n\t\t\t\tfile db.example.org\n\t\t\t}",
+     "name": "missing allow"
+    },
+    {
+     "body": "dynupdate {\n\t\t\t\tfile db.example.org\n\t\t\t\tallow update-key.example.org. * TYPE65280\n\t\t\t}",
+     "name": "unknown policy type"
+    },
+    {
+     "body": "dynupdate {\n\t\t\t\tfile db.example.org\n\t\t\t\tallow update-key.example.org. * * TXT\n\t\t\t}",
+     "name": "wildcard type mixed with named type"
+    },
+    {
+     "body": "dynupdate {\n\t\t\t\tfile db.example.org\n\t\t\t\tallow * * TXT\n\t\t\t}",
+     "name": "invalid key wildcard"
+    },
+    {
+     "body": "dynupdate {\n\t\t\t\tfile db.example.org\n\t\t\t\tallow update-key.example.org. outside.test. TXT\n\t\t\t}",
+     "name": "owner outside zone"
+    }
+   ]
+  },
+  {
+   "file": "dynupdate_test.go",
+   "func": "TestReadZoneRejectsInvalidZoneData",
+   "name": "tests",
+   "line": 660,
+   "value": [
+    {
+     "name": "missing SOA",
+     "zone": "$ORIGIN example.org.\n@ 60 IN NS ns.example.org.\n"
+    },
+    {
+     "name": "duplicate SOA",
+     "zone": "$ORIGIN example.org.\n@ 60 IN SOA ns.example.org. hostmaster.example.org. 10 60 60 60 60\n@ 60 IN SOA ns.example.org. hostmaster.example.org. 11 60 60 60 60\n"
+    },
+    {
+     "name": "zero serial",
+     "zone": "$ORIGIN example.org.\n@ 60 IN SOA ns.example.org. hostmaster.example.org. 0 60 60 60 60\n"
+    },
+    {
+     "name": "CNAME data conflict",
+     "zone": "$ORIGIN example.org.\n@ 60 IN SOA ns.example.org. hostmaster.example.org. 10 60 60 60 60\nalias 60 IN CNAME target.example.org.\nalias 60 IN A 192.0.2.20\n"
+    }
+   ]
+  },
+  {
+   "file": "dynupdate_test.go",
+   "func": "TestUnsupportedMetadataIsRejected",
+   "name": "unsupported",
+   "line": 695,
+   "value": [
+    24,
+    25,
+    30,
+    43,
+    46,
+    47,
+    48,
+    50,
+    51,
+    58,
+    59,
+    60,
+    63,
+    32768,
+    32769
+   ]
+  },
+  {
+   "file": "store_test.go",
+   "func": "TestStoreConcurrentPrerequisites",
+   "name": "instances",
+   "line": 183,
+   "value": [
+    {
+     "Next": null,
+     "Xfer": null,
+     "Zone": "example.org.",
+     "closed": false,
+     "database": "/tmp/TestKernDNSTables4195143320/001/updates.db",
+     "limits": {
+      "bytes": 0,
+      "records": 0,
+      "updateRecords": 0
+     },
+     "mu": {
+      "type": "sync.RWMutex"
+     },
+     "notifyPending": false,
+     "notifyRunning": false,
+     "permissions": [
+      {
+       "allTypes": true,
+       "key": "update-key.example.org.",
+       "name": "*",
+       "types": null
+      }
+     ],
+     "records": [
+      "example.org.\t60\tIN\tSOA\tns.example.org. hostmaster.example.org. 10 60 60 60 60",
+      "example.org.\t60\tIN\tNS\tns.example.org.",
+      "ns.example.org.\t60\tIN\tA\t192.0.2.53",
+      "www.example.org.\t60\tIN\tA\t192.0.2.1"
+     ],
+     "seed": "/tmp/TestKernDNSTables4195143320/001/updates.db.zone",
+     "store": null,
+     "view": {
+      "Fall": {
+       "Zones": null
+      },
+      "Next": null,
+      "TransferInFunc": null,
+      "Xfer": null,
+      "ZoneLookupFunc": null,
+      "Zones": {
+       "Names": [
+        "example.org."
+       ],
+       "Z": {
+        "example.org.": {
+         "Apex": {
+          "NS": [
+           "example.org.\t60\tIN\tNS\tns.example.org."
+          ],
+          "SIGNS": null,
+          "SIGSOA": null,
+          "SOA": "example.org.\t60\tIN\tSOA\tns.example.org. hostmaster.example.org. 10 60 60 60 60"
+         },
+         "Expired": false,
+         "RWMutex": {
+          "type": "sync.RWMutex"
+         },
+         "ReloadByMtime": false,
+         "ReloadInterval": 0,
+         "StartupOnce": {
+          "type": "sync.Once"
+         },
+         "TransferFrom": null,
+         "Tree": {
+          "Count": 2,
+          "Root": {
+           "Color": true,
+           "Elem": {
+            "m": {
+             "1": [
+              "www.example.org.\t60\tIN\tA\t192.0.2.1"
+             ]
+            },
+            "name": "www.example.org."
+           },
+           "Left": {
+            "Color": false,
+            "Elem": {
+             "m": {
+              "1": [
+               "ns.example.org.\t60\tIN\tA\t192.0.2.53"
+              ]
+             },
+             "name": "ns.example.org."
+            },
+            "Left": null,
+            "Right": null
+           },
+           "Right": null
+          }
+         },
+         "Upstream": {},
+         "file": ".",
+         "file_mtime": "0001-01-01 00:00:00 +0000 UTC",
+         "origLen": 2,
+         "origin": "example.org.",
+         "reloadShutdown": null
+        }
+       }
+      }
+     }
+    },
+    {
+     "Next": null,
+     "Xfer": null,
+     "Zone": "example.org.",
+     "closed": false,
+     "database": "/tmp/TestKernDNSTables4195143320/001/updates.db",
+     "limits": {
+      "bytes": 0,
+      "records": 0,
+      "updateRecords": 0
+     },
+     "mu": {
+      "type": "sync.RWMutex"
+     },
+     "notifyPending": false,
+     "notifyRunning": false,
+     "permissions": [
+      {
+       "allTypes": true,
+       "key": "update-key.example.org.",
+       "name": "*",
+       "types": null
+      }
+     ],
+     "records": [
+      "example.org.\t60\tIN\tSOA\tns.example.org. hostmaster.example.org. 10 60 60 60 60",
+      "example.org.\t60\tIN\tNS\tns.example.org.",
+      "ns.example.org.\t60\tIN\tA\t192.0.2.53",
+      "www.example.org.\t60\tIN\tA\t192.0.2.1"
+     ],
+     "seed": "/tmp/TestKernDNSTables4195143320/001/updates.db.zone",
+     "store": null,
+     "view": {
+      "Fall": {
+       "Zones": null
+      },
+      "Next": null,
+      "TransferInFunc": null,
+      "Xfer": null,
+      "ZoneLookupFunc": null,
+      "Zones": {
+       "Names": [
+        "example.org."
+       ],
+       "Z": {
+        "example.org.": {
+         "Apex": {
+          "NS": [
+           "example.org.\t60\tIN\tNS\tns.example.org."
+          ],
+          "SIGNS": null,
+          "SIGSOA": null,
+          "SOA": "example.org.\t60\tIN\tSOA\tns.example.org. hostmaster.example.org. 10 60 60 60 60"
+         },
+         "Expired": false,
+         "RWMutex": {
+          "type": "sync.RWMutex"
+         },
+         "ReloadByMtime": false,
+         "ReloadInterval": 0,
+         "StartupOnce": {
+          "type": "sync.Once"
+         },
+         "TransferFrom": null,
+         "Tree": {
+          "Count": 2,
+          "Root": {
+           "Color": true,
+           "Elem": {
+            "m": {
+             "1": [
+              "www.example.org.\t60\tIN\tA\t192.0.2.1"
+             ]
+            },
+            "name": "www.example.org."
+           },
+           "Left": {
+            "Color": false,
+            "Elem": {
+             "m": {
+              "1": [
+               "ns.example.org.\t60\tIN\tA\t192.0.2.53"
+              ]
+             },
+             "name": "ns.example.org."
+            },
+            "Left": null,
+            "Right": null
+           },
+           "Right": null
+          }
+         },
+         "Upstream": {},
+         "file": ".",
+         "file_mtime": "0001-01-01 00:00:00 +0000 UTC",
+         "origLen": 2,
+         "origin": "example.org.",
+         "reloadShutdown": null
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "file": "store_test.go",
+   "func": "TestUpdateLimitsAreAtomic",
+   "name": "updates",
+   "line": 246,
+   "value": [
+    "new.example.org.\t60\tIN\tA\t192.0.2.10",
+    "other.example.org.\t60\tIN\tA\t192.0.2.11"
+   ]
+  }
+ ]
+}

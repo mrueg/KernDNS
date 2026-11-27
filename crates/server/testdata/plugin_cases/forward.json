@@ -1,0 +1,2006 @@
+{
+ "plugin": "forward",
+ "strings": {
+  "TestClassifyToAddrs/commentedResolv": "commented_resolv.conf",
+  "TestClassifyToAddrs/resolv": "test_resolv.conf",
+  "TestHealthDomain/hcDomain": "example.org.",
+  "TestMultiForward/input": "\n      forward 1st.example.org 10.0.0.1\n      forward 2nd.example.org 10.0.0.2\n      forward 3rd.example.org 10.0.0.3\n    ",
+  "TestResolverWithHCOptions/input": "forward . 127.0.0.1 {\nresolver 10.96.0.10\n}\n",
+  "TestSetTapPlugin/input": "forward . 127.0.0.1\n\tdnstap /tmp/dnstap.sock full\n\tdnstap tcp://example.com:6000\n\t",
+  "TestSetupResolvconf/emptyResolv": "empty.conf",
+  "TestSetupResolvconf/resolv": "resolv.conf",
+  "TestSetupResolvconf/resolvIPV6": "resolv-ipv6.conf"
+ },
+ "tables": [
+  {
+   "file": "forward_test.go",
+   "func": "TestList",
+   "name": "expect",
+   "line": 36,
+   "value": [
+    {
+     "addr": "2.2.2.2:53",
+     "dohHost": "",
+     "dohMethod": "POST",
+     "doq": null,
+     "fails": 0,
+     "health": {
+      "c": {
+       "DialTimeout": 0,
+       "Dialer": {
+        "Cancel": null,
+        "Control": {
+         "func": "github.com/coredns/coredns/plugin/pkg/proxy.recvErr"
+        },
+        "ControlContext": null,
+        "Deadline": "0001-01-01 00:00:00 +0000 UTC",
+        "DualStack": false,
+        "FallbackDelay": 0,
+        "KeepAlive": 0,
+        "KeepAliveConfig": {
+         "Count": 0,
+         "Enable": false,
+         "Idle": 0,
+         "Interval": 0
+        },
+        "LocalAddr": null,
+        "Resolver": null,
+        "Timeout": 2000000000,
+        "mptcpStatus": 0
+       },
+       "Net": "udp",
+       "ReadTimeout": 1000000000,
+       "SingleInflight": false,
+       "TLSConfig": null,
+       "Timeout": 0,
+       "TsigProvider": null,
+       "TsigSecret": null,
+       "UDPSize": 0,
+       "WriteTimeout": 1000000000
+      },
+      "domain": ".",
+      "localAddress": "\u003cnil\u003e",
+      "proxyName": "TestList",
+      "recursionDesired": true
+     },
+     "probe": {
+      "Mutex": {
+       "type": "sync.Mutex"
+      },
+      "inprogress": 0,
+      "interval": 0
+     },
+     "protocol": "dns",
+     "proxyName": "TestList",
+     "readTimeout": 2000000000,
+     "transport": {
+      "addr": "2.2.2.2:53",
+      "avgDialTime": 15000000000,
+      "conns": [
+       null,
+       null
+      ],
+      "expire": 10000000000,
+      "httpClient": null,
+      "localAddress": "\u003cnil\u003e",
+      "maxAge": 0,
+      "maxIdleConns": 0,
+      "mu": {
+       "type": "sync.Mutex"
+      },
+      "proxyName": "TestList",
+      "stop": null,
+      "tlsConfig": null
+     }
+    },
+    {
+     "addr": "1.1.1.1:53",
+     "dohHost": "",
+     "dohMethod": "POST",
+     "doq": null,
+     "fails": 0,
+     "health": {
+      "c": {
+       "DialTimeout": 0,
+       "Dialer": {
+        "Cancel": null,
+        "Control": {
+         "func": "github.com/coredns/coredns/plugin/pkg/proxy.recvErr"
+        },
+        "ControlContext": null,
+        "Deadline": "0001-01-01 00:00:00 +0000 UTC",
+        "DualStack": false,
+        "FallbackDelay": 0,
+        "KeepAlive": 0,
+        "KeepAliveConfig": {
+         "Count": 0,
+         "Enable": false,
+         "Idle": 0,
+         "Interval": 0
+        },
+        "LocalAddr": null,
+        "Resolver": null,
+        "Timeout": 2000000000,
+        "mptcpStatus": 0
+       },
+       "Net": "udp",
+       "ReadTimeout": 1000000000,
+       "SingleInflight": false,
+       "TLSConfig": null,
+       "Timeout": 0,
+       "TsigProvider": null,
+       "TsigSecret": null,
+       "UDPSize": 0,
+       "WriteTimeout": 1000000000
+      },
+      "domain": ".",
+      "localAddress": "\u003cnil\u003e",
+      "proxyName": "TestList",
+      "recursionDesired": true
+     },
+     "probe": {
+      "Mutex": {
+       "type": "sync.Mutex"
+      },
+      "inprogress": 0,
+      "interval": 0
+     },
+     "protocol": "dns",
+     "proxyName": "TestList",
+     "readTimeout": 2000000000,
+     "transport": {
+      "addr": "1.1.1.1:53",
+      "avgDialTime": 15000000000,
+      "conns": [
+       null,
+       null
+      ],
+      "expire": 10000000000,
+      "httpClient": null,
+      "localAddress": "\u003cnil\u003e",
+      "maxAge": 0,
+      "maxIdleConns": 0,
+      "mu": {
+       "type": "sync.Mutex"
+      },
+      "proxyName": "TestList",
+      "stop": null,
+      "tlsConfig": null
+     }
+    },
+    {
+     "addr": "3.3.3.3:53",
+     "dohHost": "",
+     "dohMethod": "POST",
+     "doq": null,
+     "fails": 0,
+     "health": {
+      "c": {
+       "DialTimeout": 0,
+       "Dialer": {
+        "Cancel": null,
+        "Control": {
+         "func": "github.com/coredns/coredns/plugin/pkg/proxy.recvErr"
+        },
+        "ControlContext": null,
+        "Deadline": "0001-01-01 00:00:00 +0000 UTC",
+        "DualStack": false,
+        "FallbackDelay": 0,
+        "KeepAlive": 0,
+        "KeepAliveConfig": {
+         "Count": 0,
+         "Enable": false,
+         "Idle": 0,
+         "Interval": 0
+        },
+        "LocalAddr": null,
+        "Resolver": null,
+        "Timeout": 2000000000,
+        "mptcpStatus": 0
+       },
+       "Net": "udp",
+       "ReadTimeout": 1000000000,
+       "SingleInflight": false,
+       "TLSConfig": null,
+       "Timeout": 0,
+       "TsigProvider": null,
+       "TsigSecret": null,
+       "UDPSize": 0,
+       "WriteTimeout": 1000000000
+      },
+      "domain": ".",
+      "localAddress": "\u003cnil\u003e",
+      "proxyName": "TestList",
+      "recursionDesired": true
+     },
+     "probe": {
+      "Mutex": {
+       "type": "sync.Mutex"
+      },
+      "inprogress": 0,
+      "interval": 0
+     },
+     "protocol": "dns",
+     "proxyName": "TestList",
+     "readTimeout": 2000000000,
+     "transport": {
+      "addr": "3.3.3.3:53",
+      "avgDialTime": 15000000000,
+      "conns": [
+       null,
+       null
+      ],
+      "expire": 10000000000,
+      "httpClient": null,
+      "localAddress": "\u003cnil\u003e",
+      "maxAge": 0,
+      "maxIdleConns": 0,
+      "mu": {
+       "type": "sync.Mutex"
+      },
+      "proxyName": "TestList",
+      "stop": null,
+      "tlsConfig": null
+     }
+    }
+   ]
+  },
+  {
+   "file": "forward_test.go",
+   "func": "TestForward_Regression_NoBusyLoop",
+   "name": "tests",
+   "line": 105,
+   "value": [
+    {
+     "maxAttempts": 0,
+     "name": "unbounded"
+    },
+    {
+     "maxAttempts": 1,
+     "name": "single attempt"
+    },
+    {
+     "maxAttempts": 10,
+     "name": "10 attempts"
+    }
+   ]
+  },
+  {
+   "file": "forward_test.go",
+   "func": "TestForward_NextOnNodata",
+   "name": "tests",
+   "line": 235,
+   "value": [
+    {
+     "name": "serveEmpty",
+     "nextOnNodata": false
+    },
+    {
+     "name": "nextNotEmpty",
+     "nextOnNodata": true
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestClassifyToAddrs",
+   "name": "tests",
+   "line": 35,
+   "value": [
+    {
+     "errContains": "",
+     "input": [
+      "127.0.0.1"
+     ],
+     "name": "simple IP",
+     "wantDynamic": 0,
+     "wantErr": false,
+     "wantStatic": 1
+    },
+    {
+     "errContains": "",
+     "input": [
+      "127.0.0.1:8053"
+     ],
+     "name": "IP with port",
+     "wantDynamic": 0,
+     "wantErr": false,
+     "wantStatic": 1
+    },
+    {
+     "errContains": "",
+     "input": [
+      "::1"
+     ],
+     "name": "IPv6",
+     "wantDynamic": 0,
+     "wantErr": false,
+     "wantStatic": 1
+    },
+    {
+     "errContains": "",
+     "input": [
+      "tls://127.0.0.1"
+     ],
+     "name": "TLS IP",
+     "wantDynamic": 0,
+     "wantErr": false,
+     "wantStatic": 1
+    },
+    {
+     "errContains": "",
+     "input": [
+      "test_resolv.conf"
+     ],
+     "name": "resolv.conf file",
+     "wantDynamic": 0,
+     "wantErr": false,
+     "wantStatic": 1
+    },
+    {
+     "errContains": "",
+     "input": [
+      "dns.example.com"
+     ],
+     "name": "hostname",
+     "wantDynamic": 1,
+     "wantErr": false,
+     "wantStatic": 0
+    },
+    {
+     "errContains": "",
+     "input": [
+      "dns.example.com:5353"
+     ],
+     "name": "hostname with port",
+     "wantDynamic": 1,
+     "wantErr": false,
+     "wantStatic": 0
+    },
+    {
+     "errContains": "",
+     "input": [
+      "tls://dns.example.com"
+     ],
+     "name": "TLS hostname",
+     "wantDynamic": 1,
+     "wantErr": false,
+     "wantStatic": 0
+    },
+    {
+     "errContains": "",
+     "input": [
+      "https://dns.example.com"
+     ],
+     "name": "HTTPS hostname",
+     "wantDynamic": 1,
+     "wantErr": false,
+     "wantStatic": 0
+    },
+    {
+     "errContains": "",
+     "input": [
+      "rbldnsd.rbldnsd.svc.cluster.local"
+     ],
+     "name": "k8s service name",
+     "wantDynamic": 1,
+     "wantErr": false,
+     "wantStatic": 0
+    },
+    {
+     "errContains": "",
+     "input": [
+      "127.0.0.1",
+      "dns.example.com",
+      "10.0.0.1"
+     ],
+     "name": "mixed IPs and hostnames",
+     "wantDynamic": 1,
+     "wantErr": false,
+     "wantStatic": 2
+    },
+    {
+     "errContains": "",
+     "input": [
+      "commented_resolv.conf"
+     ],
+     "name": "an existing file not empty but without nameserver is skipped",
+     "wantDynamic": 0,
+     "wantErr": false,
+     "wantStatic": 0
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestParseAsHostEntry",
+   "name": "tests",
+   "line": 162,
+   "value": [
+    {
+     "hostname": "dns.example.com",
+     "input": "dns.example.com",
+     "port": "53",
+     "transport": "dns",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "dns.example.com:5353",
+     "port": "5353",
+     "transport": "dns",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "tls://dns.example.com",
+     "port": "853",
+     "transport": "tls",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "tls://dns.example.com:8853",
+     "port": "8853",
+     "transport": "tls",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "tls://dns.example.com%servername.example.com",
+     "port": "853",
+     "transport": "tls",
+     "wantOK": true,
+     "zone": "servername.example.com"
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "quic://dns.example.com",
+     "port": "853",
+     "transport": "quic",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "quic://dns.example.com:8853",
+     "port": "8853",
+     "transport": "quic",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "quic://dns.example.com%servername.example.com",
+     "port": "853",
+     "transport": "quic",
+     "wantOK": true,
+     "zone": "servername.example.com"
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "https://dns.example.com",
+     "port": "443",
+     "transport": "https",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "https://dns.example.com:8443",
+     "port": "8443",
+     "transport": "https",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "dns.example.com",
+     "input": "https://dns.example.com%servername.example.com",
+     "port": "443",
+     "transport": "https",
+     "wantOK": true,
+     "zone": "servername.example.com"
+    },
+    {
+     "hostname": "rbldnsd.rbldnsd.svc.cluster.local",
+     "input": "rbldnsd.rbldnsd.svc.cluster.local",
+     "port": "53",
+     "transport": "dns",
+     "wantOK": true,
+     "zone": ""
+    },
+    {
+     "hostname": "",
+     "input": "127.0.0.1",
+     "port": "",
+     "transport": "",
+     "wantOK": false,
+     "zone": ""
+    },
+    {
+     "hostname": "",
+     "input": "::1",
+     "port": "",
+     "transport": "",
+     "wantOK": false,
+     "zone": ""
+    },
+    {
+     "hostname": "",
+     "input": "grpc://example.com",
+     "port": "",
+     "transport": "",
+     "wantOK": false,
+     "zone": ""
+    },
+    {
+     "hostname": "",
+     "input": "",
+     "port": "",
+     "transport": "",
+     "wantOK": false,
+     "zone": ""
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestFormatResolvedAddr",
+   "name": "tests",
+   "line": 217,
+   "value": [
+    {
+     "expected": "10.0.0.1:53",
+     "ip": "10.0.0.1",
+     "port": "53",
+     "trans": "dns",
+     "zone": ""
+    },
+    {
+     "expected": "tls://10.0.0.1:853",
+     "ip": "10.0.0.1",
+     "port": "853",
+     "trans": "tls",
+     "zone": ""
+    },
+    {
+     "expected": "tls://10.0.0.1%example.com:853",
+     "ip": "10.0.0.1",
+     "port": "853",
+     "trans": "tls",
+     "zone": "example.com"
+    },
+    {
+     "expected": "quic://10.0.0.1:853",
+     "ip": "10.0.0.1",
+     "port": "853",
+     "trans": "quic",
+     "zone": ""
+    },
+    {
+     "expected": "quic://10.0.0.1%example.com:853",
+     "ip": "10.0.0.1",
+     "port": "853",
+     "trans": "quic",
+     "zone": "example.com"
+    },
+    {
+     "expected": "https://10.0.0.1:443",
+     "ip": "10.0.0.1",
+     "port": "443",
+     "trans": "https",
+     "zone": ""
+    },
+    {
+     "expected": "https://10.0.0.1%example.com:443",
+     "ip": "10.0.0.1",
+     "port": "443",
+     "trans": "https",
+     "zone": "example.com"
+    },
+    {
+     "expected": "[::1]:53",
+     "ip": "::1",
+     "port": "53",
+     "trans": "dns",
+     "zone": ""
+    },
+    {
+     "expected": "tls://[::1]:853",
+     "ip": "::1",
+     "port": "853",
+     "trans": "tls",
+     "zone": ""
+    },
+    {
+     "expected": "tls://[::1%example.com]:853",
+     "ip": "::1",
+     "port": "853",
+     "trans": "tls",
+     "zone": "example.com"
+    },
+    {
+     "expected": "quic://[::1]:853",
+     "ip": "::1",
+     "port": "853",
+     "trans": "quic",
+     "zone": ""
+    },
+    {
+     "expected": "quic://[::1%example.com]:853",
+     "ip": "::1",
+     "port": "853",
+     "trans": "quic",
+     "zone": "example.com"
+    },
+    {
+     "expected": "https://[::1]:443",
+     "ip": "::1",
+     "port": "443",
+     "trans": "https",
+     "zone": ""
+    },
+    {
+     "expected": "https://[::1%example.com]:443",
+     "ip": "::1",
+     "port": "443",
+     "trans": "https",
+     "zone": "example.com"
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedup",
+   "name": "entries",
+   "line": 271,
+   "value": [
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "host1.example.com",
+      "port": "53",
+      "transport": "dns",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "host2.example.com",
+      "port": "53",
+      "transport": "dns",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": [
+      "10.0.0.3:53"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "10.0.0.2:53"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedup",
+   "name": "expected",
+   "line": 284,
+   "value": [
+    "10.0.0.1:53",
+    "10.0.0.2:53",
+    "10.0.0.3:53"
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedupOrderPreserved",
+   "name": "entries",
+   "line": 310,
+   "value": [
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "myhost.example.com",
+      "port": "53",
+      "transport": "dns",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": [
+      "192.168.1.1:53"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestSetupResolver",
+   "name": "tests",
+   "line": 364,
+   "value": [
+    {
+     "expectedErr": "",
+     "input": "forward . 127.0.0.1 {\nresolver 10.96.0.10\n}\n",
+     "name": "single resolver IP",
+     "resolverLen": 1,
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "input": "forward . 127.0.0.1 {\nresolver 10.96.0.10 10.96.0.11\n}\n",
+     "name": "multiple resolver IPs",
+     "resolverLen": 2,
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "input": "forward . 127.0.0.1 {\nresolver ::1\n}\n",
+     "name": "IPv6 resolver",
+     "resolverLen": 1,
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "resolver must be an IP address",
+     "input": "forward . 127.0.0.1 {\nresolver dns.example.com\n}\n",
+     "name": "resolver not an IP",
+     "resolverLen": 0,
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "Wrong argument count",
+     "input": "forward . 127.0.0.1 {\nresolver\n}\n",
+     "name": "resolver no args",
+     "resolverLen": 0,
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedupTLS",
+   "name": "entries",
+   "line": 594,
+   "value": [
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "dns1.example.com",
+      "port": "853",
+      "transport": "tls",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "dns2.example.com",
+      "port": "853",
+      "transport": "tls",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": [
+      "tls://149.112.112.112:853"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "tls://9.9.9.10:853"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "dns1.example.com",
+      "port": "443",
+      "transport": "https",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": null,
+     "entry": {
+      "hostname": "dns2.example.com",
+      "port": "443",
+      "transport": "https",
+      "zone": ""
+     },
+     "static": false
+    },
+    {
+     "addrs": [
+      "https://149.112.112.112:443"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "https://9.9.9.10:443"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedupTLS",
+   "name": "expected",
+   "line": 610,
+   "value": [
+    "9.9.9.9:853",
+    "149.112.112.112:853",
+    "9.9.9.10:853",
+    "9.9.9.9:443",
+    "149.112.112.112:443",
+    "9.9.9.10:443"
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedupKeepsDistinctDoTAndDoQEndpoints",
+   "name": "entries",
+   "line": 622,
+   "value": [
+    {
+     "addrs": [
+      "tls://192.0.2.1:853"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "quic://192.0.2.1:853"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "quic://192.0.2.1%doq.example:853"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "quic://192.0.2.1%DOQ.EXAMPLE:853"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    },
+    {
+     "addrs": [
+      "dns://192.0.2.2:53",
+      "192.0.2.2:53"
+     ],
+     "entry": {
+      "hostname": "",
+      "port": "",
+      "transport": "",
+      "zone": ""
+     },
+     "static": true
+    }
+   ]
+  },
+  {
+   "file": "resolve_test.go",
+   "func": "TestExpandAndDedupKeepsDistinctDoTAndDoQEndpoints",
+   "name": "want",
+   "line": 634,
+   "value": [
+    "tls://192.0.2.1:853",
+    "quic://192.0.2.1:853",
+    "quic://192.0.2.1%doq.example:853",
+    "dns://192.0.2.2:53"
+   ]
+  },
+  {
+   "file": "setup_policy_test.go",
+   "func": "TestSetupPolicy",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedPolicy": "random",
+     "input": "forward . 127.0.0.1 {\npolicy random\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedPolicy": "round_robin",
+     "input": "forward . 127.0.0.1 {\npolicy round_robin\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedPolicy": "sequential",
+     "input": "forward . 127.0.0.1 {\npolicy sequential\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "unknown policy",
+     "expectedPolicy": "random",
+     "input": "forward . 127.0.0.1 {\npolicy random2\n}\n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 24,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": "example.org.",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain example.org\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nexcept miek.nl\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 3,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nmax_fails 3\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": true,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nforce_tcp\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": true,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nprefer_udp\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": true,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": true,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nforce_tcp\nprefer_udp\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1:53",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1:8080",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . [::1]:53",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . [2003::1]:53",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 \n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": "0.9.10.in-addr.arpa.",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward 10.9.3.0/18 127.0.0.1",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "plugin",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . ::1\n\t\tforward com ::2",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . tls://[2400:3200::1%dns.alidns.com]:853 {\ntls\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . https://127.0.0.1 \n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . quic://127.0.0.1 \n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "paths are not allowed in HTTPS upstream addresses",
+     "expectedFails": 0,
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . https://1.1.1.1/ \n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "failed to resolve",
+     "expectedFails": 0,
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . a27.0.0.1",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "unknown property",
+     "expectedFails": 0,
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nblaatl\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "Wrong argument count or unexpected line ending after 'domain'",
+     "expectedFails": 0,
+     "expectedFrom": "",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "unable to normalize 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'",
+     "expectedFails": 2,
+     "expectedFrom": ".",
+     "expectedIgnored": null,
+     "expectedOpts": {
+      "ForceTCP": false,
+      "HCDomain": ".",
+      "HCRecursionDesired": true,
+      "PreferUDP": false,
+      "TLSConnectDeadline": "0001-01-01 00:00:00 +0000 UTC"
+     },
+     "input": "forward xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 127.0.0.1 \n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSourceAddress",
+   "name": "tests",
+   "line": 110,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedSourceAddress": "192.0.2.1",
+     "input": "forward . 127.0.0.1 {\nsource_address 192.0.2.1\n}\n"
+    },
+    {
+     "expectedErr": "invalid IP address",
+     "expectedSourceAddress": "\u003cnil\u003e",
+     "input": "forward . 127.0.0.1 {\nsource_address not-an-ip\n}\n"
+    },
+    {
+     "expectedErr": "",
+     "expectedSourceAddress": "2001:db8:85a3:0:1319:8a2e:370:7344",
+     "input": "forward . 127.0.0.1 {\nsource_address 2001:0db8:85a3:0000:1319:8a2e:0370:7344\n}\n"
+    },
+    {
+     "expectedErr": "",
+     "expectedSourceAddress": "192.0.2.1",
+     "input": "forward . 127.0.0.1 {\nsource_address ::ffff:192.0.2.1\n}\n"
+    },
+    {
+     "expectedErr": "Error during parsing: Wrong argument count or unexpected line ending after 'source_address'",
+     "expectedSourceAddress": "\u003cnil\u003e",
+     "input": "forward . 127.0.0.1 {\nsource_address \n}\n"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSplitZone",
+   "name": "tests",
+   "line": 149,
+   "value": [
+    {
+     "expectedHost": "tls://127.0.0.1:854",
+     "expectedZone": "example.net",
+     "input": "tls://127.0.0.1%example.net:854"
+    },
+    {
+     "expectedHost": "tls://127.0.0.1",
+     "expectedZone": "example.net",
+     "input": "tls://127.0.0.1%example.net"
+    },
+    {
+     "expectedHost": "https://127.0.0.1:443",
+     "expectedZone": "example.net",
+     "input": "https://127.0.0.1%example.net:443"
+    },
+    {
+     "expectedHost": "https://127.0.0.1",
+     "expectedZone": "example.net",
+     "input": "https://127.0.0.1%example.net"
+    },
+    {
+     "expectedHost": "quic://127.0.0.1:853",
+     "expectedZone": "example.net",
+     "input": "quic://127.0.0.1%example.net:853"
+    },
+    {
+     "expectedHost": "tls://127.0.0.1:854",
+     "expectedZone": "",
+     "input": "tls://127.0.0.1:854"
+    },
+    {
+     "expectedHost": "https://127.0.0.1:443",
+     "expectedZone": "",
+     "input": "https://127.0.0.1:443"
+    },
+    {
+     "expectedHost": "dns://127.0.0.1",
+     "expectedZone": "",
+     "input": "dns://127.0.0.1"
+    },
+    {
+     "expectedHost": "foo:baz",
+     "expectedZone": "bar",
+     "input": "foo%bar:baz"
+    },
+    {
+     "expectedHost": "tls://[::1]:853",
+     "expectedZone": "example.net",
+     "input": "tls://[::1%example.net]:853"
+    },
+    {
+     "expectedHost": "https://[::1]:443",
+     "expectedZone": "example.net",
+     "input": "https://[::1%example.net]:443"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupTLS",
+   "name": "tests",
+   "line": 191,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedServerName": "dns",
+     "input": "forward . tls://127.0.0.1 {\n\t\t\t\ttls_servername dns\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "example.net",
+     "input": "forward . tls://127.0.0.1%example.net {\n\t\t\t\ttls\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "example.net",
+     "input": "forward . tls://127.0.0.1%example.net:854 tls://127.0.0.2%example.net tls://fe80::1%example.com {\n\t\t\t\ttls\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "example.net",
+     "input": "forward . tls://127.0.0.1%example.net:854 {\n\t\t\t\ttls\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "doq.example",
+     "input": "forward . quic://127.0.0.1%doq.example:853 {\n\t\t\t\ttls\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "both forward ('foo') and proxy level ('example.net') TLS servernames are set for upstream proxy 'tls://127.0.0.1:854'",
+     "expectedServerName": "",
+     "input": "forward . tls://127.0.0.1%example.net:854 {\n\t\t\t\ttls_servername foo\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "both forward ('foo') and proxy level ('doq.example') TLS servernames are set for upstream proxy 'quic://127.0.0.1:853'",
+     "expectedServerName": "",
+     "input": "forward . quic://127.0.0.1%doq.example:853 {\n\t\t\t\ttls_servername foo\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "",
+     "input": "forward . 127.0.0.1 {\n\t\t\t\ttls_servername dns\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "",
+     "input": "forward . 127.0.0.1 {\n\t\t\t\ttls\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "",
+     "input": "forward . tls://127.0.0.1",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "dns.alidns.com",
+     "input": "forward . tls://[2400:3200::1%dns.alidns.com]:853 {\n\t\t\t\ttls\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedServerName": "dns.alidns.com",
+     "input": "forward . tls://[2400:3200::1]:853 {\n\t\t\t\ttls\n\t\t\t\ttls_servername dns.alidns.com\n\t\t\t}",
+     "shouldErr": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupTLSclientSessionCacheCount",
+   "name": "tests",
+   "line": 273,
+   "value": [
+    {
+     "input": "forward . tls://127.0.0.1%foo tls://127.0.0.2%foo tls://127.0.0.3%foo tls://127.0.0.4%bar tls://127.0.0.5%bar { }"
+    },
+    {
+     "input": "forward . tls://127.0.0.1%foo tls://127.0.0.2%foo tls://127.0.0.3%bar tls://127.0.0.4%bar tls://127.0.0.5%bar { }"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupResolvconf",
+   "name": "tests",
+   "line": 328,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedNames": [
+      "10.10.255.252:53",
+      "10.10.255.253:53"
+     ],
+     "input": "forward . resolv.conf",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "no valid upstream addresses found",
+     "expectedNames": null,
+     "input": "forward . /tmp/TestKernDNSTables2429647562/001/null.conf",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "",
+     "expectedNames": [
+      "[0388:d254:7aec:6892:9f7f:e93b:5806:1b0f]:53"
+     ],
+     "input": "forward . resolv-ipv6.conf",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedNames": [
+      "127.0.0.1:53"
+     ],
+     "input": "forward . empty.conf 127.0.0.1",
+     "shouldErr": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupMaxConcurrent",
+   "name": "tests",
+   "line": 382,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedVal": 1000,
+     "input": "forward . 127.0.0.1 {\nmax_concurrent 1000\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "invalid",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_concurrent many\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "negative",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_concurrent -4\n}\n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupMaxConnectAttempts",
+   "name": "tests",
+   "line": 424,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedSet": false,
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedSet": true,
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_connect_attempts 0\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedSet": true,
+     "expectedVal": 5,
+     "input": "forward . 127.0.0.1 {\nmax_connect_attempts 5\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "invalid",
+     "expectedSet": false,
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_connect_attempts many\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "invalid",
+     "expectedSet": false,
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_connect_attempts -4\n}\n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupMaxIdleConns",
+   "name": "tests",
+   "line": 470,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 10,
+     "input": "forward . 127.0.0.1 {\nmax_idle_conns 10\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_idle_conns 0\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "invalid",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_idle_conns many\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "negative",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_idle_conns -1\n}\n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupHealthCheck",
+   "name": "tests",
+   "line": 512,
+   "value": [
+    {
+     "expectedDomain": ".",
+     "expectedErr": "",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "",
+     "expectedRecVal": false,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s no_rec\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": "example.org.",
+     "expectedErr": "",
+     "expectedRecVal": false,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s no_rec domain example.org\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": "example.org.",
+     "expectedErr": "",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain example.org\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain .\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": "example.org.",
+     "expectedErr": "",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain example.org.\n}\n",
+     "shouldErr": false
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "time: invalid duration",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check no_rec\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedDomain": "example.org",
+     "expectedErr": "time: invalid duration",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check domain example.org\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "health_check: unknown option rec",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s rec\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "Wrong argument count or unexpected line ending after 'domain'",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain\n}\n",
+     "shouldErr": true
+    },
+    {
+     "expectedDomain": ".",
+     "expectedErr": "health_check: invalid domain name",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nhealth_check 0.5s domain example..org\n}\n",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestNextAlternate",
+   "name": "testsValid",
+   "line": 612,
+   "value": [
+    {
+     "expected": [
+      3
+     ],
+     "input": "forward . 127.0.0.1 {\nnext NXDOMAIN\n}\n"
+    },
+    {
+     "expected": [
+      2
+     ],
+     "input": "forward . 127.0.0.1 {\nnext SERVFAIL\n}\n"
+    },
+    {
+     "expected": [
+      3,
+      2
+     ],
+     "input": "forward . 127.0.0.1 {\nnext NXDOMAIN SERVFAIL\n}\n"
+    },
+    {
+     "expected": [
+      3,
+      2,
+      5
+     ],
+     "input": "forward . 127.0.0.1 {\nnext NXDOMAIN SERVFAIL REFUSED\n}\n"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestNextAlternate",
+   "name": "testsInvalid",
+   "line": 638,
+   "value": [
+    "forward . 127.0.0.1 {\nnext\n}\n",
+    "forward . 127.0.0.1 {\nnext INVALID\n}\n",
+    "forward . 127.0.0.1 {\nnext NXDOMAIN INVALID\n}\n"
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestFailfastAllUnhealthyUpstreams",
+   "name": "tests",
+   "line": 653,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedRecVal": false,
+     "input": "forward . 127.0.0.1\n"
+    },
+    {
+     "expectedErr": "",
+     "expectedRecVal": true,
+     "input": "forward . 127.0.0.1 {\nfailfast_all_unhealthy_upstreams\n}\n"
+    },
+    {
+     "expectedErr": "Wrong argument count",
+     "expectedRecVal": false,
+     "input": "forward . 127.0.0.1 {\nfailfast_all_unhealthy_upstreams false\n}\n"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestFailover",
+   "name": "tests",
+   "line": 716,
+   "value": [
+    {
+     "failMsg": "If failover is set, records should be returned as long as one of the upstreams is work",
+     "hasRecord": true,
+     "input": "forward . [::]:33563 [::]:39179 [::]:43149 {\n\t\t\t\tpolicy sequential\n\t\t\t\tfailover ServFail Refused\n\t\t\t\t}"
+    },
+    {
+     "failMsg": "If failover is not set and the first upstream is not work, no records should be returned",
+     "hasRecord": false,
+     "input": "forward . [::]:33563 [::]:39179 [::]:43149 {\n\t\t\t\tpolicy sequential\n\t\t\t\t}"
+    },
+    {
+     "failMsg": "Although failover is not set, as long as the first upstream is work, there should be has a record return",
+     "hasRecord": true,
+     "input": "forward . [::]:43149 [::]:33563 [::]:39179 {\n\t\t\t\tpolicy sequential\n\t\t\t\t}"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestFailoverValidation",
+   "name": "cases",
+   "line": 768,
+   "value": [
+    {
+     "input": "forward . 127.0.0.1 {\n\t\tfailover NOERROR\n\t}",
+     "name": "NoErrorDisallowed",
+     "wantError": "NoError cannot be used in failover"
+    },
+    {
+     "input": "forward . 127.0.0.1 {\n\t\tfailover NOT_A_VALID_RCODE\n\t}",
+     "name": "InvalidRcode",
+     "wantError": "not a valid rcode"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupMaxAge",
+   "name": "tests",
+   "line": 804,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1\n",
+     "name": "default (no max_age)",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 30000000000,
+     "input": "forward . 127.0.0.1 {\nmax_age 30s\n}\n",
+     "name": "valid max_age",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 10000000000,
+     "input": "forward . 127.0.0.1 {\nexpire 10s\nmax_age 10s\n}\n",
+     "name": "max_age equal to expire",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_age 0s\n}\n",
+     "name": "max_age zero (unlimited)",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "negative",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_age -1s\n}\n",
+     "name": "negative max_age",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "invalid",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nmax_age invalid\n}\n",
+     "name": "invalid max_age value",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "max_age",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nexpire 30s\nmax_age 10s\n}\n",
+     "name": "max_age less than expire",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupReadTimeout",
+   "name": "tests",
+   "line": 879,
+   "value": [
+    {
+     "expectedErr": "",
+     "expectedVal": 2000000000,
+     "input": "forward . 127.0.0.1\n",
+     "name": "default (no read_timeout)",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 5000000000,
+     "input": "forward . 127.0.0.1 {\nread_timeout 5s\n}\n",
+     "name": "valid read_timeout",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 500000000,
+     "input": "forward . 127.0.0.1 {\nread_timeout 500ms\n}\n",
+     "name": "sub-second read_timeout",
+     "shouldErr": false
+    },
+    {
+     "expectedErr": "positive",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nread_timeout 0s\n}\n",
+     "name": "zero read_timeout",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "positive",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nread_timeout -1s\n}\n",
+     "name": "negative read_timeout",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "invalid",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nread_timeout invalid\n}\n",
+     "name": "invalid read_timeout value",
+     "shouldErr": true
+    },
+    {
+     "expectedErr": "",
+     "expectedVal": 0,
+     "input": "forward . 127.0.0.1 {\nread_timeout\n}\n",
+     "name": "missing read_timeout value",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

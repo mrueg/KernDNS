@@ -572,7 +572,7 @@ const TEST_PLUGINS: &str = "github.com/kerndns/kerndns/go/bridge/testplugins/unr
 
 /// Plugins whose table tests `plugin-cases` extracts (one fixture each in
 /// crates/server/testdata/plugin_cases).
-const PLUGIN_CASES: &str = "file,hosts";
+const PLUGIN_CASES: &str = "acl,any,auto,autopath,bufsize,cache,chaos,debug,dns64,dnssec,dnstap,dynupdate,erratic,errors,file,forward,geoip,grpc,grpc_server,header,health,hosts,https,https3,loadbalance,local,log,loop,metadata,metrics,minimal,multisocket,nsid,pprof,proxyproto,quic,ready,rewrite,root,secondary,shed,sign,siit,template,timeouts,tls,trace,transfer,tsig,view,whoami";
 
 /// Extract the table tests of CoreDNS's plugins into JSON fixtures for
 /// crates/server/tests/plugin_cases (see go/plugincases).

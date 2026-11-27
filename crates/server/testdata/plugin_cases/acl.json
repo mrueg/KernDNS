@@ -1,0 +1,706 @@
+{
+ "plugin": "acl",
+ "strings": {
+  "pluginName": "acl"
+ },
+ "tables": [
+  {
+   "file": "acl_test.go",
+   "func": "TestACLServeDNS",
+   "name": "tests",
+   "line": 46,
+   "value": [
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 1 BLOCKED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.167.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 1 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "192.168.0.2"
+     },
+     "config": "\n\t\t\tacl example.org {\n\t\t\t\tblock type * net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 2 BLOCKED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "10.1.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 3 BLOCKED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "10.1.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 3 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 192.168.1.2\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 4 Single IP BLOCKED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.3"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 192.168.1.2\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 4 Single IP ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tfilter type A net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Filter 1 FILTERED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 17,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.167.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tfilter type A net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Filter 1 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tallow net 192.168.0.0/16\n\t\t\t\tblock\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Whitelist 1 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "10.1.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tallow type * net 192.168.0.0/16\n\t\t\t\tblock\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Whitelist 1 REFUSED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.0.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": true,
+     "name": "Drop 1 DROPPED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t\tdrop net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Subnet-Order 1 REFUSED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.1"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop net 192.168.0.0/16\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t}",
+     "expectNoResponse": true,
+     "name": "Subnet-Order 2 DROPPED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.1"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop type A\n\t\t\t\tallow net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": true,
+     "name": "Drop-Type 1 DROPPED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "192.168.1.1"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop type A\n\t\t\t\tallow net 192.168.0.0/16\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Drop-Type 2 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "a.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl a.example.org {\n\t\t\t\tblock type * net 192.168.1.0/24\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 1 REFUSED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl a.example.org {\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 1 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "a.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 2 REFUSED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "a.example.com.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl {\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 2 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "b.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.2.2"
+     },
+     "config": "acl a.example.org {\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t}\n\t\t\tacl b.example.org {\n\t\t\t\tblock type * net 192.168.2.0/24\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 3 REFUSED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "b.example.org.",
+      "qtype": 1,
+      "sourceIP": "192.168.1.2"
+     },
+     "config": "acl a.example.org {\n\t\t\t\tblock net 192.168.1.0/24\n\t\t\t}\n\t\t\tacl b.example.org {\n\t\t\t\tblock net 192.168.2.0/24\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 3 ALLOWED",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:db8:abcd:0012::1230"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 1 BLOCKED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:db8:abcd:0013::0"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 1 ALLOWED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 2 BLOCKED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 3 Single IP BLOCKED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7335"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type A net 2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist 3 Single IP ALLOWED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "a.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:db8:abcd:0012:2019::0"
+     },
+     "config": "acl a.example.org {\n\t\t\t\tblock type * net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 1 REFUSED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:db8:abcd:0012:2019::0"
+     },
+     "config": "acl a.example.org {\n\t\t\t\tblock net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Fine-Grained 1 ALLOWED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": [
+      "example.org"
+     ]
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock type AAAA net 2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Blacklist Address%ifname",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": [
+      "eth0"
+     ]
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop net 2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\t\t}",
+     "expectNoResponse": true,
+     "name": "Drop 1 DROPPED IPV6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "2001:db8:abcd:0012:8000::1"
+     },
+     "config": "acl example.org {\n\t\t\t\tblock net 2001:db8:abcd:0012:8000::/66\n\t\t\t\tdrop net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Subnet-Order 1 REFUSED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 15,
+     "wantRcode": 5,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "2001:db8:abcd:0012:8000::1"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop net 2001:db8:abcd:0012::0/64\n\t\t\t\tblock net 2001:db8:abcd:0012:8000::/66\n\t\t\t}",
+     "expectNoResponse": true,
+     "name": "Subnet-Order 2 DROPPED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 1,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop type A\n\t\t\t\tallow net 2001:db8:85a3:0000::0/64\n\t\t\t}",
+     "expectNoResponse": true,
+     "name": "Drop-Type 1 DROPPED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    },
+    {
+     "args": {
+      "domain": "www.example.org.",
+      "qtype": 28,
+      "sourceIP": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "config": "acl example.org {\n\t\t\t\tdrop type A\n\t\t\t\tallow net 2001:db8:85a3:0000::0/64\n\t\t\t}",
+     "expectNoResponse": false,
+     "name": "Drop-Type 2 ALLOWED IPv6",
+     "wantErr": false,
+     "wantExtendedErrorCode": 0,
+     "wantRcode": 0,
+     "zones": []
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 10,
+   "value": [
+    {
+     "config": "acl {\n\t\t\t\tblock type A net 192.168.0.0/16\n\t\t\t}",
+     "name": "Blacklist 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type * net 192.168.0.0/16\n\t\t\t}",
+     "name": "Blacklist 2",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A net *\n\t\t\t}",
+     "name": "Blacklist 3",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tallow type * net 192.168.1.0/24\n\t\t\t\tblock type * net 192.168.0.0/16\n\t\t\t}",
+     "name": "Blacklist 4",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tfilter type A net 192.168.0.0/16\n\t\t\t}",
+     "name": "Filter 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tallow type * net 192.168.0.0/16\n\t\t\t\tblock type * net *\n\t\t\t}",
+     "name": "Whitelist 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tdrop type * net 192.168.0.0/16\n\t\t\t}",
+     "name": "Drop 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl a.example.org {\n\t\t\t\tblock type * net 192.168.1.0/24\n\t\t\t}",
+     "name": "fine-grained 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl a.example.org {\n\t\t\t\tblock type * net 192.168.1.0/24\n\t\t\t}\n\t\t\tacl b.example.org {\n\t\t\t\tblock type * net 192.168.2.0/24\n\t\t\t}",
+     "name": "fine-grained 2",
+     "wantErr": false
+    },
+    {
+     "config": "acl example.org {\n\t\t\t\tblock type * net 192.168.1.0/24 192.168.3.0/24\n\t\t\t}",
+     "name": "Multiple Networks 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl example.org {\n\t\t\t\tblock type TXT ANY CNAME net 192.168.3.0/24\n\t\t\t}",
+     "name": "Multiple Qtypes 1",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock A net 192.168.0.0/16\n\t\t\t}",
+     "name": "Missing argument 1",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type net 192.168.0.0/16\n\t\t\t}",
+     "name": "Missing argument 2",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type ABC net 192.168.0.0/16\n\t\t\t}",
+     "name": "Illegal argument 1",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblck type A net 192.168.0.0/16\n\t\t\t}",
+     "name": "Illegal argument 2",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A net 192.168.0/16\n\t\t\t}",
+     "name": "Illegal argument 3",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A net 192.168.0.0/33\n\t\t\t}",
+     "name": "Illegal argument 4",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A net 2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\t\t}",
+     "name": "Blacklist 1 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type * net 2001:db8:85a3::8a2e:370:7334\n\t\t\t}",
+     "name": "Blacklist 2 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A\n\t\t\t}",
+     "name": "Blacklist 3 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tallow net 2001:db8:abcd:0012::0/64\n\t\t\t\tblock net 2001:db8:abcd:0012::0/48\n\t\t\t}",
+     "name": "Blacklist 4 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tfilter type A net 2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\t\t}",
+     "name": "Filter 1 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tallow net 2001:db8:abcd:0012::0/64\n\t\t\t\tblock\n\t\t\t}",
+     "name": "Whitelist 1 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tdrop net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "name": "Drop 1 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl a.example.org {\n\t\t\t\tblock net 2001:db8:abcd:0012::0/64\n\t\t\t}",
+     "name": "fine-grained 1 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl a.example.org {\n\t\t\t\tblock net 2001:db8:abcd:0012::0/64\n\t\t\t}\n\t\t\tacl b.example.org {\n\t\t\t\tblock net 2001:db8:abcd:0013::0/64\n\t\t\t}",
+     "name": "fine-grained 2 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl example.org {\n\t\t\t\tblock net 2001:db8:abcd:0012::0/64 2001:db8:85a3::8a2e:370:7334/64\n\t\t\t}",
+     "name": "Multiple Networks 1 IPv6",
+     "wantErr": false
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A net 2001::85a3::8a2e:370:7334\n\t\t\t}",
+     "name": "Illegal argument 1 IPv6",
+     "wantErr": true
+    },
+    {
+     "config": "acl {\n\t\t\t\tblock type A net 2001:db8:85a3:::8a2e:370:7334\n\t\t\t}",
+     "name": "Illegal argument 2 IPv6",
+     "wantErr": true
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestNormalize",
+   "name": "tests",
+   "line": 245,
+   "value": [
+    {
+     "args": {
+      "rawNet": "10.218.10.8/24"
+     },
+     "name": "Network range 1",
+     "want": "10.218.10.8/24"
+    },
+    {
+     "args": {
+      "rawNet": "10.218.10.8"
+     },
+     "name": "IP address 1",
+     "want": "10.218.10.8/32"
+    },
+    {
+     "args": {
+      "rawNet": "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+     },
+     "name": "IPv6 address 1",
+     "want": "2001:0db8:85a3:0000:0000:8a2e:0370:7334/128"
+    }
+   ]
+  }
+ ]
+}

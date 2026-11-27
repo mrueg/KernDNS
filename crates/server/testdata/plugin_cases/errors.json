@@ -1,0 +1,333 @@
+{
+ "plugin": "errors",
+ "strings": {
+  "TestStop/expLog": "3 errors like '^error.*!$' occurred in last 2s"
+ },
+ "tables": [
+  {
+   "file": "errors_test.go",
+   "func": "TestErrors",
+   "name": "tests",
+   "line": 29,
+   "value": [
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedLog": "",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/errors.genErrorHandler.1"
+     }
+    },
+    {
+     "expectedCode": 9,
+     "expectedErr": {
+      "error": "test error"
+     },
+     "expectedLog": "9 example.org. A: test error\n",
+     "next": {
+      "func": "github.com/coredns/coredns/plugin/errors.genErrorHandler.1"
+     }
+    }
+   ]
+  },
+  {
+   "file": "errors_test.go",
+   "func": "TestLogPattern",
+   "name": "tests",
+   "line": 78,
+   "value": [
+    {
+     "args": {
+      "logCallback": {
+       "func": "github.com/coredns/coredns/plugin/pkg/log.P.Errorf-fm"
+      }
+     },
+     "name": "error log",
+     "want": "[ERROR] plugin/errors: 4 errors like '^error.*!$' occurred in last 2s"
+    },
+    {
+     "args": {
+      "logCallback": {
+       "func": "github.com/coredns/coredns/plugin/pkg/log.P.Warningf-fm"
+      }
+     },
+     "name": "warn log",
+     "want": "[WARNING] plugin/errors: 4 errors like '^error.*!$' occurred in last 2s"
+    },
+    {
+     "args": {
+      "logCallback": {
+       "func": "github.com/coredns/coredns/plugin/pkg/log.P.Infof-fm"
+      }
+     },
+     "name": "info log",
+     "want": "[INFO] plugin/errors: 4 errors like '^error.*!$' occurred in last 2s"
+    },
+    {
+     "args": {
+      "logCallback": {
+       "func": "github.com/coredns/coredns/plugin/pkg/log.P.Debugf-fm"
+      }
+     },
+     "name": "debug log",
+     "want": "[DEBUG] plugin/errors: 4 errors like '^error.*!$' occurred in last 2s"
+    }
+   ]
+  },
+  {
+   "file": "errors_test.go",
+   "func": "TestShowFirst",
+   "name": "tests",
+   "line": 235,
+   "value": [
+    {
+     "errorCount": 3,
+     "expectSummary": "3 errors like '^error.*!$' occurred in last 2s",
+     "name": "multiple errors",
+     "shouldHaveSummary": true
+    },
+    {
+     "errorCount": 1,
+     "expectSummary": "",
+     "name": "single error",
+     "shouldHaveSummary": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestErrorsParse",
+   "name": "tests",
+   "line": 16,
+   "value": [
+    {
+     "inputErrorsRules": "errors",
+     "optCount": 0,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors stdout",
+     "optCount": 0,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors errors.txt",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors visible",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors { log visible }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors\n\t\t  errors ",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors a b",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m .* extra\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate abc .*\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1 .*\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m ())\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n            stacktrace\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": false,
+     "stacktrace": true
+    },
+    {
+     "inputErrorsRules": "errors {\n            stacktrace\n\t\t    consolidate 1m ^exact$\n\t\t  }",
+     "optCount": 1,
+     "shouldErr": false,
+     "stacktrace": true
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m ^exact$\n\t\t  }",
+     "optCount": 1,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error\n\t\t  }",
+     "optCount": 1,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m \"format error\"\n\t\t  }",
+     "optCount": 1,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error1\n\t\t    consolidate 5s error2\n\t\t  }",
+     "optCount": 2,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error show_first\n\t\t  }",
+     "optCount": 1,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error warning show_first\n\t\t  }",
+     "optCount": 1,
+     "shouldErr": false,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error invalid_option\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error warning error\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error info debug\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error show_first warning\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t    consolidate 1m error show_first info\n\t\t  }",
+     "optCount": 0,
+     "shouldErr": true,
+     "stacktrace": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestProperLogCallbackIsSet",
+   "name": "tests",
+   "line": 111,
+   "value": [
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* warning\n\t\t    }",
+     "name": "warning is parsed properly",
+     "wantLogLevel": "[WARNING]"
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* error\n\t\t    }",
+     "name": "error is parsed properly",
+     "wantLogLevel": "[ERROR]"
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* info\n\t\t    }",
+     "name": "info is parsed properly",
+     "wantLogLevel": "[INFO]"
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* debug\n\t\t    }",
+     "name": "debug is parsed properly",
+     "wantLogLevel": "[DEBUG]"
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .*\n\t\t    }",
+     "name": "default is error",
+     "wantLogLevel": "[ERROR]"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestShowFirstOption",
+   "name": "tests",
+   "line": 173,
+   "value": [
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* show_first\n\t\t    }",
+     "name": "show_first without log level",
+     "wantLogLevel": "[ERROR]",
+     "wantShowFirst": true
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* warning show_first\n\t\t    }",
+     "name": "show_first with warning log level",
+     "wantLogLevel": "[WARNING]",
+     "wantShowFirst": true
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* error show_first\n\t\t    }",
+     "name": "show_first with error log level",
+     "wantLogLevel": "[ERROR]",
+     "wantShowFirst": true
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .*\n\t\t    }",
+     "name": "no show_first",
+     "wantLogLevel": "[ERROR]",
+     "wantShowFirst": false
+    },
+    {
+     "inputErrorsRules": "errors {\n\t\t        consolidate 1m .* info\n\t\t    }",
+     "name": "no show_first with log level",
+     "wantLogLevel": "[INFO]",
+     "wantShowFirst": false
+    }
+   ]
+  }
+ ]
+}

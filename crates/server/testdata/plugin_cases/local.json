@@ -1,0 +1,104 @@
+{
+ "plugin": "local",
+ "strings": {},
+ "tables": [
+  {
+   "file": "local_test.go",
+   "name": "testcases",
+   "line": 14,
+   "value": [
+    {
+     "answer": "localhost.\t3600\tIN\tA\t127.0.0.1",
+     "ns": null,
+     "qtype": 1,
+     "question": "localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": "localHOst.\t3600\tIN\tA\t127.0.0.1",
+     "ns": null,
+     "qtype": 1,
+     "question": "localHOst.",
+     "rcode": 0
+    },
+    {
+     "answer": "localhost.\t3600\tIN\tAAAA\t::1",
+     "ns": null,
+     "qtype": 28,
+     "question": "localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": "localhost.\t3600\tIN\tNS\tlocalhost.",
+     "ns": null,
+     "qtype": 2,
+     "question": "localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": "localhost.\t3600\tIN\tSOA\troot.localhost. localhost. 1 0 0 0 0",
+     "ns": null,
+     "qtype": 6,
+     "question": "localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": null,
+     "ns": "127.in-addr.arpa.\t3600\tIN\tSOA\troot.localhost. localhost. 1 0 0 0 0",
+     "qtype": 1,
+     "question": "127.in-addr.arpa.",
+     "rcode": 0
+    },
+    {
+     "answer": null,
+     "ns": "localhost.\t3600\tIN\tSOA\troot.localhost. localhost. 1 0 0 0 0",
+     "qtype": 15,
+     "question": "localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": "a.localhost.\t3600\tIN\tA\t127.0.0.1",
+     "ns": null,
+     "qtype": 1,
+     "question": "a.localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": "a.localhost.\t3600\tIN\tAAAA\t::1",
+     "ns": null,
+     "qtype": 28,
+     "question": "a.localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": null,
+     "ns": "a.localhost.\t3600\tIN\tSOA\troot.localhost. localhost. 1 0 0 0 0",
+     "qtype": 15,
+     "question": "a.localhost.",
+     "rcode": 0
+    },
+    {
+     "answer": "1.0.0.127.in-addr.arpa.\t3600\tIN\tPTR\tlocalhost.",
+     "ns": null,
+     "qtype": 12,
+     "question": "1.0.0.127.in-addr.arpa.",
+     "rcode": 0
+    },
+    {
+     "answer": null,
+     "ns": "127.in-addr.arpa.\t3600\tIN\tSOA\troot.localhost. localhost. 1 0 0 0 0",
+     "qtype": 15,
+     "question": "1.0.0.127.in-addr.arpa.",
+     "rcode": 0
+    },
+    {
+     "answer": null,
+     "ns": "127.in-addr.arpa.\t3600\tIN\tSOA\troot.localhost. localhost. 1 0 0 0 0",
+     "qtype": 12,
+     "question": "2.0.0.127.in-addr.arpa.",
+     "rcode": 3
+    }
+   ]
+  }
+ ]
+}

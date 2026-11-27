@@ -1,0 +1,151 @@
+{
+ "plugin": "metadata",
+ "strings": {},
+ "tables": [
+  {
+   "file": "metadata_test.go",
+   "func": "TestMetadataServeDNS",
+   "name": "expectedMetadata",
+   "line": 32,
+   "value": [
+    {
+     "test/key1": {
+      "func": "github.com/coredns/coredns/plugin/metadata.init.2.func1.1"
+     }
+    },
+    {
+     "test/key2": {
+      "func": "github.com/coredns/coredns/plugin/metadata.init.2.func1.2"
+     },
+     "test/key3": {
+      "func": "github.com/coredns/coredns/plugin/metadata.init.2.func1.3"
+     }
+    }
+   ]
+  },
+  {
+   "file": "metadata_test.go",
+   "func": "TestLabelFormat",
+   "name": "labels",
+   "line": 70,
+   "value": [
+    {
+     "isValid": true,
+     "label": "plugin/LABEL"
+    },
+    {
+     "isValid": true,
+     "label": "p/LABEL"
+    },
+    {
+     "isValid": true,
+     "label": "plugin/L"
+    },
+    {
+     "isValid": true,
+     "label": "PLUGIN/LABEL/SUB-LABEL"
+    },
+    {
+     "isValid": false,
+     "label": "LABEL"
+    },
+    {
+     "isValid": false,
+     "label": "plugin.LABEL"
+    },
+    {
+     "isValid": false,
+     "label": "/NO-PLUGIN-NOT-ACCEPTED"
+    },
+    {
+     "isValid": false,
+     "label": "ONLY-PLUGIN-NOT-ACCEPTED/"
+    },
+    {
+     "isValid": false,
+     "label": "/"
+    },
+    {
+     "isValid": false,
+     "label": "//"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "input": "metadata",
+     "shouldErr": false,
+     "zones": []
+    },
+    {
+     "input": "metadata example.com.",
+     "shouldErr": false,
+     "zones": [
+      "example.com."
+     ]
+    },
+    {
+     "input": "metadata example.com. net.",
+     "shouldErr": false,
+     "zones": [
+      "example.com.",
+      "net."
+     ]
+    },
+    {
+     "input": "metadata example.com. { some_param }",
+     "shouldErr": true,
+     "zones": []
+    },
+    {
+     "input": "metadata\nmetadata",
+     "shouldErr": true,
+     "zones": []
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupHealth",
+   "name": "tests",
+   "line": 39,
+   "value": [
+    {
+     "input": "metadata",
+     "shouldErr": false,
+     "zones": []
+    },
+    {
+     "input": "metadata example.com.",
+     "shouldErr": false,
+     "zones": [
+      "example.com."
+     ]
+    },
+    {
+     "input": "metadata example.com. net.",
+     "shouldErr": false,
+     "zones": [
+      "example.com.",
+      "net."
+     ]
+    },
+    {
+     "input": "metadata example.com. { some_param }",
+     "shouldErr": true,
+     "zones": []
+    },
+    {
+     "input": "metadata\nmetadata",
+     "shouldErr": true,
+     "zones": []
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,463 @@
+{
+ "plugin": "auto",
+ "strings": {
+  "TestWalkNonExistent/nonExistingDir": "highly_unlikely_to_exist_dir",
+  "zoneContent": "; testzone\n@\tIN\tSOA\tsns.dns.icann.org. noc.dns.icann.org. 2016082534 7200 3600 1209600 3600\n\t\tNS\ta.iana-servers.net.\n\t\tNS\tb.iana-servers.net.\n\nwww IN A 127.0.0.1\n"
+ },
+ "tables": [
+  {
+   "file": "auto_test.go",
+   "func": "TestAutoServeDNS",
+   "name": "tests",
+   "line": 24,
+   "value": [
+    {
+     "expectedCode": 2,
+     "name": "valid A query",
+     "qname": "test.example.org.",
+     "qtype": 1,
+     "shouldMatch": true,
+     "zones": [
+      "example.org."
+     ]
+    },
+    {
+     "expectedCode": 5,
+     "name": "AXFR query refused",
+     "qname": "test.example.org.",
+     "qtype": 252,
+     "shouldMatch": true,
+     "zones": [
+      "example.org."
+     ]
+    },
+    {
+     "expectedCode": 5,
+     "name": "IXFR query refused",
+     "qname": "test.example.org.",
+     "qtype": 251,
+     "shouldMatch": true,
+     "zones": [
+      "example.org."
+     ]
+    },
+    {
+     "expectedCode": 0,
+     "name": "no matching zone",
+     "qname": "test.notfound.org.",
+     "qtype": 1,
+     "shouldMatch": false,
+     "zones": [
+      "example.org."
+     ]
+    }
+   ]
+  },
+  {
+   "file": "auto_test.go",
+   "func": "TestAutoServeDNSZoneMatching",
+   "name": "tests",
+   "line": 106,
+   "value": [
+    {
+     "hasZone": true,
+     "name": "exact zone match",
+     "names": [
+      "example.org."
+     ],
+     "origins": [
+      "example.org."
+     ],
+     "qname": "test.example.org.",
+     "shouldRefuse": false
+    },
+    {
+     "hasZone": true,
+     "name": "subdomain zone match",
+     "names": [
+      "example.org."
+     ],
+     "origins": [
+      "example.org."
+     ],
+     "qname": "sub.test.example.org.",
+     "shouldRefuse": false
+    },
+    {
+     "hasZone": false,
+     "name": "no origin match",
+     "names": [
+      "example.org."
+     ],
+     "origins": [
+      "other.org."
+     ],
+     "qname": "test.example.org.",
+     "shouldRefuse": false
+    },
+    {
+     "hasZone": false,
+     "name": "origin match but no name match",
+     "names": [
+      "other.org."
+     ],
+     "origins": [
+      "example.org."
+     ],
+     "qname": "test.example.org.",
+     "shouldRefuse": true
+    }
+   ]
+  },
+  {
+   "file": "regexp_test.go",
+   "func": "TestRewriteToExpand",
+   "name": "tests",
+   "line": 10,
+   "value": [
+    {
+     "expected": "",
+     "in": ""
+    },
+    {
+     "expected": "${1}",
+     "in": "{1}"
+    },
+    {
+     "expected": "${1",
+     "in": "{1"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestAutoParse",
+   "name": "tests",
+   "line": 14,
+   "value": [
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory /tmp\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto 10.0.0.0/24 {\n\t\t\t\tdirectory /tmp\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 0,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp\n\t\t\t\treload 0\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "bliep",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp (.*) bliep\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "(.*)",
+     "expectedReloadInterval": 10000000000,
+     "expectedTempl": "bliep",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp (.*) bliep\n\t\t\t\treload 10s\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 0,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp\n\t\t\t\tno_reload\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "(.*)",
+     "expectedReloadInterval": 10000000000,
+     "expectedTempl": "bliep",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp (.*) bliep 10\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "(.*)",
+     "expectedReloadInterval": 10000000000,
+     "expectedTempl": "bliep",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp (.*) bliep 10\n\t\t\t\ttransfer to 127.0.0.1\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "",
+     "inputFileRules": "auto {\n\t\t\t\tdirectory /tmp (.*)\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory /tmp * {1}\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory /foobar/coredns * {1}\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory /tmp (.*) {1} aa\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory /tmp\n\t\t\t\tupstream 8.8.8.8 1.1.1.1\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedDirectory": "/tmp",
+     "expectedRe": "db\\.(.*)",
+     "expectedReloadInterval": 60000000000,
+     "expectedTempl": "${1}",
+     "inputFileRules": "auto example.org {\n\t\t\t\tdirectory /tmp\n\t\t\t\tupstream\n\t\t\t}",
+     "shouldErr": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupReload",
+   "name": "tests",
+   "line": 161,
+   "value": [
+    {
+     "config": "auto {\n\t\t\t\tdirectory .\n\t\t\t\treload 5s\n\t\t\t}",
+     "name": "reload valid",
+     "wantErr": false
+    },
+    {
+     "config": "auto {\n\t\t\t\tdirectory .\n\t\t\t\treload 0\n\t\t\t}",
+     "name": "reload disable",
+     "wantErr": false
+    },
+    {
+     "config": "auto {\n\t\t\t\tdirectory .\n\t\t\t\treload -1s\n\t\t\t}",
+     "name": "reload invalid",
+     "wantErr": true
+    },
+    {
+     "config": "auto {\n\t\t\t\tdirectory .\n\t\t\t\treload\n\t\t\t}",
+     "name": "reload invalid",
+     "wantErr": true
+    }
+   ]
+  },
+  {
+   "file": "walk_test.go",
+   "name": "dbFiles",
+   "line": 14,
+   "value": [
+    "db.example.org",
+    "aa.example.org"
+   ]
+  },
+  {
+   "file": "xfr_test.go",
+   "func": "TestAutoTransferZoneCase",
+   "name": "tests",
+   "line": 28,
+   "value": [
+    {
+     "errorType": "no SOA",
+     "expectError": true,
+     "name": "exact match",
+     "zone": "example.org."
+    },
+    {
+     "errorType": "not authoritative",
+     "expectError": true,
+     "name": "case different",
+     "zone": "EXAMPLE.ORG."
+    },
+    {
+     "errorType": "not authoritative",
+     "expectError": true,
+     "name": "no match",
+     "zone": "other.org."
+    }
+   ]
+  },
+  {
+   "file": "zone_test.go",
+   "func": "TestZonesNames",
+   "name": "tests",
+   "line": 12,
+   "value": [
+    {
+     "expected": [],
+     "name": "empty zones",
+     "zones": []
+    },
+    {
+     "expected": [
+      "example.org."
+     ],
+     "name": "single zone",
+     "zones": [
+      "example.org."
+     ]
+    },
+    {
+     "expected": [
+      "example.org.",
+      "test.org.",
+      "another.com."
+     ],
+     "name": "multiple zones",
+     "zones": [
+      "example.org.",
+      "test.org.",
+      "another.com."
+     ]
+    }
+   ]
+  },
+  {
+   "file": "zone_test.go",
+   "func": "TestZonesOrigins",
+   "name": "tests",
+   "line": 60,
+   "value": [
+    {
+     "expected": [],
+     "name": "empty origins",
+     "origins": []
+    },
+    {
+     "expected": [
+      "example.org."
+     ],
+     "name": "single origin",
+     "origins": [
+      "example.org."
+     ]
+    },
+    {
+     "expected": [
+      "example.org.",
+      "test.org."
+     ],
+     "name": "multiple origins",
+     "origins": [
+      "example.org.",
+      "test.org."
+     ]
+    }
+   ]
+  },
+  {
+   "file": "zone_test.go",
+   "func": "TestZonesZones",
+   "name": "tests",
+   "line": 118,
+   "value": [
+    {
+     "expected": {
+      "Apex": {
+       "NS": null,
+       "SIGNS": null,
+       "SIGSOA": null,
+       "SOA": null
+      },
+      "Expired": false,
+      "RWMutex": {
+       "type": "sync.RWMutex"
+      },
+      "ReloadByMtime": false,
+      "ReloadInterval": 0,
+      "StartupOnce": {
+       "type": "sync.Once"
+      },
+      "TransferFrom": null,
+      "Tree": null,
+      "Upstream": null,
+      "file": "",
+      "file_mtime": "0001-01-01 00:00:00 +0000 UTC",
+      "origLen": 0,
+      "origin": "",
+      "reloadShutdown": null
+     },
+     "name": "existing zone",
+     "zoneName": "example.org."
+    },
+    {
+     "expected": {
+      "Apex": {
+       "NS": null,
+       "SIGNS": null,
+       "SIGSOA": null,
+       "SOA": null
+      },
+      "Expired": false,
+      "RWMutex": {
+       "type": "sync.RWMutex"
+      },
+      "ReloadByMtime": false,
+      "ReloadInterval": 0,
+      "StartupOnce": {
+       "type": "sync.Once"
+      },
+      "TransferFrom": null,
+      "Tree": null,
+      "Upstream": null,
+      "file": "",
+      "file_mtime": "0001-01-01 00:00:00 +0000 UTC",
+      "origLen": 0,
+      "origin": "",
+      "reloadShutdown": null
+     },
+     "name": "another existing zone",
+     "zoneName": "test.org."
+    },
+    {
+     "expected": null,
+     "name": "non-existent zone",
+     "zoneName": "notfound.org."
+    }
+   ]
+  }
+ ]
+}

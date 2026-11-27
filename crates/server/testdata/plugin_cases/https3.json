@@ -1,0 +1,74 @@
+{
+ "plugin": "https3",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 13,
+   "value": [
+    {
+     "expectedErrContent": "",
+     "expectedMaxStreams": null,
+     "input": "https3",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedMaxStreams": null,
+     "input": "https3 {\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedMaxStreams": 100,
+     "input": "https3 {\n\t\t\t\tmax_streams 100\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedMaxStreams": 0,
+     "input": "https3 {\n\t\t\t\tmax_streams 0\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "Wrong argument count",
+     "expectedMaxStreams": null,
+     "input": "https3 {\n\t\t\t\tmax_streams\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "invalid max_streams value",
+     "expectedMaxStreams": null,
+     "input": "https3 {\n\t\t\t\tmax_streams abc\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "must be a non-negative integer",
+     "expectedMaxStreams": null,
+     "input": "https3 {\n\t\t\t\tmax_streams -1\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "already defined",
+     "expectedMaxStreams": null,
+     "input": "https3 {\n\t\t\t\tmax_streams 100\n\t\t\t\tmax_streams 200\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "unknown property",
+     "expectedMaxStreams": null,
+     "input": "https3 {\n\t\t\t\tunknown_option 123\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "Wrong argument count",
+     "expectedMaxStreams": null,
+     "input": "https3 extra_arg",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

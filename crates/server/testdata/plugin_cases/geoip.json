@@ -1,0 +1,191 @@
+{
+ "plugin": "geoip",
+ "strings": {
+  "TestMetadataUnknownIP/unknownIPAddr": "203.0.113.1",
+  "asnDBPath": "testdata/GeoLite2-ASN.mmdb",
+  "cityDBPath": "testdata/GeoLite2-City.mmdb",
+  "fixturesDir": "./testdata",
+  "pluginName": "geoip",
+  "unknownDBPath": "testdata/GeoLite2-UnknownDbType.mmdb"
+ },
+ "tables": [
+  {
+   "file": "geoip_test.go",
+   "func": "TestMetadata",
+   "name": "tests",
+   "line": 17,
+   "value": [
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "Cambridge",
+     "label": "geoip/city/name",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "GB",
+     "label": "geoip/country/code",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "United Kingdom",
+     "label": "geoip/country/name",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "true",
+     "label": "geoip/country/is_in_european_union",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "EU",
+     "label": "geoip/continent/code",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "Europe",
+     "label": "geoip/continent/name",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "52.2242",
+     "label": "geoip/latitude",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "0.1315",
+     "label": "geoip/longitude",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "Europe/London",
+     "label": "geoip/timezone",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "CB4",
+     "label": "geoip/postalcode",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-City.mmdb",
+     "expectedValue": "ENG,CAM",
+     "label": "geoip/subdivisions/code",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-ASN.mmdb",
+     "expectedValue": "12345",
+     "label": "geoip/asn/number",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-ASN.mmdb",
+     "expectedValue": "Test ASN Organization",
+     "label": "geoip/asn/org",
+     "remoteIP": "81.2.69.142"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-ASN.mmdb",
+     "expectedValue": "0",
+     "label": "geoip/asn/number",
+     "remoteIP": "10.0.0.1"
+    },
+    {
+     "dbPath": "testdata/GeoLite2-ASN.mmdb",
+     "expectedValue": "Not routed",
+     "label": "geoip/asn/org",
+     "remoteIP": "10.0.0.1"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestGeoIPParse",
+   "name": "tests",
+   "line": 47,
+   "value": [
+    {
+     "config": "geoip testdata/GeoLite2-City.mmdb\n",
+     "expectedDBType": 1,
+     "expectedErr": "",
+     "shouldErr": false
+    },
+    {
+     "config": "geoip testdata/GeoLite2-City.mmdb { edns-subnet }",
+     "expectedDBType": 1,
+     "expectedErr": "",
+     "shouldErr": false
+    },
+    {
+     "config": "geoip testdata/GeoLite2-ASN.mmdb\n",
+     "expectedDBType": 2,
+     "expectedErr": "",
+     "shouldErr": false
+    },
+    {
+     "config": "geoip testdata/GeoLite2-ASN.mmdb { edns-subnet }",
+     "expectedDBType": 2,
+     "expectedErr": "",
+     "shouldErr": false
+    },
+    {
+     "config": "geoip",
+     "expectedDBType": 0,
+     "expectedErr": "Wrong argument count",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip testdata/GeoLite2-City.mmdb {\n\tlanguages en fr es zh-CN\n}\n",
+     "expectedDBType": 0,
+     "expectedErr": "unknown property \"languages\"",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip testdata/GeoLite2-City.mmdb\ngeoip testdata/GeoLite2-City.mmdb\n",
+     "expectedDBType": 0,
+     "expectedErr": "configuring multiple databases is not supported",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip 1 2 3",
+     "expectedDBType": 0,
+     "expectedErr": "Wrong argument count",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip { }",
+     "expectedDBType": 0,
+     "expectedErr": "Error during parsing",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip /dbpath { city }",
+     "expectedDBType": 0,
+     "expectedErr": "unknown property \"city\"",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip /invalidPath\n",
+     "expectedDBType": 0,
+     "expectedErr": "failed to open database file: open /invalidPath:",
+     "shouldErr": true
+    },
+    {
+     "config": "geoip testdata/GeoLite2-UnknownDbType.mmdb\n",
+     "expectedDBType": 0,
+     "expectedErr": "reader does not support the \"UnknownDbType\" database type",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

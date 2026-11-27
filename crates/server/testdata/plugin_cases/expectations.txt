@@ -25,3 +25,290 @@ skip file TestZoneReloadByMtime/expectedNS rewrites the zone file mid-test and w
 
 # hosts
 skip hosts TestReplaceWithAsteriskLabel/tests tests the Go replaceWithAsteriskLabel helper
+
+# acl
+skip acl TestNormalize/tests tests the Go normalize helper
+
+# any, chaos, whoami, header, local: everything runs
+
+# auto
+skip auto TestAutoServeDNS/tests builds Auto with an in-memory zone map and fake zone names; KernDNS's auto loads zones from a directory
+skip auto TestAutoServeDNSZoneMatching/tests checks Auto's internal origins/names lists against the query
+skip auto TestRewriteToExpand/tests tests the Go rewriteToExpand helper
+skip auto dbFiles file names shared by the walk tests (directory scan of the Go package's temp dir)
+skip auto TestAutoTransferZoneCase/tests calls Auto.Transfer directly with Go errors as expectations
+skip auto TestZonesNames/tests tests the Go Zones.Names method
+skip auto TestZonesOrigins/tests tests the Go Zones.Origins method
+skip auto TestZonesZones/tests tests the Go Zones.Zones method
+
+# autopath
+skip autopath TestInSearchPath/tests tests the Go AutoPath.FirstInSearchPath helper
+
+# cache
+skip cache TestCacheInsertion/cacheTestCases#8 the RRSIG is valid at the test's fixed 2017 clock only; through the server the cache sees the real time and (correctly) doesn't cache an expired signature
+skip cache TestServeFromStaleCache/tests moves the cache's clock forward (futureMinutes); KernDNS's cache has no injectable clock
+skip cache TestServeFromStaleCacheResponseTTL/tests moves the cache's clock forward; no injectable clock
+skip cache TestServeFromStaleCacheFetchVerify/tests moves the cache's clock forward; no injectable clock
+skip cache TestComputeTTL/tests tests the Go computeTTL helper
+skip cache TestCacheKeepTTL/tests moves the cache's clock forward; no injectable clock
+skip cache TestCacheSeparation/testCases inserts with Go's internal key function and checks the internal lookup
+skip cache TestPreferPositiveRetainsLKGAcrossNonAnswerSuccessRefreshes/refreshes moves the cache's clock and needs serve_stale verify options KernDNS doesn't have
+skip cache TestPreferPositiveVerifyKeepsStaleOnNonAnswers/tests needs serve_stale ... verify with a prefer-positive policy, not supported by KernDNS yet
+skip cache TestPreferPositiveVerifyRejectsInvalidFreshAnswers/modes needs serve_stale refresh options KernDNS doesn't have
+skip cache TestPreferPositiveVerifyRejectsInvalidFreshAnswers/invalidResponses response builders (Go closures) for the table above
+skip cache TestResponseWithDNSSEC/tcs runs against an in-process file plugin built in Go with a signed zone the test generates
+skip cache TestFilterRRSlice/rrs tests the Go filterRRSlice helper
+skip cache TestPrefetch/tests moves the cache's clock and counts upstream calls at given times; no injectable clock
+skip cache TestServeStaleFailureRecheckImmediate/tests needs serve_stale's failure recheck options, not supported by KernDNS yet
+skip cache TestServeStaleFailureRecheckRejectsInvalidRefresh/modes needs serve_stale's failure recheck options, not supported by KernDNS yet
+skip cache TestServeStaleFailureRecheckRejectsInvalidRefresh/invalidResponses response builders (Go closures) for the table above
+
+# debug: TestDebug runs as a setup table
+
+# dnstap
+skip dnstap TestTransport/transport opens Go dnstap writers on raw listeners; the dnstap end-to-end test in crates/server/tests/plugins_e2e.rs covers the transports
+skip dnstap TestListenerCreation/tests tests the Go listener constructor
+
+# dynupdate
+skip dynupdate TestSerialArithmetic/tests tests the Go serial comparison helper
+skip dynupdate TestPrerequisites/tests calls the Go prerequisite checker on an in-memory zone
+skip dynupdate TestParseRejectsUnsafeConfiguration/tests the bodies are inserted into a Corefile with a database path the test creates
+skip dynupdate TestReadZoneRejectsInvalidZoneData/tests tests the Go zone reader on bbolt data; KernDNS's database is its own file format
+skip dynupdate TestUnsupportedMetadataIsRejected/unsupported record types for a Go helper
+skip dynupdate TestStoreConcurrentPrerequisites/instances Go plugin instances sharing a bbolt store
+skip dynupdate TestUpdateLimitsAreAtomic/updates records for a Go store test
+
+# errors
+skip errors TestErrors/tests checks the log output of a Go logger
+skip errors TestLogPattern/tests tests the Go pattern log helper
+skip errors TestShowFirst/tests counts consolidated log lines from a Go logger with a mocked clock
+skip errors TestProperLogCallbackIsSet/tests checks which Go log function is set
+skip errors TestShowFirstOption/tests checks the parsed show_first flag
+
+# file: see above
+
+# geoip
+skip geoip TestMetadata/tests reads the MaxMind fixture databases in the Go package's testdata; KernDNS's geoip unit tests use the same databases
+
+# log
+skip log TestJSONQueryEscaping/want JSON fields of a Go log line
+skip log TestLoggedClassNameErrorWithoutSOA/tests checks the output of a Go logger
+skip log TestLogged/tests checks the output of a Go logger
+
+# loadbalance
+skip loadbalance TestLoadBalanceRandom/tests counts record positions after Go's randomizer
+skip loadbalance TestLoadBalanceXFR/answer AXFR records written through the Go shuffler
+skip loadbalance TestRoundRobinDoesNotMutateInput/inputs tests the Go roundRobin helper
+skip loadbalance TestSortPreferred/records input of the Go sortPreferred helper
+skip loadbalance TestSortPreferred/cidrs input of the Go sortPreferred helper
+skip loadbalance TestSortPreferred/expectedOrder output of the Go sortPreferred helper
+skip loadbalance testWeighted parsed weight file settings (Go internals)
+skip loadbalance testOneDomainWRR weight data for the Go WRR tests
+skip loadbalance testTwoDomainsWRR weight data for the Go WRR tests
+skip loadbalance TestWeightFileUpdate/tests tests the Go weight file parser
+skip loadbalance TestLoadBalanceWRR/oneDomain weight data for the Go WRR test
+skip loadbalance TestLoadBalanceWRR/twoDomains weight data for the Go WRR test
+skip loadbalance TestLoadBalanceWRR/tests counts record positions over many shuffles with a seeded Go random source
+
+# metadata
+skip metadata TestMetadataServeDNS/expectedMetadata values from Go test providers
+skip metadata TestLabelFormat/labels tests the Go IsLabel helper
+
+# metrics
+skip metrics TestMetricsTLS/tests starts the metrics HTTPS listener with the Go package's testdata certificates
+skip metrics TestMetrics/tests scrapes Go metric registries
+skip metrics TestRecorder_WriteMsg/tests tests the Go recorder
+
+# minimal
+skip minimal TestMinimizeResponse/baseAnswer records shared by other tables (checked through them)
+skip minimal TestMinimizeResponse/baseNs records shared by other tables (checked through them)
+skip minimal TestMinimizeResponse/baseExtra records shared by other tables (checked through them)
+
+# loop
+skip loop TestParseServerBlockKeys/tests tests the Go server block key parser
+
+# pprof
+skip pprof TestHandlerPprofEndpoints/testCases Go runtime profiles (KernDNS serves a CPU profile and 404 for Go-only profiles)
+
+# proxyproto
+skip proxyproto TestMetadataThroughChain/tlvs TLVs of a Go PROXY header for the metadata test
+skip proxyproto TestMetadataPublishesTLV/tlvs TLVs of a Go PROXY header for the metadata test
+
+# secondary
+skip secondary TestTransferInCatalogRejectsUncoordinatedMigration/tests calls the Go catalog transfer with internal state
+
+# sign
+skip sign TestNames/expected output of the Go names helper
+
+# siit
+skip siit TestSIITDNS64NoRecursion/cases Go response writers with recursion markers
+skip siit TestToUnmappedAAAA/eam EAM mapping for a Go helper
+skip siit TestToAlgorithmicFallback/eam EAM mapping for a Go helper
+skip siit TestSynthesizePreservesAuthoritativeAndRecursive/cases calls the Go synthesize helper
+skip siit TestServeDNSMetricCounting/cases reads Go metric counters
+skip siit TestExtractIPv4RFC6052Vectors/cases tests the Go RFC 6052 helper
+skip siit TestToRejectsNonzeroUOctet/eam EAM mapping for a Go helper
+skip siit TestToAcceptsZeroUOctet/eam EAM mapping for a Go helper
+
+# tls
+skip tls TestTLSClientAuthentication/tests checks the parsed Go tls.ClientAuthType
+
+# tsig
+skip tsig TestParse/secrets parsed secrets (Go internals) of a table that needs a secrets file the test writes
+skip tsig TestParse/serverBlockKeys server block keys for a Go controller
+skip tsig TestParseKeyFile/expectedSecrets parsed secrets (Go internals)
+skip tsig TestServeDNS/cases signs requests with Go's TSIG implementation and a test writer that fakes TsigStatus
+skip tsig TestServeDNSTsigErrors/cases fakes TsigStatus errors in a Go test writer
+skip tsig TestServeDNSTsigNext/cases fakes TsigStatus in a Go test writer
+
+# view
+skip view TestFilter_ErrorPaths/tests calls the Go filter function with broken expressions
+
+# rewrite
+skip rewrite TestCNameTargetRewrite/ruleset rules with an upstream answered by a Go fake
+skip rewrite TestCNAMETargetRewrite_upstreamFailurePaths/cases Go fake upstreams that fail
+skip rewrite TestEdns0LocalSetRevertRestoresPreexisting/original EDNS0 option bytes for a Go reverter test
+skip rewrite TestRemapStringRewriter/tests tests the Go remapStringRewriter helper
+skip rewrite tests not driven yet: a reverter table for rules the Go test builds in code
+skip rewrite valueTests not driven yet: a reverter table for rules the Go test builds in code
+skip rewrite edns0NoOPTRevertTests not driven yet: a reverter table for rules the Go test builds in code
+skip rewrite TestRewriteDefaultRevertPolicy/tests not driven yet: rules built in code with a Go revert policy
+skip rewrite TestRewriteEDNS0Local/tests EDNS0 option rewriting (not driven yet: compares Go EDNS0 option structs)
+skip rewrite TestEdns0MultiRule/tests EDNS0 option rewriting (not driven yet: compares Go EDNS0 option structs)
+skip rewrite TestRewriteEDNS0LocalVariable/expectedMetadata metadata values for the table below
+skip rewrite TestRewriteEDNS0LocalVariable/tests EDNS0 option rewriting (not driven yet: compares Go EDNS0 option structs)
+skip rewrite TestRewriteEDNS0Subnet/tests not driven yet: EDNS0 subnet rewriting with a Go test writer
+skip rewrite TestRewriteEDNS0Revert/tests EDNS0 option rewriting (not driven yet: compares Go EDNS0 option structs)
+skip rewrite TestRewriteEDNS0Unset/tests EDNS0 option rewriting (not driven yet: compares Go EDNS0 option structs)
+skip rewrite TestTtlRewrite/ruleset expected Go rule types (reflect.Type)
+
+# trace
+skip trace TestParseServiceEndpoint/tests tests the Go service endpoint helper
+skip trace TestTrace/cases reads spans from a Go mock tracer
+skip trace TestTrace_DataDog/cases reads spans from a Go mock tracer
+
+# grpc
+skip grpc TestPoliciesOrdering/in Go proxy structs for the policy helper
+skip grpc TestPoliciesOrdering/in2 Go proxy structs for the policy helper
+skip grpc TestProxy/tests Go proxy structs with a fake gRPC client
+
+# forward
+skip forward TestList/expect Go proxy structs
+skip forward TestForward_Regression_NoBusyLoop/tests counts upstream attempts on Go proxies
+skip forward TestForward_NextOnNodata/tests not driven yet: needs a dnstest upstream and next_on_nodata
+skip forward TestClassifyToAddrs/tests tests the Go resolver helper (upstreams given as hostnames are not supported by KernDNS yet)
+skip forward TestParseAsHostEntry/tests tests the Go resolver helper (hostnames are not supported by KernDNS yet)
+skip forward TestFormatResolvedAddr/tests tests the Go resolver helper
+skip forward TestExpandAndDedup/entries input of the Go resolver helper
+skip forward TestExpandAndDedup/expected output of the Go resolver helper
+skip forward TestExpandAndDedupOrderPreserved/entries input of the Go resolver helper
+skip forward TestExpandAndDedupTLS/entries input of the Go resolver helper
+skip forward TestExpandAndDedupTLS/expected output of the Go resolver helper
+skip forward TestExpandAndDedupKeepsDistinctDoTAndDoQEndpoints/entries input of the Go resolver helper
+skip forward TestExpandAndDedupKeepsDistinctDoTAndDoQEndpoints/want output of the Go resolver helper
+skip forward TestSplitZone/tests tests the Go splitZone helper
+skip forward TestSetupTLSclientSessionCacheCount/tests checks the parsed Go TLS session cache
+skip forward TestNextAlternate/testsValid checks parsed rcodes (Go internals)
+skip forward TestFailfastAllUnhealthyUpstreams/tests checks the parsed flag
+skip forward TestFailover/tests needs dnstest upstreams
+
+# template
+skip template TestSetupParse/serverBlockKeys server block keys for a Go controller
+skip template TestHandler/tests the templates are Go structs and the checks Go closures (verifyResponse)
+skip template TestVarMatch/expected values for a Go closure
+skip cache TestCacheSeparatesQuestionClasses/classes an empty list of Go dns.Class values (the classes are set in the loop)
+skip tsig TestParseKeyFileErrors/tests contents of key files for the Go key file parser (the test writes them to temp files)
+
+# rows (generated from the failures, grouped by cause)
+xfail errors TestErrorsParse/tests#14 errors { consolidate } is not supported by KernDNS yet
+xfail errors TestErrorsParse/tests#15 errors { consolidate } is not supported by KernDNS yet
+xfail errors TestErrorsParse/tests#16 errors { consolidate } is not supported by KernDNS yet
+xfail errors TestErrorsParse/tests#17 errors { consolidate } is not supported by KernDNS yet
+xfail errors TestErrorsParse/tests#18 errors { consolidate } is not supported by KernDNS yet
+xfail errors TestErrorsParse/tests#19 errors { consolidate } is not supported by KernDNS yet
+xfail errors TestErrorsParse/tests#20 errors { consolidate } is not supported by KernDNS yet
+skip geoip TestGeoIPParse/tests#0 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
+skip geoip TestGeoIPParse/tests#1 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
+skip geoip TestGeoIPParse/tests#2 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
+skip geoip TestGeoIPParse/tests#3 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
+xfail dnssec TestSetupDnssec/tests#4 RSASHA1 keys can't sign with ring; KernDNS refuses them at startup (docs/PLAN.md)
+xfail dnssec TestSetupDnssec/tests#5 RSASHA1 keys can't sign with ring; KernDNS refuses them at startup (docs/PLAN.md)
+xfail dnssec TestSetupDnssec/tests#6 RSASHA1 keys can't sign with ring; KernDNS refuses them at startup (docs/PLAN.md)
+xfail dnssec TestSetupDnssec/tests#10 RSASHA1 keys can't sign with ring; KernDNS refuses them at startup (docs/PLAN.md)
+skip sign TestParse/tests#0 needs the key and zone files in the Go package's testdata directory
+skip sign TestParse/tests#1 needs the key and zone files in the Go package's testdata directory
+skip tls TestTLS/tests#0 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
+skip tls TestTLS/tests#1 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
+skip tls TestTLS/tests#2 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
+skip tls TestTLS/tests#3 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
+skip tls TestTLS/tests#4 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
+skip tls TestTLS/tests#5 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
+xfail tls TestTLS/tests#6 tls { keylog } is not supported by KernDNS yet
+xfail cache TestServeStale/tests#8 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#9 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#10 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#11 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#12 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#13 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#14 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#15 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#16 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStale/tests#17 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStaleFailureRecheck/tests#0 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStaleFailureRecheck/tests#1 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStaleFailureRecheck/tests#2 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStaleFailureRecheck/tests#3 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
+xfail cache TestServeStalePolicy/tests#0 cache { serve_stale_policy } is not supported by KernDNS yet
+xfail cache TestServeStalePolicy/tests#1 cache { serve_stale_policy } is not supported by KernDNS yet
+xfail template TestVar/tests#0 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#1 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#2 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#3 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#4 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#5 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#6 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#7 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#9 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#10 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#11 template var needs the expr language, not supported by KernDNS
+xfail template TestVar/tests#12 template var needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#0 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#1 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#2 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#3 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#4 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#5 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#6 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#7 template var needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#8 template var needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#9 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#10 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#11 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#12 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#13 template expr needs the expr language, not supported by KernDNS
+xfail template TestExpr/tests#14 template expr needs the expr language, not supported by KernDNS
+xfail template TestExprMatch/tests#0 template expr needs the expr language, not supported by KernDNS
+xfail template TestExprMatch/tests#1 template expr needs the expr language, not supported by KernDNS
+xfail template TestExprMatch/tests#2 template expr needs the expr language, not supported by KernDNS
+xfail template TestExprMatch/tests#3 template expr needs the expr language, not supported by KernDNS
+xfail template TestSetupParseVar/tests#0 template var needs the expr language, not supported by KernDNS
+xfail template TestSetupParseVar/tests#1 template var needs the expr language, not supported by KernDNS
+xfail template TestSetupParseVar/tests#2 template var needs the expr language, not supported by KernDNS
+xfail template TestSetupParseExpr/tests#0 template expr needs the expr language, not supported by KernDNS
+xfail template TestSetupParseExpr/tests#1 template expr needs the expr language, not supported by KernDNS
+xfail template TestSetupParseExpr/tests#2 template var needs the expr language, not supported by KernDNS
+xfail template TestSetupParseExpr/tests#3 template expr needs the expr language, not supported by KernDNS
+xfail template TestSetupParseExpr/tests#4 template expr needs the expr language, not supported by KernDNS
+skip grpc TestSetupResolvconf/tests#0 the Go test writes the resolv.conf into its working directory
+xfail forward TestSetupResolver/tests#0 forward { resolver } is not supported by KernDNS yet
+xfail forward TestSetupResolver/tests#1 forward { resolver } is not supported by KernDNS yet
+xfail forward TestSetupResolver/tests#2 forward { resolver } is not supported by KernDNS yet
+xfail forward TestSetup/tests#15 forward https:// (DoH) upstreams are not supported by KernDNS yet
+xfail forward TestSetup/tests#16 forward quic:// (DoQ) upstreams are not supported by KernDNS yet
+xfail forward TestSetupTLS/tests#4 forward quic:// (DoQ) upstreams are not supported by KernDNS yet
+skip forward TestSetupResolvconf/tests#0 the Go test writes the resolv.conf into its working directory
+skip forward TestSetupResolvconf/tests#2 the Go test writes the resolv.conf into its working directory
+skip forward TestSetupResolvconf/tests#3 the Go test writes the resolv.conf into its working directory
+xfail metrics TestPrometheusParse/tests#2 prometheus { runtime_metrics } (Go runtime metrics) is not supported by KernDNS
+xfail metrics TestPrometheusParse/tests#3 prometheus { runtime_metrics } (Go runtime metrics) is not supported by KernDNS
+xfail transfer TestParse/tests#0 IPv6 zone identifiers in transfer to are not supported by KernDNS yet

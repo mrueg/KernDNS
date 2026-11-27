@@ -1,0 +1,223 @@
+{
+ "plugin": "minimal",
+ "strings": {},
+ "tables": [
+  {
+   "file": "minimal_test.go",
+   "func": "TestMinimizeResponse",
+   "name": "baseAnswer",
+   "line": 36,
+   "value": [
+    "example.com.\t293\tIN\tA\t142.250.76.46"
+   ]
+  },
+  {
+   "file": "minimal_test.go",
+   "func": "TestMinimizeResponse",
+   "name": "baseNs",
+   "line": 39,
+   "value": [
+    "example.com.\t157127\tIN\tNS\tns2.example.com.",
+    "example.com.\t157127\tIN\tNS\tns1.example.com.",
+    "example.com.\t157127\tIN\tNS\tns3.example.com.",
+    "example.com.\t157127\tIN\tNS\tns4.example.com."
+   ]
+  },
+  {
+   "file": "minimal_test.go",
+   "func": "TestMinimizeResponse",
+   "name": "baseExtra",
+   "line": 46,
+   "value": [
+    "ns2.example.com.\t316273\tIN\tA\t216.239.34.10",
+    "ns2.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:34::a",
+    "ns3.example.com.\t316274\tIN\tA\t216.239.36.10",
+    "ns3.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:36::a",
+    "ns1.example.com.\t165555\tIN\tA\t216.239.32.10",
+    "ns1.example.com.\t165555\tIN\tAAAA\t2001:4860:4802:32::a",
+    "ns4.example.com.\t190188\tIN\tA\t216.239.38.10",
+    "ns4.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:38::a"
+   ]
+  },
+  {
+   "file": "minimal_test.go",
+   "func": "TestMinimizeResponse",
+   "name": "tests",
+   "line": 57,
+   "value": [
+    {
+     "active": false,
+     "minimal": {
+      "Answer": [
+       "example.com.\t293\tIN\tA\t142.250.76.46"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": null,
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "original": {
+      "Answer": [
+       "example.com.\t293\tIN\tA\t142.250.76.46"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": [
+       "ns2.example.com.\t316273\tIN\tA\t216.239.34.10",
+       "ns2.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:34::a",
+       "ns3.example.com.\t316274\tIN\tA\t216.239.36.10",
+       "ns3.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:36::a",
+       "ns1.example.com.\t165555\tIN\tA\t216.239.32.10",
+       "ns1.example.com.\t165555\tIN\tAAAA\t2001:4860:4802:32::a",
+       "ns4.example.com.\t190188\tIN\tA\t216.239.38.10",
+       "ns4.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:38::a"
+      ],
+      "Ns": null,
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "active": false,
+     "minimal": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": [
+       "ns2.example.com.\t316273\tIN\tA\t216.239.34.10",
+       "ns2.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:34::a",
+       "ns3.example.com.\t316274\tIN\tA\t216.239.36.10",
+       "ns3.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:36::a",
+       "ns1.example.com.\t165555\tIN\tA\t216.239.32.10",
+       "ns1.example.com.\t165555\tIN\tAAAA\t2001:4860:4802:32::a",
+       "ns4.example.com.\t190188\tIN\tA\t216.239.38.10",
+       "ns4.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:38::a"
+      ],
+      "Ns": [
+       "example.com.\t157127\tIN\tNS\tns2.example.com.",
+       "example.com.\t157127\tIN\tNS\tns1.example.com.",
+       "example.com.\t157127\tIN\tNS\tns3.example.com.",
+       "example.com.\t157127\tIN\tNS\tns4.example.com."
+      ],
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "original": {
+      "Answer": null,
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": [
+       "ns2.example.com.\t316273\tIN\tA\t216.239.34.10",
+       "ns2.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:34::a",
+       "ns3.example.com.\t316274\tIN\tA\t216.239.36.10",
+       "ns3.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:36::a",
+       "ns1.example.com.\t165555\tIN\tA\t216.239.32.10",
+       "ns1.example.com.\t165555\tIN\tAAAA\t2001:4860:4802:32::a",
+       "ns4.example.com.\t190188\tIN\tA\t216.239.38.10",
+       "ns4.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:38::a"
+      ],
+      "Ns": [
+       "example.com.\t157127\tIN\tNS\tns2.example.com.",
+       "example.com.\t157127\tIN\tNS\tns1.example.com.",
+       "example.com.\t157127\tIN\tNS\tns3.example.com.",
+       "example.com.\t157127\tIN\tNS\tns4.example.com."
+      ],
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 0,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    },
+    {
+     "active": false,
+     "minimal": {
+      "Answer": [
+       "example.com.\t293\tIN\tA\t142.250.76.46"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": [
+       "ns2.example.com.\t316273\tIN\tA\t216.239.34.10",
+       "ns2.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:34::a",
+       "ns3.example.com.\t316274\tIN\tA\t216.239.36.10",
+       "ns3.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:36::a",
+       "ns1.example.com.\t165555\tIN\tA\t216.239.32.10",
+       "ns1.example.com.\t165555\tIN\tAAAA\t2001:4860:4802:32::a",
+       "ns4.example.com.\t190188\tIN\tA\t216.239.38.10",
+       "ns4.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:38::a"
+      ],
+      "Ns": [
+       "example.com.\t157127\tIN\tNS\tns2.example.com.",
+       "example.com.\t157127\tIN\tNS\tns1.example.com.",
+       "example.com.\t157127\tIN\tNS\tns3.example.com.",
+       "example.com.\t157127\tIN\tNS\tns4.example.com."
+      ],
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 2,
+      "RecursionAvailable": false,
+      "Truncated": false
+     },
+     "original": {
+      "Answer": [
+       "example.com.\t293\tIN\tA\t142.250.76.46"
+      ],
+      "AuthenticatedData": false,
+      "Authoritative": false,
+      "CheckingDisabled": false,
+      "Do": false,
+      "Error": null,
+      "Extra": [
+       "ns2.example.com.\t316273\tIN\tA\t216.239.34.10",
+       "ns2.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:34::a",
+       "ns3.example.com.\t316274\tIN\tA\t216.239.36.10",
+       "ns3.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:36::a",
+       "ns1.example.com.\t165555\tIN\tA\t216.239.32.10",
+       "ns1.example.com.\t165555\tIN\tAAAA\t2001:4860:4802:32::a",
+       "ns4.example.com.\t190188\tIN\tA\t216.239.38.10",
+       "ns4.example.com.\t157127\tIN\tAAAA\t2001:4860:4802:38::a"
+      ],
+      "Ns": [
+       "example.com.\t157127\tIN\tNS\tns2.example.com.",
+       "example.com.\t157127\tIN\tNS\tns1.example.com.",
+       "example.com.\t157127\tIN\tNS\tns3.example.com.",
+       "example.com.\t157127\tIN\tNS\tns4.example.com."
+      ],
+      "Qname": "",
+      "Qtype": 0,
+      "Rcode": 2,
+      "RecursionAvailable": false,
+      "Truncated": false
+     }
+    }
+   ]
+  }
+ ]
+}

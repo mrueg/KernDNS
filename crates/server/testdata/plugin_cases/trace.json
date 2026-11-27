@@ -1,0 +1,636 @@
+{
+ "plugin": "trace",
+ "strings": {
+  "defEpType": "zipkin",
+  "defServiceName": "coredns",
+  "defaultTopLevelSpanName": "servedns",
+  "metaTraceIdKey": "trace/traceid"
+ },
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestTraceParse",
+   "name": "tests",
+   "line": 12,
+   "value": [
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:1234/api/v2/spans",
+     "every": 1,
+     "input": "trace localhost:1234",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://zipkin-http.monitoring:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace zipkin-http.monitoring:9411",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://http-collector:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace zipkin http-collector:9411",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://myhttpscollector:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace zipkin myhttpscollector:9411",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "https://zipkin-http.monitoring:9411/custom/spans",
+     "every": 1,
+     "input": "trace zipkin https://zipkin-http.monitoring:9411/custom/spans",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "HTTP://collector:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace HTTP://collector:9411/api/v2/spans",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "HTTPS://collector:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace zipkin HTTPS://collector:9411/api/v2/spans",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "HtTpS://collector:9411/Custom/Spans?Tenant=Blue",
+     "every": 1,
+     "input": "trace zipkin HtTpS://collector:9411/Custom/Spans?Tenant=Blue",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "httpS://collector:9411/Custom/Spans?Tenant=Blue",
+     "every": 1,
+     "input": "trace zipkin httpS://collector:9411/Custom/Spans?Tenant=Blue",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:1234/somewhere/else",
+     "every": 1,
+     "input": "trace http://localhost:1234/somewhere/else",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:1234/api/v2/spans",
+     "every": 1,
+     "input": "trace zipkin localhost:1234",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "localhost",
+     "every": 1,
+     "input": "trace datadog localhost",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:8127",
+     "every": 1,
+     "input": "trace datadog http://localhost:8127",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "localhost",
+     "every": 1,
+     "input": "trace datadog localhost {\n datadog_analytics_rate 0.1\n}",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:9411/api/v2/spans",
+     "every": 100,
+     "input": "trace {\n every 100\n}",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": true,
+     "endpoint": "http://localhost:9411/api/v2/spans",
+     "every": 100,
+     "input": "trace {\n every 100\n service foobar\nclient_server\n}",
+     "serviceName": "foobar",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": true,
+     "endpoint": "http://localhost:9411/api/v2/spans",
+     "every": 2,
+     "input": "trace {\n every 2\n client_server true\n}",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace {\n client_server false\n}",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "http://localhost:9411/api/v2/spans",
+     "every": 1,
+     "input": "trace {\n zipkin_max_backlog_size 100\n zipkin_max_batch_size 200\n zipkin_max_batch_interval 10s\n}",
+     "serviceName": "coredns",
+     "shouldErr": false,
+     "zipkinMaxBacklogSize": 100,
+     "zipkinMaxBatchInterval": 10000000000,
+     "zipkinMaxBatchSize": 200
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace footype localhost:4321",
+     "serviceName": "",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n every 2\n client_server junk\n}",
+     "serviceName": "",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace datadog localhost {\n datadog_analytics_rate 2\n}",
+     "serviceName": "",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n zipkin_max_backlog_size wrong\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n zipkin_max_batch_size wrong\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n zipkin_max_batch_interval wrong\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n zipkin_max_backlog_size\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n zipkin_max_batch_size\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n zipkin_max_batch_interval\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    },
+    {
+     "clientServer": false,
+     "endpoint": "",
+     "every": 1,
+     "input": "trace {\n evrey 100\n}",
+     "serviceName": "coredns",
+     "shouldErr": true,
+     "zipkinMaxBacklogSize": 0,
+     "zipkinMaxBatchInterval": 0,
+     "zipkinMaxBatchSize": 0
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestParseServiceEndpoint",
+   "name": "tests",
+   "line": 101,
+   "value": [
+    {
+     "expectedServiceEndpoint": "127.0.0.1:8053",
+     "listenHosts": [
+      "127.0.0.1"
+     ],
+     "name": "IPv4 address",
+     "port": "8053"
+    },
+    {
+     "expectedServiceEndpoint": "[3d47:98c0:b113::3]:8853",
+     "listenHosts": [
+      "3d47:98c0:b113::3"
+     ],
+     "name": "IPv6 address",
+     "port": "8853"
+    },
+    {
+     "expectedServiceEndpoint": "localhost:8053",
+     "listenHosts": [
+      "localhost"
+     ],
+     "name": "Hostname",
+     "port": "8053"
+    },
+    {
+     "expectedServiceEndpoint": "[3d47:98c0:b113::3]:8853",
+     "listenHosts": [
+      "3d47:98c0:b113::3",
+      "127.0.0.1"
+     ],
+     "name": "Multiple addresses",
+     "port": "8853"
+    }
+   ]
+  },
+  {
+   "file": "trace_test.go",
+   "func": "TestTrace",
+   "name": "cases",
+   "line": 50,
+   "value": [
+    {
+     "err": null,
+     "name": "NXDOMAIN",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 61716,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.org.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "rcode": 3,
+     "status": 0
+    },
+    {
+     "err": null,
+     "name": "NOERROR",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 9488,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.net.",
+        "Qclass": 1,
+        "Qtype": 5
+       }
+      ]
+     },
+     "rcode": 0,
+     "status": 0
+    },
+    {
+     "err": {
+      "error": "test error"
+     },
+     "name": "SERVFAIL",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 13585,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.net.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "rcode": 2,
+     "status": 0
+    },
+    {
+     "err": {
+      "error": "test error"
+     },
+     "name": "No response written",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 57103,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.net.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "rcode": 2,
+     "status": 2
+    }
+   ]
+  },
+  {
+   "file": "trace_test.go",
+   "func": "TestTrace_DataDog",
+   "name": "cases",
+   "line": 211,
+   "value": [
+    {
+     "err": null,
+     "name": "NXDOMAIN",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 44753,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.org.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "rcode": 3,
+     "status": 0
+    },
+    {
+     "err": null,
+     "name": "NOERROR",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 44537,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.net.",
+        "Qclass": 1,
+        "Qtype": 5
+       }
+      ]
+     },
+     "rcode": 0,
+     "status": 0
+    },
+    {
+     "err": {
+      "error": "test error"
+     },
+     "name": "SERVFAIL with error",
+     "question": {
+      "Answer": null,
+      "Compress": false,
+      "Extra": null,
+      "MsgHdr": {
+       "AuthenticatedData": false,
+       "Authoritative": false,
+       "CheckingDisabled": false,
+       "Id": 28321,
+       "Opcode": 0,
+       "Rcode": 0,
+       "RecursionAvailable": false,
+       "RecursionDesired": true,
+       "Response": false,
+       "Truncated": false,
+       "Zero": false
+      },
+      "Ns": null,
+      "Question": [
+       {
+        "Name": "example.net.",
+        "Qclass": 1,
+        "Qtype": 1
+       }
+      ]
+     },
+     "rcode": 2,
+     "status": 0
+    }
+   ]
+  }
+ ]
+}

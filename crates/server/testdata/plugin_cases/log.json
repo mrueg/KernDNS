@@ -1,0 +1,463 @@
+{
+ "plugin": "log",
+ "strings": {
+  "TestJSONQueryEscaping/value": "arbitrary \"metadata\"\nwith\t\\escapes"
+ },
+ "tables": [
+  {
+   "file": "json_test.go",
+   "func": "TestJSONQueryEscaping",
+   "name": "want",
+   "line": 77,
+   "value": {
+    "bufsize": 65535,
+    "client_ip": "2001:db8::1",
+    "client_port": 40212,
+    "dnssec_ok": true,
+    "id": 42,
+    "level": "INFO",
+    "msg": "{\"name\":\".\",\"metadata\":\"arbitrary \"metadata\"\nwith\t\\escapes\"}",
+    "opcode": 0,
+    "plugin": "log",
+    "protocol": "tcp",
+    "qclass": "IN",
+    "qname": ".",
+    "qtype": "A",
+    "rcode": "REFUSED",
+    "request_size": 12
+   }
+  },
+  {
+   "file": "log_test.go",
+   "func": "TestLoggedClassNameErrorWithoutSOA",
+   "name": "tests",
+   "line": 191,
+   "value": [
+    {
+     "class": 3,
+     "name": "error",
+     "shouldLog": false
+    },
+    {
+     "class": 2,
+     "name": "denial",
+     "shouldLog": true
+    }
+   ]
+  },
+  {
+   "file": "log_test.go",
+   "func": "TestLogged",
+   "name": "tests",
+   "line": 244,
+   "value": [
+    {
+     "Domain": "example.org.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      }
+     ],
+     "ShouldLog": true,
+     "ShouldNOTString": "",
+     "ShouldString": "A IN example.org."
+    },
+    {
+     "Domain": "example.net.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      }
+     ],
+     "ShouldLog": false,
+     "ShouldNOTString": "",
+     "ShouldString": ""
+    },
+    {
+     "Domain": "example.net.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      },
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.net."
+      }
+     ],
+     "ShouldLog": true,
+     "ShouldNOTString": "",
+     "ShouldString": "A IN example.net."
+    },
+    {
+     "Domain": "example.org.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{type} {class}",
+       "NameScope": "."
+      }
+     ],
+     "ShouldLog": true,
+     "ShouldNOTString": "example.org",
+     "ShouldString": "A IN"
+    },
+    {
+     "Domain": "example.org.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port}",
+       "NameScope": "."
+      }
+     ],
+     "ShouldLog": true,
+     "ShouldNOTString": "A IN example.org",
+     "ShouldString": "10.240.0.1:40212"
+    },
+    {
+     "Domain": "example.org.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} \"{\u003eopcode}\"",
+       "NameScope": "."
+      }
+     ],
+     "ShouldLog": true,
+     "ShouldNOTString": "",
+     "ShouldString": "\"0\""
+    },
+    {
+     "Domain": "foo.%s.example.org.",
+     "Rules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} \"{\u003eopcode}\"",
+       "NameScope": "."
+      }
+     ],
+     "ShouldLog": true,
+     "ShouldNOTString": "%!s(MISSING)",
+     "ShouldString": "foo.%s.example.org."
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestLogParse",
+   "name": "tests",
+   "line": 13,
+   "value": [
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "."
+      }
+     ],
+     "inputLogRules": "log",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org. {common}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} \"{\u003eopcode}\"",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org {combined}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      },
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} \"{\u003eopcode}\"",
+       "NameScope": "example.net."
+      }
+     ],
+     "inputLogRules": "log example.org.\n\t\tlog example.net {combined}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{host}",
+       "NameScope": "example.org."
+      },
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{when}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org {host}\n\t\t\t  log example.org {when}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      },
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.net."
+      }
+     ],
+     "inputLogRules": "log example.org example.net",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{host}",
+       "NameScope": "example.org."
+      },
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{host}",
+       "NameScope": "example.net."
+      }
+     ],
+     "inputLogRules": "log example.org example.net {host}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "denial": {}
+       },
+       "Format": "{when}",
+       "NameScope": "example.org."
+      },
+      {
+       "Class": {
+        "denial": {}
+       },
+       "Format": "{when}",
+       "NameScope": "example.net."
+      }
+     ],
+     "inputLogRules": "log example.org example.net {when} {\n\t\t\tclass denial\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org {\n\t\t\t\tclass all\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "denial": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org {\n\t\t\tclass denial\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "denial": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "."
+      }
+     ],
+     "inputLogRules": "log {\n\t\t\tclass denial\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "denial": {},
+        "error": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "."
+      }
+     ],
+     "inputLogRules": "log {\n\t\t\tclass denial error\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "denial": {},
+        "error": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration}",
+       "NameScope": "."
+      }
+     ],
+     "inputLogRules": "log {\n\t\t\tclass denial\n\t\t\tclass error\n\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [],
+     "inputLogRules": "log {\n\t\t\tclass abracadabra\n\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedLogRules": [],
+     "inputLogRules": "log {\n\t\t\tclass\n\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedLogRules": [],
+     "inputLogRules": "log {\n\t\t\tunknown\n\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} \"{\u003eopcode}\" {/forward/upstream}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org \"{combined} {/forward/upstream}\"",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} {/forward/upstream}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org \"{common} {/forward/upstream}\"",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{when} {remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} \"{\u003eopcode}\" {/forward/upstream}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org \"{when} {combined} {/forward/upstream}\"",
+     "shouldErr": false
+    },
+    {
+     "expectedLogRules": [
+      {
+       "Class": {
+        "all": {}
+       },
+       "Format": "{when} {remote}:{port} - {\u003eid} \"{type} {class} {name} {proto} {size} {\u003edo} {\u003ebufsize}\" {rcode} {\u003erflags} {rsize} {duration} {/forward/upstream}",
+       "NameScope": "example.org."
+      }
+     ],
+     "inputLogRules": "log example.org \"{when} {common} {/forward/upstream}\"",
+     "shouldErr": false
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+ "plugin": "multisocket",
+ "strings": {
+  "pluginName": "multisocket"
+ },
+ "tables": [
+  {
+   "file": "multisocket_test.go",
+   "func": "TestMultisocket",
+   "name": "tests",
+   "line": 13,
+   "value": [
+    {
+     "expectedErrContent": "",
+     "expectedNumSockets": 8,
+     "input": "multisocket",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedNumSockets": 2,
+     "input": "multisocket 2",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedNumSockets": 1024,
+     "input": "multisocket 1024",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedNumSockets": 1,
+     "input": " multisocket 1",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "invalid num sockets",
+     "expectedNumSockets": 0,
+     "input": "multisocket text",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "num sockets can not be zero or negative",
+     "expectedNumSockets": 0,
+     "input": "multisocket 0",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "num sockets can not be zero or negative",
+     "expectedNumSockets": 0,
+     "input": "multisocket -1",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "num sockets exceeds maximum",
+     "expectedNumSockets": 0,
+     "input": "multisocket 1025",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "Wrong argument count or unexpected line ending after '2'",
+     "expectedNumSockets": 0,
+     "input": "multisocket 2 2",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "Unexpected token '{', expecting argument",
+     "expectedNumSockets": 0,
+     "input": "multisocket 2 {\n\t\t\tblock\n\t\t}",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

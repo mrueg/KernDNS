@@ -1,0 +1,60 @@
+{
+ "plugin": "whoami",
+ "strings": {
+  "name": "whoami"
+ },
+ "tables": [
+  {
+   "file": "whoami_test.go",
+   "func": "TestWhoami",
+   "name": "tests",
+   "line": 18,
+   "value": [
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": [
+      "example.org.",
+      "_udp.example.org."
+     ],
+     "qname": "example.org",
+     "qtype": 1,
+     "remote": ""
+    },
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": [
+      "Example.ORG.",
+      "_udp.Example.ORG."
+     ],
+     "qname": "Example.ORG",
+     "qtype": 1,
+     "remote": ""
+    },
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": [
+      "example.org.",
+      "_udp.example.org."
+     ],
+     "qname": "example.org",
+     "qtype": 1,
+     "remote": "2003::1/64"
+    },
+    {
+     "expectedCode": 0,
+     "expectedErr": null,
+     "expectedReply": [
+      "Example.ORG.",
+      "_udp.Example.ORG."
+     ],
+     "qname": "Example.ORG",
+     "qtype": 1,
+     "remote": "2003::1/64"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,74 @@
+{
+ "plugin": "ready",
+ "strings": {},
+ "tables": [
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupReady",
+   "name": "tests",
+   "line": 10,
+   "value": [
+    {
+     "expectedAddr": ":8181",
+     "expectedMonitorType": "until-ready",
+     "input": "ready",
+     "shouldErr": false
+    },
+    {
+     "expectedAddr": "localhost:1234",
+     "expectedMonitorType": "until-ready",
+     "input": "ready localhost:1234",
+     "shouldErr": false
+    },
+    {
+     "expectedAddr": ":8181",
+     "expectedMonitorType": "until-ready",
+     "input": "\nready { \n\tmonitor until-ready\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedAddr": ":8181",
+     "expectedMonitorType": "continuously",
+     "input": "\nready { \n\tmonitor continuously \n}",
+     "shouldErr": false
+    },
+    {
+     "expectedAddr": "localhost:1234",
+     "expectedMonitorType": "continuously",
+     "input": "\nready localhost:1234 { \n\tmonitor continuously \n}",
+     "shouldErr": false
+    },
+    {
+     "expectedAddr": "",
+     "expectedMonitorType": "",
+     "input": "\nready localhost:1234 { \n\tmonitor 404 \n}",
+     "shouldErr": true
+    },
+    {
+     "expectedAddr": "",
+     "expectedMonitorType": "",
+     "input": "\nready {\n\tmonitro continuously\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedAddr": "",
+     "expectedMonitorType": "",
+     "input": "ready localhost:1234 b",
+     "shouldErr": true
+    },
+    {
+     "expectedAddr": "",
+     "expectedMonitorType": "",
+     "input": "ready bla",
+     "shouldErr": true
+    },
+    {
+     "expectedAddr": "",
+     "expectedMonitorType": "",
+     "input": "ready bla bla",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

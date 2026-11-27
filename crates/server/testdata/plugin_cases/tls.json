@@ -1,0 +1,172 @@
+{
+ "plugin": "tls",
+ "strings": {
+  "TestTLSKeyLog/input": "tls test_cert.pem test_key.pem test_ca.pem {\nkeylog\n}"
+ },
+ "tables": [
+  {
+   "file": "acme_test.go",
+   "func": "TestParseACMETLSErrors",
+   "name": "tests",
+   "line": 114,
+   "value": [
+    {
+     "input": "tls",
+     "name": "missing domain",
+     "want": "at least one domain"
+    },
+    {
+     "input": "tls {\nacme\n}",
+     "name": "missing acme arguments",
+     "want": "Wrong argument"
+    },
+    {
+     "input": "tls {\nacme 192.0.2.1\n}",
+     "name": "IP identifier",
+     "want": "invalid ACME domain"
+    },
+    {
+     "input": "tls {\nacme dns.example\nca ftp://ca.example\n}",
+     "name": "invalid CA",
+     "want": "invalid ACME CA URL"
+    },
+    {
+     "input": "tls {\nacme dns.example\nresolver 1.1.1.1\n}",
+     "name": "invalid resolver",
+     "want": "invalid ACME resolver"
+    },
+    {
+     "input": "tls {\nacme dns.example\nresolver 1.1.1.1:dns\n}",
+     "name": "invalid resolver port",
+     "want": "invalid ACME resolver port"
+    },
+    {
+     "input": "tls {\nacme *.*.example\n}",
+     "name": "invalid wildcard",
+     "want": "invalid ACME domain"
+    },
+    {
+     "input": "tls {\nacme dns.example\nca_root missing.pem\n}",
+     "name": "missing CA root",
+     "want": "reading ACME CA root"
+    },
+    {
+     "input": "tls {\nacme dns.example\nacme other.example\n}",
+     "name": "duplicate option",
+     "want": "only be specified once"
+    },
+    {
+     "input": "tls {\nacme dns.example\nprovider example\n}",
+     "name": "unknown option",
+     "want": "unknown ACME option"
+    }
+   ]
+  },
+  {
+   "file": "tls_test.go",
+   "func": "TestTLS",
+   "name": "tests",
+   "line": 16,
+   "value": [
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth nocert\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth request\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth require\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth verify_if_given\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth require_and_verify\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nkeylog /tmp/TestKernDNSTables632664554/001/tls.log\n}",
+     "shouldErr": false
+    },
+    {
+     "expectedErrContent": "unknown option",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nunknown\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "Wrong argument",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "Wrong argument",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth none bogus\n}",
+     "shouldErr": true
+    },
+    {
+     "expectedErrContent": "unknown authentication type",
+     "expectedRoot": "",
+     "input": "tls test_cert.pem test_key.pem test_ca.pem {\nclient_auth bogus\n}",
+     "shouldErr": true
+    }
+   ]
+  },
+  {
+   "file": "tls_test.go",
+   "func": "TestTLSClientAuthentication",
+   "name": "tests",
+   "line": 67,
+   "value": [
+    {
+     "expectedType": 0,
+     "option": ""
+    },
+    {
+     "expectedType": 0,
+     "option": "{\nclient_auth nocert\n}"
+    },
+    {
+     "expectedType": 1,
+     "option": "{\nclient_auth request\n}"
+    },
+    {
+     "expectedType": 2,
+     "option": "{\nclient_auth require\n}"
+    },
+    {
+     "expectedType": 3,
+     "option": "{\nclient_auth verify_if_given\n}"
+    },
+    {
+     "expectedType": 4,
+     "option": "{\nclient_auth require_and_verify\n}"
+    }
+   ]
+  }
+ ]
+}

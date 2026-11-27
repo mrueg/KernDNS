@@ -1,0 +1,29 @@
+{
+ "plugin": "debug",
+ "strings": {
+  "TestHexdump/str": "Hi There!",
+  "TestHexdumpf/str": "Hi There!",
+  "TestNoDebug/str": "Hi There!",
+  "prefix": "debug: "
+ },
+ "tables": [
+  {
+   "file": "debug_test.go",
+   "func": "TestDebug",
+   "name": "tests",
+   "line": 11,
+   "value": [
+    {
+     "expectedDebug": true,
+     "input": "debug",
+     "shouldErr": false
+    },
+    {
+     "expectedDebug": false,
+     "input": "debug off",
+     "shouldErr": true
+    }
+   ]
+  }
+ ]
+}

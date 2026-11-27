@@ -1,0 +1,650 @@
+{
+ "plugin": "loadbalance",
+ "strings": {
+  "missingDomainWRR": "\n# missing domain\n192.168.1.14 10\nw2,example.org\n192.168.2.14 11\n192.168.2.15 12\n",
+  "missingWeightWRR": "\nw1,example.org\n192.168.1.14\n192.168.1.15 20\n",
+  "oneDomainWRR": "\nw1,example.org\n192.168.1.15 10\n192.168.1.14 20\n",
+  "ramdomShufflePolicy": "round_robin",
+  "twoDomainsWRR": "\n# domain 1\nw1.example.org\n192.168.1.15   10\n192.168.1.14   20\n\n# domain 2\nw2.example.org\n # domain 3\n w3.example.org\n 192.168.2.16 11\n 192.168.2.15 12\n 192.168.2.14 13\n",
+  "weightedRoundRobinPolicy": "weighted",
+  "wrongIpWRR": "\nw1,example.org\n192.168.1.300 10\n",
+  "wrongWeightWRR": "\nw1,example.org\n192.168.1.14 300\n",
+  "zeroWeightWRR": "\nw1,example.org\n192.168.1.14 0\n"
+ },
+ "tables": [
+  {
+   "file": "loadbalance_test.go",
+   "func": "TestLoadBalanceRandom",
+   "name": "tests",
+   "line": 18,
+   "value": [
+    {
+     "addressAnswer": 1,
+     "addressExtra": 0,
+     "answer": [
+      "cname1.region2.skydns.test.\t300\tIN\tCNAME\tcname2.region2.skydns.test.",
+      "cname2.region2.skydns.test.\t300\tIN\tCNAME\tcname3.region2.skydns.test.",
+      "cname5.region2.skydns.test.\t300\tIN\tCNAME\tcname6.region2.skydns.test.",
+      "cname6.region2.skydns.test.\t300\tIN\tCNAME\tendpoint.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t2 mx2.region2.skydns.test.",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t3 mx3.region2.skydns.test."
+     ],
+     "cnameAnswer": 4,
+     "cnameExtra": 0,
+     "extra": null,
+     "mxAnswer": 3,
+     "mxExtra": 0
+    },
+    {
+     "addressAnswer": 1,
+     "addressExtra": 0,
+     "answer": [
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "cname.region2.skydns.test.\t300\tIN\tCNAME\tendpoint.region2.skydns.test."
+     ],
+     "cnameAnswer": 1,
+     "cnameExtra": 0,
+     "extra": null,
+     "mxAnswer": 1,
+     "mxExtra": 0
+    },
+    {
+     "addressAnswer": 3,
+     "addressExtra": 4,
+     "answer": [
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.2",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx2.region2.skydns.test.",
+      "cname2.region2.skydns.test.\t300\tIN\tCNAME\tcname3.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.3",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx3.region2.skydns.test."
+     ],
+     "cnameAnswer": 1,
+     "cnameExtra": 1,
+     "extra": [
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "endpoint.region2.skydns.test.\t300\tIN\tAAAA\t::1",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "cname2.region2.skydns.test.\t300\tIN\tCNAME\tcname3.region2.skydns.test.",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx2.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.3",
+      "endpoint.region2.skydns.test.\t300\tIN\tAAAA\t::2",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx3.region2.skydns.test."
+     ],
+     "mxAnswer": 3,
+     "mxExtra": 3
+    }
+   ]
+  },
+  {
+   "file": "loadbalance_test.go",
+   "func": "TestLoadBalanceXFR",
+   "name": "answer",
+   "line": 129,
+   "value": [
+    "skydns.test.\t30\tIN\tSOA\tns.dns.skydns.test. hostmaster.skydns.test. 1542756695 7200 1800 86400 30",
+    "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+    "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+    "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.2",
+    "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx2.region2.skydns.test.",
+    "cname2.region2.skydns.test.\t300\tIN\tCNAME\tcname3.region2.skydns.test.",
+    "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.3",
+    "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx3.region2.skydns.test.",
+    "skydns.test.\t30\tIN\tSOA\tns.dns.skydns.test. hostmaster.skydns.test. 1542756695 7200 1800 86400 30"
+   ]
+  },
+  {
+   "file": "loadbalance_test.go",
+   "func": "TestRoundRobinDoesNotMutateInput",
+   "name": "inputs",
+   "line": 222,
+   "value": {
+    "addresses only": [
+     "a.example.org.\t300\tIN\tA\t10.0.0.1",
+     "a.example.org.\t300\tIN\tA\t10.0.0.2",
+     "a.example.org.\t300\tIN\tA\t10.0.0.3",
+     "a.example.org.\t300\tIN\tA\t10.0.0.4"
+    ],
+    "mixed": [
+     "a.example.org.\t300\tIN\tCNAME\tb.example.org.",
+     "b.example.org.\t300\tIN\tA\t10.0.0.1",
+     "b.example.org.\t300\tIN\tA\t10.0.0.2",
+     "example.org.\t300\tIN\tMX\t10 mx.example.org."
+    ]
+   }
+  },
+  {
+   "file": "prefer_test.go",
+   "func": "TestSortPreferred",
+   "name": "records",
+   "line": 13,
+   "value": [
+    "example.org.\t300\tIN\tA\t10.9.30.1",
+    "example.org.\t300\tIN\tA\t10.9.20.5",
+    "example.org.\t300\tIN\tA\t192.168.1.2",
+    "example.org.\t300\tIN\tA\t10.10.0.1",
+    "example.org.\t300\tIN\tA\t10.9.20.3",
+    "example.org.\t300\tIN\tA\t172.16.0.1",
+    "example.org.\t300\tIN\tAAAA\t2001:db8::1",
+    "example.org.\t300\tIN\tAAAA\t2001:db8:abcd::1",
+    "example.org.\t300\tIN\tAAAA\tfd00::1",
+    "example.org.\t300\tIN\tCNAME\talias.example.org."
+   ]
+  },
+  {
+   "file": "prefer_test.go",
+   "func": "TestSortPreferred",
+   "name": "cidrs",
+   "line": 26,
+   "value": [
+    "2001:db8::/32",
+    "10.9.20.0/24",
+    "10.9.30.0/24"
+   ]
+  },
+  {
+   "file": "prefer_test.go",
+   "func": "TestSortPreferred",
+   "name": "expectedOrder",
+   "line": 40,
+   "value": [
+    "alias.example.org.",
+    "2001:db8::1",
+    "2001:db8:abcd::1",
+    "10.9.20.5",
+    "10.9.20.3",
+    "10.9.30.1",
+    "192.168.1.2",
+    "10.10.0.1",
+    "172.16.0.1",
+    "fd00::1"
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "name": "testWeighted",
+   "line": 11,
+   "value": [
+    {
+     "expectedWeightFile": "wfile",
+     "expectedWeightReload": "30s"
+    },
+    {
+     "expectedWeightFile": "wf",
+     "expectedWeightReload": "10s"
+    },
+    {
+     "expectedWeightFile": "wf",
+     "expectedWeightReload": "0s"
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetup",
+   "name": "tests",
+   "line": 21,
+   "value": [
+    {
+     "expectedErrContent": "",
+     "expectedPolicy": "round_robin",
+     "input": "loadbalance",
+     "shouldErr": false,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "",
+     "expectedPolicy": "round_robin",
+     "input": "loadbalance round_robin",
+     "shouldErr": false,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "",
+     "expectedPolicy": "weighted",
+     "input": "loadbalance weighted wfile",
+     "shouldErr": false,
+     "weightedDataIndex": 0
+    },
+    {
+     "expectedErrContent": "",
+     "expectedPolicy": "weighted",
+     "input": "loadbalance weighted wf {\n                                                reload 10s\n                                              } ",
+     "shouldErr": false,
+     "weightedDataIndex": 1
+    },
+    {
+     "expectedErrContent": "",
+     "expectedPolicy": "weighted",
+     "input": "loadbalance weighted wf {\n                                                reload 0s\n                                              } ",
+     "shouldErr": false,
+     "weightedDataIndex": 2
+    },
+    {
+     "expectedErrContent": "unknown policy",
+     "expectedPolicy": "",
+     "input": "loadbalance fleeb",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "unknown property",
+     "expectedPolicy": "",
+     "input": "loadbalance round_robin a",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "missing weight file argument",
+     "expectedPolicy": "",
+     "input": "loadbalance weighted",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "unexpected argument",
+     "expectedPolicy": "",
+     "input": "loadbalance weighted a b",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "unknown property",
+     "expectedPolicy": "",
+     "input": "loadbalance weighted wfile {\n                                                   susu\n                                                 } ",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "invalid reload duration",
+     "expectedPolicy": "",
+     "input": "loadbalance weighted wfile {\n                                                   reload a\n                                                 } ",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    },
+    {
+     "expectedErrContent": "unexpected argument",
+     "expectedPolicy": "",
+     "input": "loadbalance weighted wfile {\n                                                    reload 30s  a\n                                                 } ",
+     "shouldErr": true,
+     "weightedDataIndex": -1
+    }
+   ]
+  },
+  {
+   "file": "weighted_test.go",
+   "name": "testOneDomainWRR",
+   "line": 23,
+   "value": {
+    "w1,example.org.": [
+     {
+      "address": "192.168.1.15",
+      "value": 10
+     },
+     {
+      "address": "192.168.1.14",
+      "value": 20
+     }
+    ]
+   }
+  },
+  {
+   "file": "weighted_test.go",
+   "name": "testTwoDomainsWRR",
+   "line": 45,
+   "value": {
+    "w1.example.org.": [
+     {
+      "address": "192.168.1.15",
+      "value": 10
+     },
+     {
+      "address": "192.168.1.14",
+      "value": 20
+     }
+    ],
+    "w2.example.org.": [],
+    "w3.example.org.": [
+     {
+      "address": "192.168.2.16",
+      "value": 11
+     },
+     {
+      "address": "192.168.2.15",
+      "value": 12
+     },
+     {
+      "address": "192.168.2.14",
+      "value": 13
+     }
+    ]
+   }
+  },
+  {
+   "file": "weighted_test.go",
+   "func": "TestWeightFileUpdate",
+   "name": "tests",
+   "line": 88,
+   "value": [
+    {
+     "expectedDomains": null,
+     "expectedErrContent": "",
+     "shouldErr": false,
+     "weightFilContent": ""
+    },
+    {
+     "expectedDomains": {
+      "w1,example.org.": [
+       {
+        "address": "192.168.1.15",
+        "value": 10
+       },
+       {
+        "address": "192.168.1.14",
+        "value": 20
+       }
+      ]
+     },
+     "expectedErrContent": "",
+     "shouldErr": false,
+     "weightFilContent": "\nw1,example.org\n192.168.1.15 10\n192.168.1.14 20\n"
+    },
+    {
+     "expectedDomains": {
+      "w1.example.org.": [
+       {
+        "address": "192.168.1.15",
+        "value": 10
+       },
+       {
+        "address": "192.168.1.14",
+        "value": 20
+       }
+      ],
+      "w2.example.org.": [],
+      "w3.example.org.": [
+       {
+        "address": "192.168.2.16",
+        "value": 11
+       },
+       {
+        "address": "192.168.2.15",
+        "value": 12
+       },
+       {
+        "address": "192.168.2.14",
+        "value": 13
+       }
+      ]
+     },
+     "expectedErrContent": "",
+     "shouldErr": false,
+     "weightFilContent": "\n# domain 1\nw1.example.org\n192.168.1.15   10\n192.168.1.14   20\n\n# domain 2\nw2.example.org\n # domain 3\n w3.example.org\n 192.168.2.16 11\n 192.168.2.15 12\n 192.168.2.14 13\n"
+    },
+    {
+     "expectedDomains": null,
+     "expectedErrContent": "wrong domain name",
+     "shouldErr": true,
+     "weightFilContent": "\nw1,example.org\n192.168.1.14\n192.168.1.15 20\n"
+    },
+    {
+     "expectedDomains": null,
+     "expectedErrContent": "missing domain name",
+     "shouldErr": true,
+     "weightFilContent": "\n# missing domain\n192.168.1.14 10\nw2,example.org\n192.168.2.14 11\n192.168.2.15 12\n"
+    },
+    {
+     "expectedDomains": null,
+     "expectedErrContent": "wrong IP address",
+     "shouldErr": true,
+     "weightFilContent": "\nw1,example.org\n192.168.1.300 10\n"
+    },
+    {
+     "expectedDomains": null,
+     "expectedErrContent": "wrong weight value",
+     "shouldErr": true,
+     "weightFilContent": "\nw1,example.org\n192.168.1.14 300\n"
+    },
+    {
+     "expectedDomains": null,
+     "expectedErrContent": "wrong weight value",
+     "shouldErr": true,
+     "weightFilContent": "\nw1,example.org\n192.168.1.14 0\n"
+    }
+   ]
+  },
+  {
+   "file": "weighted_test.go",
+   "func": "TestLoadBalanceWRR",
+   "name": "oneDomain",
+   "line": 237,
+   "value": {
+    "endpoint.region2.skydns.test.": [
+     {
+      "address": "10.240.0.2",
+      "value": 3
+     },
+     {
+      "address": "10.240.0.1",
+      "value": 2
+     }
+    ]
+   }
+  },
+  {
+   "file": "weighted_test.go",
+   "func": "TestLoadBalanceWRR",
+   "name": "twoDomains",
+   "line": 243,
+   "value": {
+    "endpoint.region1.skydns.test.": [
+     {
+      "address": "::2",
+      "value": 4
+     },
+     {
+      "address": "::1",
+      "value": 3
+     }
+    ],
+    "endpoint.region2.skydns.test.": [
+     {
+      "address": "10.240.0.2",
+      "value": 5
+     },
+     {
+      "address": "10.240.0.1",
+      "value": 2
+     }
+    ]
+   }
+  },
+  {
+   "file": "weighted_test.go",
+   "func": "TestLoadBalanceWRR",
+   "name": "tests",
+   "line": 255,
+   "value": [
+    {
+     "addressAnswer": 5,
+     "addressExtra": 5,
+     "answer": [
+      "cname1.region2.skydns.test.\t300\tIN\tCNAME\tcname2.region2.skydns.test.",
+      "cname2.region2.skydns.test.\t300\tIN\tCNAME\tcname3.region2.skydns.test.",
+      "cname5.region2.skydns.test.\t300\tIN\tCNAME\tcname6.region2.skydns.test.",
+      "cname6.region2.skydns.test.\t300\tIN\tCNAME\tendpoint.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.2",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.3",
+      "endpoint.region1.skydns.test.\t300\tIN\tAAAA\t::1",
+      "endpoint.region1.skydns.test.\t300\tIN\tAAAA\t::2",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t2 mx2.region2.skydns.test.",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t3 mx3.region2.skydns.test."
+     ],
+     "cnameAnswer": 4,
+     "cnameExtra": 1,
+     "domains": {
+      "endpoint.region1.skydns.test.": [
+       {
+        "address": "::2",
+        "value": 4
+       },
+       {
+        "address": "::1",
+        "value": 3
+       }
+      ],
+      "endpoint.region2.skydns.test.": [
+       {
+        "address": "10.240.0.2",
+        "value": 5
+       },
+       {
+        "address": "10.240.0.1",
+        "value": 2
+       }
+      ]
+     },
+     "extra": [
+      "cname6.region2.skydns.test.\t300\tIN\tCNAME\tendpoint.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.2",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.3",
+      "endpoint.region1.skydns.test.\t300\tIN\tAAAA\t::1",
+      "endpoint.region1.skydns.test.\t300\tIN\tAAAA\t::2",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test."
+     ],
+     "mxAnswer": 3,
+     "mxExtra": 1,
+     "queries": [
+      {
+       "randv": 0,
+       "topIP": "10.240.0.2"
+      },
+      {
+       "randv": 4,
+       "topIP": "10.240.0.2"
+      },
+      {
+       "randv": 5,
+       "topIP": "::2"
+      },
+      {
+       "randv": 8,
+       "topIP": "::2"
+      },
+      {
+       "randv": 9,
+       "topIP": "::1"
+      },
+      {
+       "randv": 11,
+       "topIP": "::1"
+      },
+      {
+       "randv": 12,
+       "topIP": "10.240.0.1"
+      },
+      {
+       "randv": 13,
+       "topIP": "10.240.0.1"
+      },
+      {
+       "randv": 14,
+       "topIP": "10.240.0.3"
+      }
+     ],
+     "sumWeights": 15
+    },
+    {
+     "addressAnswer": 3,
+     "addressExtra": 0,
+     "answer": [
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.1",
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "cname.region2.skydns.test.\t300\tIN\tCNAME\tendpoint.region2.skydns.test.",
+      "endpoint.region2.skydns.test.\t300\tIN\tA\t10.240.0.2",
+      "endpoint.region1.skydns.test.\t300\tIN\tA\t10.240.0.3"
+     ],
+     "cnameAnswer": 1,
+     "cnameExtra": 0,
+     "domains": {
+      "endpoint.region2.skydns.test.": [
+       {
+        "address": "10.240.0.2",
+        "value": 3
+       },
+       {
+        "address": "10.240.0.1",
+        "value": 2
+       }
+      ]
+     },
+     "extra": null,
+     "mxAnswer": 1,
+     "mxExtra": 0,
+     "queries": [
+      {
+       "randv": 0,
+       "topIP": "10.240.0.2"
+      },
+      {
+       "randv": 2,
+       "topIP": "10.240.0.2"
+      },
+      {
+       "randv": 3,
+       "topIP": "10.240.0.1"
+      },
+      {
+       "randv": 4,
+       "topIP": "10.240.0.1"
+      },
+      {
+       "randv": 5,
+       "topIP": "10.240.0.3"
+      }
+     ],
+     "sumWeights": 6
+    },
+    {
+     "addressAnswer": 0,
+     "addressExtra": 0,
+     "answer": [
+      "mx.region2.skydns.test.\t300\tIN\tMX\t1 mx1.region2.skydns.test.",
+      "cname.region2.skydns.test.\t300\tIN\tCNAME\tendpoint.region2.skydns.test."
+     ],
+     "cnameAnswer": 1,
+     "cnameExtra": 0,
+     "domains": {
+      "endpoint.region2.skydns.test.": [
+       {
+        "address": "10.240.0.2",
+        "value": 3
+       },
+       {
+        "address": "10.240.0.1",
+        "value": 2
+       }
+      ]
+     },
+     "extra": null,
+     "mxAnswer": 1,
+     "mxExtra": 0,
+     "queries": [
+      {
+       "randv": 0,
+       "topIP": ""
+      }
+     ],
+     "sumWeights": 0
+    }
+   ]
+  }
+ ]
+}

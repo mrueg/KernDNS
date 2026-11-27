@@ -1,0 +1,481 @@
+{
+ "plugin": "dnssec",
+ "strings": {
+  "dbMiekNL": "\n$TTL    30M\n$ORIGIN miek.nl.\n@       IN      SOA     linode.atoom.net. miek.miek.nl. (\n                             1282630057 ; Serial\n                             4H         ; Refresh\n                             1H         ; Retry\n                             7D         ; Expire\n                             4H )       ; Negative Cache TTL\n                IN      NS      linode.atoom.net.\n\n                IN      MX      1  aspmx.l.google.com.\n\n                IN      A       139.162.196.78\n                IN      AAAA    2a01:7e00::f03c:91ff:fef1:6735\n\na               IN      A       139.162.196.78\n                IN      AAAA    2a01:7e00::f03c:91ff:fef1:6735\nwww             IN      CNAME   a\ndeleg\t\t\tIN\t\tNS\t\tns01.deleg\n\t\t\t\tIN\t\tDS\t\t18512 13 2 D4E806322598BC97A003EF1ACDFF352EEFF7B42DBB0D41B8224714C36AEF08D9\nunsigned\t\tIN\t\tNS\t\tns01.deleg\n",
+  "dsKey": "miek.nl. IN DS 18512 13 2 D4E806322598BC97A003EF1ACDFF352EEFF7B42DBB0D41B8224714C36AEF08D9",
+  "keypriv": "Private-key-format: v1.3\nAlgorithm: 5 (RSASHA1)\nModulus: wWkO/4JvbeQUmjC75VT75vY3W4QeLouX0fQHMtqwU50mMQRyUI6r8qUPjrza84xfEk03xnA7KIJrtjRMRipLBa+EfKfdscLC7Lgjp+yzhZ3tj11T7pBOAnwuKYYbjQiLONz3OqhTxD6rzW8i6SlhY4eKgehjuGxYG9JFKXMMmTc=\nPublicExponent: AQAB\nPrivateExponent: K5XyZFBPrjMVFX5gCZlyPyVDamNGrfSVXSIiMSqpS96BSdCXtmHAjCj4bZFPwkzi6+vs4tJN8p4ZifEVM0a6qwPZyENBrc2qbsweOXE6l8BaPVWFX30xvVRzGXuNtXxlBXE17zoHty5r5mRyRou1bc2HUS5otdkEjE30RiocQVk=\nPrime1: 7RRFUxaZkVNVH1DaT/SV5Sb8kABB389qLwU++argeDCVf+Wm9BBlTrsz2U6bKlfpaUmYZKtCCd+CVxqzMyuu0w==\nPrime2: 0NiY3d7Fa08IGY9L4TaFc02A721YcDNBBf95BP31qGvwnYsLFM/1xZwaEsIjohg8g+m/GpyIlvNMbK6pywIVjQ==\nExponent1: XjXO8pype9mMmvwrNNix9DTQ6nxfsQugW30PMHGZ78kGr6NX++bEC0xS50jYWjRDGcbYGzD+9iNujSScD3qNZw==\nExponent2: wkoOhLIfhUIj7etikyUup2Ld5WAbW15DSrotstg0NrgcQ+Q7reP96BXeJ79WeREFE09cyvv/EjdLzPv81/CbbQ==\nCoefficient: ah4LL0KLTO8kSKHK+X9Ud8grYi94QSNdbX11ge/eFcS/41QhDuZRTAFv4y0+IG+VWd+XzojLsQs+jzLe5GzINg==\nCreated: 20170901060531\nPublish: 20170901060531\nActivate: 20170901060531\n",
+  "keypub": "; This is a zone-signing key, keyid 45330, for cluster.local.\n; Created: 20170901060531 (Fri Sep  1 08:05:31 2017)\n; Publish: 20170901060531 (Fri Sep  1 08:05:31 2017)\n; Activate: 20170901060531 (Fri Sep  1 08:05:31 2017)\ncluster.local. IN DNSKEY 256 3 5 AwEAAcFpDv+Cb23kFJowu+VU++b2N1uEHi6Ll9H0BzLasFOdJjEEclCO q/KlD4682vOMXxJNN8ZwOyiCa7Y0TEYqSwWvhHyn3bHCwuy4I6fss4Wd 7Y9dU+6QTgJ8LimGG40Iizjc9zqoU8Q+q81vIukpYWOHioHoY7hsWBvS RSlzDJk3",
+  "kskpriv": "Private-key-format: v1.3\nAlgorithm: 5 (RSASHA1)\nModulus: wWkO/4JvbeQUmjC75VT75vY3W4QeLouX0fQHMtqwU50mMQRyUI6r8qUPjrza84xfEk03xnA7KIJrtjRMRipLBa+EfKfdscLC7Lgjp+yzhZ3tj11T7pBOAnwuKYYbjQiLONz3OqhTxD6rzW8i6SlhY4eKgehjuGxYG9JFKXMMmTc=\nPublicExponent: AQAB\nPrivateExponent: K5XyZFBPrjMVFX5gCZlyPyVDamNGrfSVXSIiMSqpS96BSdCXtmHAjCj4bZFPwkzi6+vs4tJN8p4ZifEVM0a6qwPZyENBrc2qbsweOXE6l8BaPVWFX30xvVRzGXuNtXxlBXE17zoHty5r5mRyRou1bc2HUS5otdkEjE30RiocQVk=\nPrime1: 7RRFUxaZkVNVH1DaT/SV5Sb8kABB389qLwU++argeDCVf+Wm9BBlTrsz2U6bKlfpaUmYZKtCCd+CVxqzMyuu0w==\nPrime2: 0NiY3d7Fa08IGY9L4TaFc02A721YcDNBBf95BP31qGvwnYsLFM/1xZwaEsIjohg8g+m/GpyIlvNMbK6pywIVjQ==\nExponent1: XjXO8pype9mMmvwrNNix9DTQ6nxfsQugW30PMHGZ78kGr6NX++bEC0xS50jYWjRDGcbYGzD+9iNujSScD3qNZw==\nExponent2: wkoOhLIfhUIj7etikyUup2Ld5WAbW15DSrotstg0NrgcQ+Q7reP96BXeJ79WeREFE09cyvv/EjdLzPv81/CbbQ==\nCoefficient: ah4LL0KLTO8kSKHK+X9Ud8grYi94QSNdbX11ge/eFcS/41QhDuZRTAFv4y0+IG+VWd+XzojLsQs+jzLe5GzINg==\nCreated: 20170901060531\nPublish: 20170901060531\nActivate: 20170901060531\n",
+  "kskpub": "; This is a zone-signing key, keyid 45330, for cluster.local.\n; Created: 20170901060531 (Fri Sep  1 08:05:31 2017)\n; Publish: 20170901060531 (Fri Sep  1 08:05:31 2017)\n; Activate: 20170901060531 (Fri Sep  1 08:05:31 2017)\ncluster.local. IN DNSKEY 257 3 5 AwEAAcFpDv+Cb23kFJowu+VU++b2N1uEHi6Ll9H0BzLasFOdJjEEclCO q/KlD4682vOMXxJNN8ZwOyiCa7Y0TEYqSwWvhHyn3bHCwuy4I6fss4Wd 7Y9dU+6QTgJ8LimGG40Iizjc9zqoU8Q+q81vIukpYWOHioHoY7hsWBvS RSlzDJk3",
+  "privKey": "Private-key-format: v1.3\nAlgorithm: 13 (ECDSAP256SHA256)\nPrivateKey: /4BZk8AFvyW5hL3cOLSVxIp1RTqHSAEloWUxj86p3gs=\nCreated: 20160423195532\nPublish: 20160423195532\nActivate: 20160423195532\n",
+  "privKey1": "Private-key-format: v1.3\nAlgorithm: 13 (ECDSAP256SHA256)\nPrivateKey: i8j4OfDGT8CQt24SDwLz2hg9yx4qKOEOh1LvbAuSp1c=\nCreated: 20160423211746\nPublish: 20160423211746\nActivate: 20160423211746\n",
+  "pubKey": "miek.nl. IN DNSKEY 257 3 13 0J8u0XJ9GNGFEBXuAmLu04taHG4BXPP3gwhetiOUMnGA+x09nqzgF5IY OyjWB7N3rXqQbnOSILhH1hnuyh7mmA==",
+  "pubKey1": "example.org. IN DNSKEY 257 3 13 tVRWNSGpHZbCi7Pr7OmbADVUO3MxJ0Lb8Lk3o/HBHqCxf5K/J50lFqRa 98lkdAIiFOVRy8LyMvjwmxZKwB5MNw==",
+  "server": "dns//."
+ },
+ "tables": [
+  {
+   "file": "handler_test.go",
+   "name": "dnssecTestCases",
+   "line": 16,
+   "value": [
+    {
+     "Answer": [
+      "miek.nl.\t3600\tIN\tDNSKEY\t257 3 13 0J8u0XJ9GNGFEBXuAmLu04taHG4"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "miek.nl.",
+     "Qtype": 48,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t3600\tIN\tDNSKEY\t257 3 13 0J8u0XJ9GNGFEBXuAmLu04taHG4",
+      "miek.nl.\t3600\tIN\tRRSIG\tDNSKEY 13 2 3600 20160503150844 20160425120844 18512 miek.nl. Iw/kNOyM"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "miek.nl.",
+     "Qtype": 48,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "handler_test.go",
+   "name": "dnsTestCases",
+   "line": 33,
+   "value": [
+    {
+     "Answer": [
+      "miek.nl.\t3600\tIN\tDNSKEY\t257 3 13 0J8u0XJ9GNGFEBXuAmLu04taHG4"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "miek.nl.",
+     "Qtype": 48,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 13 2 1800 20220101121212 20220201121212 18512 miek.nl. RandomNotChecked"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "miek.nl.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "deleg.miek.nl.\t1800\tIN\tDS\t18512 13 2 D4E806322598BC97A003EF1ACDFF352EEFF7B42DBB0D41B8224714C36AEF08D9",
+      "deleg.miek.nl.\t1800\tIN\tNS\tns01.deleg.miek.nl.",
+      "deleg.miek.nl.\t1800\tIN\tRRSIG\tDS 13 3 1800 20220101121212 20220201121212 18512 miek.nl. RandomNotChecked"
+     ],
+     "Qname": "deleg.miek.nl.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "unsigned.miek.nl.\t1800\tIN\tNS\tns01.deleg.miek.nl.",
+      "unsigned.miek.nl.\t1800\tIN\tNSEC\tunsigned\\000.miek.nl. NS RRSIG NSEC",
+      "unsigned.miek.nl.\t1800\tIN\tRRSIG\tNSEC 13 3 1800 20220101121212 20220201121212 18512 miek.nl. RandomNotChecked"
+     ],
+     "Qname": "unsigned.miek.nl.",
+     "Qtype": 2,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "deleg.miek.nl.\t1800\tIN\tDS\t18512 13 2 D4E806322598BC97A003EF1ACDFF352EEFF7B42DBB0D41B8224714C36AEF08D9"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net."
+     ],
+     "Qname": "deleg.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "unsigned.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNSEC\t\\000.miek.nl. A HINFO NS SOA MX TXT AAAA LOC SRV CERT SSHFP RRSIG NSEC DNSKEY TLSA HIP OPENPGPKEY SPF",
+      "miek.nl.\t1800\tIN\tRRSIG\tNSEC 13 2 1800 20220101121212 20220201121212 18512 miek.nl. RandomNotChecked",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 13 2 3600 20171220141741 20171212111741 18512 miek.nl. 8bLTReqmuQtw==",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "deleg.miek.nl.\t1800\tIN\tDS\t18512 13 2 D4E806322598BC97A003EF1ACDFF352EEFF7B42DBB0D41B8224714C36AEF08D9",
+      "deleg.miek.nl.\t1800\tIN\tRRSIG\tDS 13 3 1800 20220101121212 20220201121212 18512 miek.nl. RandomNotChecked"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 13 2 3600 20161217114912 20161209084912 18512 miek.nl. ad9gA8VWgF1H8ze9/0Rk2Q=="
+     ],
+     "Qname": "deleg.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 13 2 3600 20171220141741 20171212111741 18512 miek.nl. 8bLTReqmuQtw==",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400",
+      "unsigned.miek.nl.\t1800\tIN\tNSEC\t\\000.unsigned.miek.nl. NS RRSIG NSEC",
+      "unsigned.miek.nl.\t1800\tIN\tRRSIG\tNSEC 13 3 1800 20220101121212 20220201121212 18512 miek.nl. RandomNotChecked"
+     ],
+     "Qname": "unsigned.miek.nl.",
+     "Qtype": 43,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tMX\t1 aspmx.l.google.com."
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net."
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "miek.nl.\t1800\tIN\tMX\t1 aspmx.l.google.com.",
+      "miek.nl.\t1800\tIN\tRRSIG\tMX 13 2 3600 20160503192428 20160425162428 18512 miek.nl. 4nxuGKitXjPVA9zP1JIUvA09"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 13 2 3600 20161217114912 20161209084912 18512 miek.nl. ad9gA8VWgF1H8ze9/0Rk2Q=="
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 15,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "a.miek.nl.\t1800\tIN\tAAAA\t2a01:7e00::f03c:91ff:fef1:6735",
+      "a.miek.nl.\t1800\tIN\tRRSIG\tAAAA 13 3 3600 20160503193047 20160425163047 18512 miek.nl. UAyMG+gcnoXW3",
+      "www.miek.nl.\t1800\tIN\tCNAME\ta.miek.nl.",
+      "www.miek.nl.\t1800\tIN\tRRSIG\tCNAME 13 3 3600 20160503193047 20160425163047 18512 miek.nl. E3qGZn"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNS\tlinode.atoom.net.",
+      "miek.nl.\t1800\tIN\tRRSIG\tNS 13 2 3600 20161217114912 20161209084912 18512 miek.nl. ad9gA8VWgF1H8ze9/0Rk2Q=="
+     ],
+     "Qname": "www.miek.nl.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 13 2 3600 20171220135446 20171212105446 18512 miek.nl. hCRzzjYz6w==",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400",
+      "wwwww.miek.nl.\t1800\tIN\tNSEC\t\\000.wwwww.miek.nl. A HINFO TXT LOC SRV CERT SSHFP RRSIG NSEC TLSA HIP OPENPGPKEY SPF",
+      "wwwww.miek.nl.\t1800\tIN\tRRSIG\tNSEC 13 3 3600 20171220135446 20171212105446 18512 miek.nl. cVUQWs8xw=="
+     ],
+     "Qname": "wwwww.miek.nl.",
+     "Qtype": 28,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": [
+      "miek.nl.\t1800\tIN\tNSEC\t\\000.miek.nl. A NS SOA MX TXT AAAA LOC SRV CERT SSHFP RRSIG NSEC DNSKEY TLSA HIP OPENPGPKEY SPF",
+      "miek.nl.\t1800\tIN\tRRSIG\tNSEC 13 2 3600 20171220141741 20171212111741 18512 miek.nl. GuXROL7Uu+UiPcg==",
+      "miek.nl.\t1800\tIN\tRRSIG\tSOA 13 2 3600 20171220141741 20171212111741 18512 miek.nl. 8bLTReqmuQtw==",
+      "miek.nl.\t1800\tIN\tSOA\tlinode.atoom.net. miek.miek.nl. 1282630057 14400 3600 604800 14400"
+     ],
+     "Qname": "miek.nl.",
+     "Qtype": 13,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": null,
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": true,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "www.example.org.",
+     "Qtype": 28,
+     "Rcode": 2,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupDnssec",
+   "name": "tests",
+   "line": 29,
+   "value": [
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": null,
+     "input": "dnssec",
+     "shouldErr": false
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "example.org."
+     ],
+     "input": "dnssec example.org",
+     "shouldErr": false
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "10.in-addr.arpa."
+     ],
+     "input": "dnssec 10.0.0.0/8",
+     "shouldErr": false
+    },
+    {
+     "expectedCapacity": 100,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "example.org."
+     ],
+     "input": "dnssec example.org {\n\t\t\t\tcache_capacity 100\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "cluster.local."
+     ],
+     "input": "dnssec cluster.local {\n\t\t\t\tkey file Kcluster.local\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "example.org.",
+      "cluster.local."
+     ],
+     "input": "dnssec example.org cluster.local {\n\t\t\t\tkey file Kcluster.local\n\t\t\t}",
+     "shouldErr": false
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "can not sign any",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "example.org."
+     ],
+     "input": "dnssec example.org {\n\t\t\t\tkey file Kcluster.local\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "argument count",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "example.org."
+     ],
+     "input": "dnssec example.org {\n\t\t\t\tkey\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "argument count",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": [
+      "example.org."
+     ],
+     "input": "dnssec example.org {\n\t\t\t\tkey file\n\t\t\t}",
+     "shouldErr": true
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": false,
+     "expectedZones": null,
+     "input": "dnssec\n\t\t  dnssec",
+     "shouldErr": true
+    },
+    {
+     "expectedCapacity": 10000,
+     "expectedErrContent": "",
+     "expectedKeys": null,
+     "expectedSplitkeys": true,
+     "expectedZones": [
+      "cluster.local."
+     ],
+     "input": "dnssec cluster.local {\n\t\t\t\tkey file Kcluster.local\n\t\t\t\tkey file ksk_Kcluster.local\n\t\t\t}",
+     "shouldErr": false
+    }
+   ]
+  }
+ ]
+}

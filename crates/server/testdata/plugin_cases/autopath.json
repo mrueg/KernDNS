@@ -1,0 +1,107 @@
+{
+ "plugin": "autopath",
+ "strings": {
+  "defaultA": " 3600 IN A 127.0.0.53",
+  "resolvConf": "nameserver 1.2.3.4\ndomain foo.com\nsearch bar.com baz.com\noptions ndots:5\n"
+ },
+ "tables": [
+  {
+   "file": "autopath_test.go",
+   "name": "autopathTestCases",
+   "line": 14,
+   "value": [
+    {
+     "Answer": [
+      "b.example.org.\t3600\tIN\tCNAME\tb.com.",
+      "b.com.\t3600\tIN\tA\t127.0.0.53"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "b.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    },
+    {
+     "Answer": [
+      "a.example.com.\t3600\tIN\tA\t127.0.0.53"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "a.example.com.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "autopath_test.go",
+   "name": "autopathNoAnswerTestCases",
+   "line": 79,
+   "value": [
+    {
+     "Answer": [
+      "b.example.org.\t3600\tIN\tCNAME\tb.com.",
+      "b.com.\t3600\tIN\tA\t127.0.0.53"
+     ],
+     "AuthenticatedData": false,
+     "Authoritative": false,
+     "CheckingDisabled": false,
+     "Do": false,
+     "Error": null,
+     "Extra": null,
+     "Ns": null,
+     "Qname": "c.example.org.",
+     "Qtype": 1,
+     "Rcode": 0,
+     "RecursionAvailable": false,
+     "Truncated": false
+    }
+   ]
+  },
+  {
+   "file": "autopath_test.go",
+   "func": "TestInSearchPath",
+   "name": "tests",
+   "line": 174,
+   "value": [
+    {
+     "b": false,
+     "qname": "google.com"
+    },
+    {
+     "b": true,
+     "qname": "default.svc.cluster.local."
+    },
+    {
+     "b": true,
+     "qname": "a.default.svc.cluster.local."
+    },
+    {
+     "b": false,
+     "qname": "a.b.svc.cluster.local."
+    }
+   ]
+  },
+  {
+   "file": "setup_test.go",
+   "func": "TestSetupAutoPath",
+   "name": "tests",
+   "line": 20,
+   "dropped": "undefined: resolv"
+  }
+ ]
+}
