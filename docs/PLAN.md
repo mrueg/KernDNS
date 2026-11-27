@@ -293,6 +293,12 @@ More wave 5 ports:
   A reload replaces the hooks; caddy keeps adding them, so with the
   `reload` plugin CoreDNS reruns the startup commands of every
   configuration loaded so far.
+- `pprof` keeps CoreDNS's syntax and errors, but there is no Go runtime to
+  profile: `/debug/pprof/profile?seconds=N` returns a CPU profile in
+  pprof's (gzipped protobuf) format, sampled at 100 Hz with the `pprof`
+  crate, which `go tool pprof` reads, and `/debug/pprof/cmdline` the
+  command line. Go-only profiles (heap, goroutine, block, mutex, trace,
+  ...) answer 404; `block` is accepted and logs a warning.
 
 Performance follow-ups from the first benchmarks, done:
 

@@ -45,3 +45,5 @@ http = "1"
 quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
 h3 = "0.0.8"
 h3-quinn = "0.0.10"
+pprof = { version = "0.15", default-features = false }
+flate2 = "1"
