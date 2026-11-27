@@ -1,0 +1,9 @@
+# about: dnssec signs file answers (10k zone) for DO queries; signatures cached after warmup
+# queries: {FIX}/q-file.txt
+# dnsperf: -D
+example.org:{PORT} {
+    dnssec {
+        key file {DIR}/Kexample.org
+    }
+    file {FIX}/db.example.org
+}

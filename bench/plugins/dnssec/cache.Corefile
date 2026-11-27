@@ -1,0 +1,10 @@
+# about: cache in front of dnssec and file: signed answers come from the cache
+# queries: {FIX}/q-file.txt
+# dnsperf: -D
+example.org:{PORT} {
+    cache
+    dnssec {
+        key file {DIR}/Kexample.org
+    }
+    file {FIX}/db.example.org
+}

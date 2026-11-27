@@ -59,7 +59,7 @@ skip  TestJSONLoggingProcessHelper                    does not start a server th
 pass  TestKubernetesAutopathCacheRefresh
 pass  TestLargeAXFR
 pass  TestLookupAutoPathErratic
-xfail TestLookupBalanceRewriteCacheDnssec             Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'dnssec' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestLookupBalanceRewriteCacheDnssec
 pass  TestLookupCache
 pass  TestLookupCacheWithoutEdns
 pass  TestLookupDS

@@ -1,0 +1,10 @@
+# about: dnssec with the smallest signature cache (1024): most answers are signed per query
+# queries: {FIX}/q-file.txt
+# dnsperf: -D
+example.org:{PORT} {
+    dnssec {
+        key file {DIR}/Kexample.org
+        cache_capacity 0
+    }
+    file {FIX}/db.example.org
+}
