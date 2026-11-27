@@ -103,10 +103,91 @@ impl Kubernetes {
         out.push(ns_addrs.iter().map(|(host, ip)| address_record(host, *ip, 0)).collect());
 
         let zone_path = backend::path(zone, "coredns");
-        self.transfer_services(&mut out, &zone_path);
+        if self.is_multicluster_zone(zone) {
+            self.transfer_multicluster_services(&mut out, &zone_path);
+        } else {
+            self.transfer_services(&mut out, &zone_path);
+        }
 
         out.push(soa);
         Ok(out)
+    }
+
+    /// `transferMultiClusterServices`: like [`Self::transfer_services`]
+    /// from ServiceImports.
+    fn transfer_multicluster_services(&self, out: &mut Vec<Vec<Record>>, zone_path: &str) {
+        let Some(api) = self.api() else { return };
+        let mut imports = api.service_import_list();
+        imports.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.namespace.cmp(&b.namespace)));
+        for svc in imports {
+            if !self.namespace_exposed(&svc.namespace) {
+                continue;
+            }
+            let base = [zone_path, SVC, svc.namespace.as_str(), svc.name.as_str()];
+            let has_cluster_ip = svc.cluster_ips.first().and_then(|ip| backend::parse_ip(ip)).is_some();
+            if has_cluster_ip {
+                let mut host = String::new();
+                for ip in &svc.cluster_ips {
+                    let s = Service {
+                        host: ip.clone(),
+                        ttl: self.ttl,
+                        key: join_key(&base),
+                        ..Default::default()
+                    };
+                    host = emit_address_record(out, &s);
+                }
+                for p in &svc.ports {
+                    let mut s = Service {
+                        host: host.clone(),
+                        port: p.port,
+                        ttl: self.ttl,
+                        key: join_key(&base),
+                        ..Default::default()
+                    };
+                    out.push(vec![s.new_srv(&backend::domain(&s.key), 100)]);
+                    if p.name.is_empty() {
+                        continue;
+                    }
+                    let proto = format!("_{}", p.protocol).to_lowercase();
+                    let name = format!("_{}", p.name).to_lowercase();
+                    s.key = join_key(&[&base[..], &[proto.as_str(), name.as_str()]].concat());
+                    out.push(vec![s.new_srv(&backend::domain(&s.key), 100)]);
+                }
+                continue;
+            }
+            for ep in api.mc_ep_index(&format!("{}.{}", svc.name, svc.namespace)) {
+                self.transfer_endpoints(out, &base, &ep.endpoints);
+            }
+        }
+    }
+
+    /// The records of a headless service's endpoints.
+    fn transfer_endpoints(&self, out: &mut Vec<Vec<Record>>, base: &[&str], ep: &crate::object::Endpoints) {
+        for sub in &ep.subsets {
+            let weight = calc_srv_weight(sub.addresses.len());
+            for addr in &sub.addresses {
+                let mut s = Service {
+                    host: addr.ip.clone(),
+                    ttl: self.ttl,
+                    key: join_key(base),
+                    ..Default::default()
+                };
+                emit_address_record(out, &s);
+                let hostname = endpoint_hostname(addr, self.endpoint_name_mode);
+                s.key = join_key(&[base, &[hostname.as_str()]].concat());
+                s.host = emit_address_record(out, &s);
+                for p in &sub.ports {
+                    if p.name.is_empty() {
+                        continue;
+                    }
+                    s.port = p.port;
+                    let proto = format!("_{}", p.protocol).to_lowercase();
+                    let name = format!("_{}", p.name).to_lowercase();
+                    s.key = join_key(&[base, &[proto.as_str(), name.as_str()]].concat());
+                    out.push(vec![s.new_srv(&backend::domain(&s.key), weight)]);
+                }
+            }
+        }
     }
 
     fn transfer_services(&self, out: &mut Vec<Vec<Record>>, zone_path: &str) {
@@ -157,31 +238,7 @@ impl Kubernetes {
                         continue;
                     }
                     for ep in api.ep_index(&format!("{}.{}", svc.name, svc.namespace)) {
-                        for sub in &ep.subsets {
-                            let weight = calc_srv_weight(sub.addresses.len());
-                            for addr in &sub.addresses {
-                                let mut s = Service {
-                                    host: addr.ip.clone(),
-                                    ttl: self.ttl,
-                                    key: join_key(&base),
-                                    ..Default::default()
-                                };
-                                emit_address_record(out, &s);
-                                let hostname = endpoint_hostname(addr, self.endpoint_name_mode);
-                                s.key = join_key(&[&base[..], &[hostname.as_str()]].concat());
-                                s.host = emit_address_record(out, &s);
-                                for p in &sub.ports {
-                                    if p.name.is_empty() {
-                                        continue;
-                                    }
-                                    s.port = p.port;
-                                    let proto = format!("_{}", p.protocol).to_lowercase();
-                                    let name = format!("_{}", p.name).to_lowercase();
-                                    s.key = join_key(&[&base[..], &[proto.as_str(), name.as_str()]].concat());
-                                    out.push(vec![s.new_srv(&backend::domain(&s.key), weight)]);
-                                }
-                            }
-                        }
+                        self.transfer_endpoints(out, &base, &ep);
                     }
                 }
                 "ExternalName" => {
