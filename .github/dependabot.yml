@@ -20,3 +20,27 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+
+  # go/bridge embeds CoreDNS plugins; github.com/coredns/coredns comes from
+  # the third_party/coredns submodule (a replace), so it is bumped with the
+  # submodule, not here
+  - package-ecosystem: gomod
+    directories:
+      - /go/bridge
+      - /go/difftest
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: github.com/coredns/coredns
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  # the Dockerfile's base images (pinned by digest)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker-base-images:
+        patterns: ["*"]
