@@ -5,6 +5,7 @@
 
 pub mod acl;
 pub mod any;
+pub mod auto;
 pub mod autopath;
 pub mod backend;
 pub mod bind;
@@ -31,6 +32,7 @@ pub mod loopdetect;
 pub mod metadata;
 pub mod metrics;
 pub mod minimal;
+pub mod multisocket;
 pub mod nsid;
 pub mod pluginmetrics;
 pub mod ready;
@@ -93,5 +95,7 @@ pub fn registry() -> Registry {
     r.register(view::Setup);
     r.register(autopath::Setup);
     r.register(dns64::Setup);
+    r.register(auto::Setup);
+    r.register(multisocket::Setup);
     r
 }

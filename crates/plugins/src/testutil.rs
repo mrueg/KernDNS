@@ -28,6 +28,22 @@ pub fn run_setup(f: &dyn PluginFactory, directive: &str) -> (Result<(), String>,
     (res, cfg)
 }
 
+/// Run `f` with a controller for `name`'s tokens in `directive` (inside
+/// `.:53 { ... }`, starting on line 2), like `caddy.NewTestController`.
+pub fn with_controller<T>(name: &'static str, directive: &str, f: impl FnOnce(&mut Controller<'_>) -> T) -> T {
+    let blocks = parse(&format!(".:53 {{\n{directive}\n}}"), "Corefile").expect("parses");
+    let mut cfg = BlockConfig::new(ZoneAddr::parse(".:53", "53").unwrap());
+    let mut hooks = Hooks::default();
+    let mut c = Controller::new(
+        name,
+        Dispenser::new(blocks[0].tokens_for(name)),
+        &mut cfg,
+        &mut hooks,
+        ".".into(),
+    );
+    f(&mut c)
+}
+
 pub fn setup_ok(f: &dyn PluginFactory, directive: &str) -> bool {
     run_setup(f, directive).0.is_ok()
 }
