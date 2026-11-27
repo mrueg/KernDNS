@@ -33,6 +33,22 @@ pub fn reset() {
     LIST.lock().unwrap().checks.clear();
 }
 
+/// The checks of the running configuration, saved while a new one loads.
+pub struct Saved(BTreeMap<String, Option<Check>>, bool);
+
+/// Save the current checks, e.g. before loading a new configuration.
+pub fn save() -> Saved {
+    let l = LIST.lock().unwrap();
+    Saved(l.checks.clone(), l.keep)
+}
+
+/// Put saved checks back (loading the new configuration failed).
+pub fn restore(s: Saved) {
+    let mut l = LIST.lock().unwrap();
+    l.checks = s.0;
+    l.keep = s.1;
+}
+
 /// Keep checking plugins after they first report ready.
 pub fn set_monitor_continuously(keep: bool) {
     LIST.lock().unwrap().keep = keep;
