@@ -1214,6 +1214,28 @@ fn report(results: &[(Case, [Option<Result1>; 2], u32)]) -> Result<String> {
     }
     writeln!(
         report,
+        "Overview: CoreDNS → KernDNS, with KernDNS's change relative to CoreDNS.\n"
+    )?;
+    writeln!(report, "| level | case | max QPS | CPU µs / query | peak RSS |")?;
+    writeln!(report, "|---|---|---|---|---|")?;
+    for (c, r, _) in results {
+        let (Some(cd), Some(kd)) = (&r[0], &r[1]) else {
+            writeln!(report, "| {} | {} | failed | | |", c.level, c.name)?;
+            continue;
+        };
+        writeln!(
+            report,
+            "| {} | {} | {} | {} | {} |",
+            c.level,
+            c.name,
+            compare(cd.max.qps / 1000.0, kd.max.qps / 1000.0, 0, "k"),
+            compare(cd.cpu_us, kd.cpu_us, 1, ""),
+            compare(cd.rss_mib, kd.rss_mib, 0, " MiB"),
+        )?;
+    }
+    writeln!(report)?;
+    writeln!(
+        report,
         "| level | case | server | max QPS | avg latency @ fixed rate | stddev | max | CPU µs / query | peak RSS |"
     )?;
     writeln!(report, "|---|---|---|---:|---:|---:|---:|---:|---:|")?;
@@ -1238,6 +1260,17 @@ fn report(results: &[(Case, [Option<Result1>; 2], u32)]) -> Result<String> {
         }
     }
     Ok(report)
+}
+
+/// `a → b (+x%)`: a CoreDNS value, the KernDNS value and KernDNS's change
+/// relative to CoreDNS.
+fn compare(a: f64, b: f64, decimals: usize, unit: &str) -> String {
+    let pct = if a > 0.0 {
+        format!(" ({:+.0}%)", (b / a - 1.0) * 100.0)
+    } else {
+        String::new()
+    };
+    format!("{a:.decimals$} → {b:.decimals$}{unit}{pct}")
 }
 
 /// RSS (current, peak) in MiB.
@@ -1415,6 +1448,13 @@ pub fn k8s(args: &[String]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compare_shows_change() {
+        assert_eq!(compare(40.0, 83.0, 0, "k"), "40 → 83k (+108%)");
+        assert_eq!(compare(49.8, 31.2, 1, ""), "49.8 → 31.2 (-37%)");
+        assert_eq!(compare(0.0, 5.0, 0, " MiB"), "0 → 5 MiB");
+    }
 
     #[test]
     fn rcodes() {
