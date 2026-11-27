@@ -123,6 +123,34 @@ pub static FORWARD_MAX_CONCURRENT_REJECTS: LazyLock<IntCounter> = LazyLock::new(
     .unwrap()
 });
 
+// grpc
+pub static GRPC_REQUESTS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "grpc",
+        "requests_total",
+        "Counter of requests made per upstream.",
+        &["to"],
+    )
+});
+pub static GRPC_RESPONSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "grpc",
+        "responses_total",
+        "Counter of requests made per upstream.",
+        &["rcode", "to"],
+    )
+});
+pub static GRPC_REQUEST_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
+    register_histogram_vec!(
+        HistogramOpts::new("request_duration_seconds", "Histogram of the time each request took.")
+            .namespace("coredns")
+            .subsystem("grpc")
+            .buckets(kerndns_core::metrics::time_buckets()),
+        &["to"]
+    )
+    .unwrap()
+});
+
 // hosts
 pub static HOSTS_ENTRIES: LazyLock<GaugeVec> = LazyLock::new(|| {
     gauge(

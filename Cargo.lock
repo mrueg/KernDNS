@@ -1197,6 +1197,7 @@ dependencies = [
  "bytes",
  "data-encoding",
  "hmac",
+ "http",
  "http-body-util",
  "hyper",
  "hyper-util",

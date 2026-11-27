@@ -1,0 +1,6 @@
+# about: dnstap (full) with forward's FORWARDER_QUERY/RESPONSE messages, to a shared upstream
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    dnstap {DNSTAP} full
+    forward . 127.0.0.1:{BACKEND}
+}

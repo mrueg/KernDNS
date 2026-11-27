@@ -188,8 +188,7 @@ reloads like the plain DNS ones:
   doesn't announce datagram support, and when a DoQ request gets no answer
   KernDNS still ends the stream (CoreDNS leaves it open).
 - **Not yet:** settings changed by a reload (certificates, limits) don't apply
-  to listeners that are kept, as for DoT and DoH; the `grpc` forwarding
-  plugin.
+  to listeners that are kept, as for DoT and DoH.
 
 ## Plugin waves
 
@@ -214,6 +213,44 @@ servers (UDP socket and TCP listener each) per address, and the listener
 plugins `https`, `https3`, `quic` and `grpc_server` come with DoH3, DoQ and
 gRPC listeners (see above). The upstream tests still failing are listed with
 their reasons in `go/compat/expectations.txt`.
+
+`grpc` forwards queries to CoreDNS's `DnsService` with a gRPC client of
+its own on hyper's HTTP/2 client, the counterpart of the `grpc://`
+listener and sharing its protobuf code (`kerndns_core::protobuf`): one
+multiplexed connection per upstream (h2c, or TLS with ALPN `h2` from
+`tls`/`tls_servername`), redialed when it breaks, `grpc-timeout` from the
+5 s budget, grpc-go's status codes and messages, `NotFound` answered as
+NXDOMAIN, `unix://` upstreams and resolv.conf files. `policy` and
+`except` are shared with `forward` (`forward::policy`); like CoreDNS there
+are no health checks. CoreDNS and KernDNS fronts, each forwarding to a
+CoreDNS and a KernDNS `grpc://` backend (h2c and TLS), give identical
+answers (NOERROR, NXDOMAIN, REFUSED, `except`, DNSSEC OK, TCP clients) and
+identical `coredns_grpc_*` metrics; an unreachable upstream is a quick
+SERVFAIL in both. Deviation: an upstream with a scheme other than `dns://`
+or `unix://` (`tls://…`, `grpc://…`) is a setup error; CoreDNS accepts it
+and then fails every query.
+
+`dnstap` writes dnstap messages over Frame Streams to unix, TCP and TLS
+sinks (a queue of 10,000 messages times the queue multiple, dropped
+messages logged every 10 s, reconnects, `skipverify`) or to sinks that connect to it
+(`listen`, with `tls CERT KEY [CA]`), with `full`, `identity`, `version`
+and `extra` (placeholders and `{/metadata}`). Other plugins log through
+the block's `dnstap::Taps` (CoreDNS's `*dnstap.Dnstap` handler lookup);
+`forward` sends FORWARDER_QUERY/FORWARDER_RESPONSE from its upstream
+socket. The protobuf messages and the bidirectional Frame Streams
+handshake (READY/ACCEPT/START, STOP/FINISH) are written by hand: the
+crates.io options are `framestream` (a blocking `std::io::Write` encoder
+without the READY/ACCEPT/FINISH handshake CoreDNS's encoder does) and
+`dnstap` (built on it, mio and rust-protobuf with build-time codegen).
+Compared with CoreDNS through a golang-dnstap sink (outgoing unix socket
+and `listen` over TCP, UDP and TCP clients, forwarded NOERROR/NXDOMAIN/
+DNSSEC answers, a chain error answered by the server): the same messages,
+fields and DNS payloads, except the `version` field (`KernDNS-0.1.0`
+instead of `CoreDNS-1.15.0`, as for `chaos`). Like CoreDNS, the
+CLIENT_RESPONSE carries the response as the client gets it (EDNS echoed,
+truncated over UDP); KernDNS emits it once the chain returns rather than
+inside the write, so `extra` sees metadata set later in the chain the way
+CoreDNS's lazily evaluated metadata does.
 
 Performance follow-ups from the first benchmarks, done:
 
