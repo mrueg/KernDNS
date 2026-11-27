@@ -3,7 +3,7 @@
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -25,11 +25,22 @@ pub fn text(status: u16, body: impl Into<String>) -> (u16, String, Vec<u8>) {
 pub struct Endpoint {
     pub addr: SocketAddr,
     task: tokio::task::AbortHandle,
+    /// Disconnects once the accept loop, and with it the listener, is gone.
+    closed: Mutex<std::sync::mpsc::Receiver<()>>,
 }
 
 impl Endpoint {
+    /// Stop serving and close the listener before returning (waiting up to
+    /// a second), so the address can be bound again right away, e.g. by the
+    /// next configuration on reload. Call it off the async workers: it
+    /// blocks while a worker drops the aborted task.
     pub fn stop(&self) {
         self.task.abort();
+        let _ = self
+            .closed
+            .lock()
+            .unwrap()
+            .recv_timeout(std::time::Duration::from_secs(1));
     }
 }
 
@@ -67,9 +78,20 @@ pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
     std_listener.set_nonblocking(true)?;
     let local = std_listener.local_addr()?;
     let listener = TcpListener::from_std(std_listener)?;
+    let (closed_tx, closed) = std::sync::mpsc::channel::<()>();
+    // fields drop in order: the listener is closed before the sender goes
+    struct Owned {
+        listener: TcpListener,
+        _closed: std::sync::mpsc::Sender<()>,
+    }
+    let owned = Owned {
+        listener,
+        _closed: closed_tx,
+    };
     let task = tokio::spawn(async move {
+        let owned = owned;
         loop {
-            let Ok((stream, _)) = listener.accept().await else {
+            let Ok((stream, _)) = owned.listener.accept().await else {
                 continue;
             };
             let route = route.clone();
@@ -91,5 +113,34 @@ pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
     Ok(Endpoint {
         addr: local,
         task: task.abort_handle(),
+        closed: Mutex::new(closed),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `ready`, `health` and `prometheus` stop their endpoint in a shutdown
+    /// hook and bind the same address again in the next configuration's
+    /// startup hook right after: on reload the port must already be free,
+    /// as it is once CoreDNS has closed its listener.
+    #[test]
+    fn stop_releases_the_port() {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let route: Route = Arc::new(|_, _| text(200, "OK"));
+        let mut ep = rt.block_on(async { serve("127.0.0.1:0", route.clone()) }).unwrap();
+        for _ in 0..100 {
+            let addr = ep.addr;
+            ep.stop();
+            ep = rt
+                .block_on(async { serve(&addr.to_string(), route.clone()) })
+                .unwrap_or_else(|e| panic!("bind {addr} after stop: {e}"));
+        }
+        ep.stop();
+    }
 }
