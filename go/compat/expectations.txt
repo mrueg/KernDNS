@@ -7,7 +7,7 @@
 #
 # <status> <test> <reason>
 pass  TestACLAuthorizesAutopathExpandedName
-xfail TestACMEDNS01CertificateManagement              starting CoreDNS: plugin/tls: ACME certificates are not supported by KernDNS yet
+pass  TestACMEDNS01CertificateManagement
 pass  TestAuto
 pass  TestAutoAXFR
 pass  TestAutoNonExistentZone

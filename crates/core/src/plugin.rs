@@ -221,6 +221,13 @@ pub struct Hooks {
     pub shutdown: Vec<(&'static str, ShutdownHook)>,
     /// Event hooks by name (`on-<id>`), in registration order.
     pub events: Vec<(String, EventHook)>,
+    /// State shared by all server blocks of one Corefile load, like
+    /// caddy's instance storage (`Controller.Get`/`Set`).
+    pub storage: Extensions,
+    /// Handlers to add to every server block, with their directive names
+    /// (`dnsserver.AddPluginToAllServerBlocks`). The server inserts them
+    /// at their directive's place in each block's chain.
+    pub all_blocks: Vec<(&'static str, PluginFn)>,
 }
 
 /// What a plugin's setup gets: a [`Dispenser`] over its tokens (available
@@ -263,6 +270,19 @@ impl<'a> Controller<'a> {
     /// Add this directive's handler to the chain.
     pub fn add_plugin(&mut self, f: impl Fn(Next) -> Arc<dyn Handler> + Send + Sync + 'static) {
         self.config.plugins.push((self.directive, Arc::new(f)));
+    }
+
+    /// Add this directive's handler to every server block of the
+    /// Corefile, like `dnsserver.AddPluginToAllServerBlocks`: it runs at
+    /// this directive's place in each block's chain.
+    pub fn add_plugin_to_all_blocks(&mut self, f: impl Fn(Next) -> Arc<dyn Handler> + Send + Sync + 'static) {
+        self.hooks.all_blocks.push((self.directive, Arc::new(f)));
+    }
+
+    /// State shared by every server block of this Corefile load (caddy's
+    /// instance storage).
+    pub fn instance_storage(&mut self) -> &mut Extensions {
+        &mut self.hooks.storage
     }
 
     /// Run `f` after all plugins are set up and before serving starts.

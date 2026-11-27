@@ -14,7 +14,7 @@ data-encoding.workspace = true
 regex.workspace = true
 hyper = { workspace = true, features = ["client", "http2"] }
 http.workspace = true
-hyper-util.workspace = true
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "http2"] }
 http-body-util.workspace = true
 bytes.workspace = true
 rustls.workspace = true
@@ -31,4 +31,13 @@ pprof.workspace = true
 flate2.workspace = true
 maxminddb.workspace = true
 serde.workspace = true
+# ACME (tls plugin): ring only, no aws-lc-rs
+instant-acme = { version = "0.8.5", default-features = false, features = ["hyper-rustls", "ring", "rcgen"] }
+hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "http2", "ring", "tls12"] }
+rustls-webpki = { version = "0.103", default-features = false, features = ["std", "ring"] }
+tower-service = "0.3"
+idna = "1"
+serde_json = "1"
 
+[dev-dependencies]
+rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }
