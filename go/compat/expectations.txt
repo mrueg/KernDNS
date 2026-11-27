@@ -16,7 +16,7 @@ pass  TestBind_FilterAll
 pass  TestCacheACLAuthorization
 skip  TestChaos                                       expects the version string CoreDNS-1.15.0; KernDNS reports KernDNS-<version>
 pass  TestClasslessReverse
-xfail TestCompressScrub                               Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestCompressScrub
 pass  TestCorefileParsing
 xfail TestDNS64FallbackError                          stdin:3 - Error during parsing: Directive 'dns64' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestDynUpdateAXFRIncludesUpdatedRecord
@@ -58,7 +58,7 @@ skip  TestJSONLoggingProcess                          does not start a server th
 skip  TestJSONLoggingProcessHelper                    does not start a server through the test helpers
 xfail TestKubernetesAutopathCacheRefresh              isolated test failed: exit status 1
 pass  TestLargeAXFR
-xfail TestLookupAutoPathErratic                       Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestLookupAutoPathErratic                       Could not get CoreDNS serving instance: stdin:3 - Error during parsing: Directive 'autopath' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestLookupBalanceRewriteCacheDnssec             Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'dnssec' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestLookupCache
 pass  TestLookupCacheWithoutEdns
@@ -81,7 +81,7 @@ xfail TestMultisocket                                 Could not get CoreDNS serv
 xfail TestMultisocket_Restart                         Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'multisocket' is not available in KernDNS yet (no Rust port of this plugin)
 xfail TestMultisocket_WhoAmI                          Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'multisocket' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestNoPlugins
-xfail TestProxyThreeWay                               Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+pass  TestProxyThreeWay
 pass  TestProxyToChaosServer
 xfail TestQUIC                                        Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
 xfail TestQUICProtocolError                           Could not get CoreDNS serving instance: quic://:0: the quic:// transport is not supported by KernDNS yet
@@ -115,8 +115,8 @@ pass  TestTsigBadKey
 pass  TestTsigBadSig
 pass  TestTsigBadTime
 pass  TestUppercaseServerBlockZone
-xfail TestView                                        Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
-xfail TestViewServerBlockOrdering                     Could not get CoreDNS serving instance: stdin:2 - Error during parsing: Directive 'erratic' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestView                                        Could not get CoreDNS serving instance: stdin:4 - Error during parsing: Directive 'view' is not available in KernDNS yet (no Rust port of this plugin)
+xfail TestViewServerBlockOrdering                     Could not start server: stdin:6 - Error during parsing: Directive 'view' is not available in KernDNS yet (no Rust port of this plugin)
 pass  TestZoneDanglingCNAMENegativeAuthority
 pass  TestZoneEDNS0Lookup
 pass  TestZoneExternalCNAMELookupWithProxy

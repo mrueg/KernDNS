@@ -13,6 +13,7 @@ pub mod cancel;
 pub mod chaos;
 pub mod debug;
 pub mod dynupdate;
+pub mod erratic;
 pub mod errors;
 pub mod expr;
 pub mod file;
@@ -72,6 +73,7 @@ pub fn registry() -> Registry {
     r.register(secondary::Setup);
     r.register(template::Setup);
     r.register(dynupdate::Setup);
+    r.register(erratic::Setup);
     r.register(tls::Setup);
     r.register(transfer::Setup);
     r.register(tsig::Setup);
