@@ -1,0 +1,76 @@
+//! Plugin execution order.
+//!
+//! As in CoreDNS, the order in which plugins run is fixed by this list and
+//! not by the order of directives in the Corefile. The list is CoreDNS
+//! v1.15.0's `plugin.cfg`; a directive that isn't listed here is rejected as
+//! unknown even if a plugin with that name is registered.
+
+pub const DIRECTIVES: &[&str] = &[
+    "root",
+    "metadata",
+    "geoip",
+    "cancel",
+    "proxyproto",
+    "quic",
+    "grpc_server",
+    "https",
+    "https3",
+    "timeouts",
+    "multisocket",
+    "reload",
+    "nsid",
+    "bufsize",
+    "bind",
+    "debug",
+    "trace",
+    "ready",
+    "health",
+    "pprof",
+    "shed",
+    "prometheus",
+    "errors",
+    "log",
+    "dnstap",
+    "local",
+    "dns64",
+    "siit",
+    "any",
+    "chaos",
+    "loadbalance",
+    "tsig",
+    "rewrite",
+    "autopath",
+    "acl",
+    "cache",
+    "header",
+    "dnssec",
+    "tls",
+    "minimal",
+    "template",
+    "transfer",
+    "dynupdate",
+    "hosts",
+    "route53",
+    "azure",
+    "clouddns",
+    "k8s_external",
+    "kubernetes",
+    "file",
+    "auto",
+    "secondary",
+    "etcd",
+    "loop",
+    "forward",
+    "grpc",
+    "erratic",
+    "whoami",
+    "on",
+    "sign",
+    "view",
+    "nomad",
+];
+
+/// Position of `name` in the execution order, if it is a known directive.
+pub fn position(name: &str) -> Option<usize> {
+    DIRECTIVES.iter().position(|d| *d == name)
+}

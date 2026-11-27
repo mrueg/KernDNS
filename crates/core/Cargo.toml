@@ -1,0 +1,15 @@
+[package]
+name = "kerndns-core"
+description = "Plugin model for KernDNS: handlers, requests, response writers, setup controller and registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kerndns-corefile.workspace = true
+hickory-proto.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+prometheus.workspace = true
+rustls.workspace = true
