@@ -22,18 +22,40 @@ pub struct Answer {
     pub msgs: Vec<Message>,
     /// Signs each encoded message (TSIG), if a plugin asked for it.
     pub signer: Option<Arc<dyn ResponseSigner>>,
+    /// Told the encoded size once the answer is on the wire.
+    pub on_sent: Vec<kerndns_core::handler::SentHook>,
 }
 
 impl From<Vec<Message>> for Answer {
     fn from(msgs: Vec<Message>) -> Self {
-        Answer { msgs, signer: None }
+        Answer {
+            msgs,
+            signer: None,
+            on_sent: Vec::new(),
+        }
+    }
+}
+
+impl Answer {
+    /// The messages, for callers that don't encode them; the hooks get the
+    /// size they would have on the wire.
+    fn into_msgs(self, req: &Request) -> Vec<Message> {
+        let mut msgs = self.msgs;
+        scrub_truncate(req, &mut msgs);
+        if !self.on_sent.is_empty() {
+            let n = msgs.iter().map(|m| to_wire(m).map_or(0, |v| v.len())).sum();
+            for h in &self.on_sent {
+                h(n);
+            }
+        }
+        msgs
     }
 }
 
 /// Encode an answer for the wire: each response is truncated to `size`
 /// if needed, then signed.
 pub fn encode(answer: Answer, size: usize) -> Vec<Vec<u8>> {
-    let mut out = Vec::new();
+    let mut out: Vec<Vec<u8>> = Vec::new();
     for mut m in answer.msgs {
         if m.metadata.message_type != MessageType::Response {
             continue;
@@ -51,6 +73,12 @@ pub fn encode(answer: Answer, size: usize) -> Vec<Vec<u8>> {
             wire = s.sign(wire);
         }
         out.push(wire);
+    }
+    if !answer.on_sent.is_empty() {
+        let n = out.iter().map(Vec::len).sum();
+        for h in &answer.on_sent {
+            h(n);
+        }
     }
     out
 }
@@ -106,8 +134,7 @@ impl Upstream for SelfUpstream {
         let mut name = name.clone();
         name.set_fqdn(true);
         r.msg.queries = vec![Query::query(name, qtype)];
-        let mut msgs = inner.serve(&r, ctx.loop_count).await.msgs;
-        scrub_truncate(&r, &mut msgs);
+        let msgs = inner.serve(&r, ctx.loop_count).await.into_msgs(&r);
         Ok(msgs.into_iter().last())
     }
 }
@@ -131,9 +158,7 @@ impl Dispatcher {
 
     /// Serve one request and return the messages to send.
     pub async fn serve(&self, req: &Request) -> Vec<Message> {
-        let mut msgs = self.0.serve(req, 0).await.msgs;
-        scrub_truncate(req, &mut msgs);
-        msgs
+        self.0.serve(req, 0).await.into_msgs(req)
     }
 
     /// Serve one request; the answer may come with a signer (TSIG).
@@ -295,6 +320,7 @@ impl Inner {
         Answer {
             msgs,
             signer: ctx.signer,
+            on_sent: ctx.on_sent,
         }
     }
 
