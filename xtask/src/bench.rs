@@ -18,7 +18,8 @@
 //! # needs: kubernetes               (start the fake Kubernetes API server)
 //! # live-queries: {DIR}/q-live.txt  (dnsperf input with --kubeconfig)
 //! # needs: etcd                     (start a throwaway etcd with SkyDNS records)
-//! # bridge: etcd                    (KernDNS runs these plugins in Go, -bridge)
+//! # bridge: etcd                    (KernDNS runs these plugins in Go: -bridge,
+//!                                    -bridge.prefer)
 //! ```
 //!
 //! Placeholders: `{PORT}` (the server's port), `{DIR}` (the case's
@@ -448,7 +449,7 @@ fn write_fixtures(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-struct Proc(Child);
+pub(crate) struct Proc(Child);
 
 impl Drop for Proc {
     fn drop(&mut self) {
@@ -457,7 +458,7 @@ impl Drop for Proc {
     }
 }
 
-fn free_port() -> Result<u16> {
+pub(crate) fn free_port() -> Result<u16> {
     // a port free for both UDP and TCP
     loop {
         let u = std::net::UdpSocket::bind("127.0.0.1:0")?;
@@ -979,13 +980,16 @@ pub fn run(args: &[String]) -> Result<()> {
             let mut runs_done = Vec::new();
             let mut err = None;
             let frames0 = dnstap_frames.load(std::sync::atomic::Ordering::Relaxed);
-            let args: &[String] = if *label == "KernDNS" && !case.bridge.is_empty() {
-                &bridge_args
+            // the case's bridge plugins run in Go even where a Rust port exists
+            let args: Vec<String> = if *label == "KernDNS" && !case.bridge.is_empty() {
+                let mut a = bridge_args.clone();
+                a.extend(["-bridge.prefer".to_string(), case.bridge.join(",")]);
+                a
             } else {
-                &[]
+                Vec::new()
             };
             for _ in 0..runs {
-                match measure(&cpus, bin, args, &cf, port, case, &q, secs, rate) {
+                match measure(&cpus, bin, &args, &cf, port, case, &q, secs, rate) {
                     Ok((r, used)) => {
                         rate = Some(used);
                         runs_done.push(r);
@@ -1108,10 +1112,38 @@ fn base64(b: &[u8]) -> String {
     s
 }
 
+/// POST `body` to etcd's JSON gateway; the response if it is a 200.
+pub(crate) fn etcd_post(port: u16, path: &str, body: &str) -> Result<Option<String>> {
+    use std::io::{Read, Write};
+    let mut s = std::net::TcpStream::connect(("127.0.0.1", port))?;
+    write!(
+        s,
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )?;
+    let mut resp = String::new();
+    s.read_to_string(&mut resp)?;
+    Ok(resp.starts_with("HTTP/1.1 200").then_some(resp))
+}
+
+/// Put `k` = `v` (with a lease if not 0) through etcd's JSON gateway.
+pub(crate) fn etcd_put(port: u16, k: &str, v: &str, lease: i64) -> Result<bool> {
+    let lease = if lease != 0 {
+        format!(r#","lease":"{lease}""#)
+    } else {
+        String::new()
+    };
+    let body = format!(
+        r#"{{"key":"{}","value":"{}"{lease}}}"#,
+        base64(k.as_bytes()),
+        base64(v.as_bytes())
+    );
+    Ok(etcd_post(port, "/v3/kv/put", &body)?.is_some())
+}
+
 /// A throwaway etcd on `port` filled with [`etcd_records`] (through its
 /// JSON gateway); writes the queries to `{FIX}/q-etcd.txt`.
-fn start_etcd(work: &Path, port: u16, cpus: &str, fix: &Path) -> Result<Proc> {
-    use std::io::{Read, Write};
+pub(crate) fn start_etcd(work: &Path, port: u16, cpus: &str, fix: &Path) -> Result<Proc> {
     let data = work.join("etcd-data");
     let _ = fs::remove_dir_all(&data);
     let url = format!("http://127.0.0.1:{port}");
@@ -1126,22 +1158,7 @@ fn start_etcd(work: &Path, port: u16, cpus: &str, fix: &Path) -> Result<Proc> {
         .context("starting etcd (is it installed?)")?;
     let etcd = Proc(child);
     let (kv, queries) = etcd_records(500)?;
-    let put = |k: &str, v: &str| -> Result<bool> {
-        let body = format!(
-            r#"{{"key":"{}","value":"{}"}}"#,
-            base64(k.as_bytes()),
-            base64(v.as_bytes())
-        );
-        let mut s = std::net::TcpStream::connect(("127.0.0.1", port))?;
-        write!(
-            s,
-            "POST /v3/kv/put HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            body.len()
-        )?;
-        let mut resp = String::new();
-        s.read_to_string(&mut resp)?;
-        Ok(resp.starts_with("HTTP/1.1 200"))
-    };
+    let put = |k: &str, v: &str| etcd_put(port, k, v, 0);
     let deadline = Instant::now() + Duration::from_secs(30);
     // the first put also waits until etcd is up and has a leader
     while !put(&kv[0].0, &kv[0].1).unwrap_or(false) {

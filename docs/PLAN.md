@@ -125,7 +125,9 @@ execution order at the same place (interface version 2, `kb_directives`).
   `ready` sees their `Ready()` through the bridge, also after a reload.
 
 - `cargo xtask compat-test --bridge` runs CoreDNS's own etcd tests (build
-  tag `etcd`) against KernDNS with the Go `etcd` plugin, against a
+  tag `etcd`) against KernDNS with the Go `etcd` plugin (now that `etcd`
+  has a Rust port, through `-bridge.prefer etcd`, also settable as
+  `$KERNDNS_BRIDGE_PREFER`), against a
   throwaway local etcd: `TestEtcdCache` and `TestEtcdCredentials` pass;
   `TestEtcdStubAndProxyLookup` needs a live internet address and fails on
   CoreDNS too. A differential run of `log`, `cache` (Rust) + `etcd` (Go) +
@@ -148,7 +150,9 @@ execution order at the same place (interface version 2, `kb_directives`).
 
 **Choosing per directive:** Rust port if one exists, else the bridge if it
 provides the plugin, else an error saying how to build the bridge with it.
-`prefer go|rust` and `cache@go` override this for A/B tests and benchmarks.
+`-bridge.prefer PLUGINS` (or `$KERNDNS_BRIDGE_PREFER`) runs those plugins
+in Go even though a Rust port exists, for A/B tests and benchmarks (the
+`bridge` setups and `bench/plugins/etcd/bridge` use it for `etcd`).
 
 ## Encrypted listeners (M4)
 
@@ -261,8 +265,47 @@ errors with the retry time).
 | 4: policy and rewriting | `rewrite`, `template`, `acl`, `metadata`, `view`, `cancel`, `timeouts`, `header`, `dns64`, `autopath`, `nsid`, `tls` (done) |
 | 5: DNSSEC and the rest | `dnssec`, `sign`, `dnstap`, `grpc`, `siit`, `shed`, `proxyproto`, `on`, `pprof`, `geoip`, `trace` (done) |
 
-Through the Go bridge until someone needs a port: `etcd`, `route53`,
+Through the Go bridge until someone needs a port: `route53`,
 `clouddns`, `azure`, third-party plugins.
+
+`etcd` is ported (`crates/plugins/src/etcd`). Like CoreDNS it reads etcd
+on every query (a prefix range, an exact read when the prefix is empty,
+and a `LeaseTimeToLive` per key with a lease) and leaves caching to
+`cache`; records go through the shared service backend
+(`crate::backend`, CoreDNS's `backend_lookup.go`), so wildcards (`*`,
+`any`), groups, SRV weights per priority, `targetstrip`, CNAME chasing
+in and out of the zone (out of zone through the server, like
+`upstream`), the time-based SOA serial, lease TTL bounds and
+`no_apex_fallback` behave as in CoreDNS. CoreDNS's etcd plugin has no
+metrics of its own. The table tests of `plugin/etcd` and `plugin/etcd/msg`
+run against an in-memory key space; `cargo xtask etcd-difftest` serves
+the benchmark's 500 services plus the unit tests' records, leases, long
+TXT strings, weights, out-of-zone targets and broken JSON from one
+throwaway etcd to CoreDNS and KernDNS (two Corefile variants, 16k
+queries each) with no differences. With `--bridge` (Go `etcd` inside
+KernDNS) it finds the bridge's one gap: Go's `upstream` can't resolve
+through the Rust server, so out-of-zone CNAME and SRV/MX targets lose
+their addresses. Differences from CoreDNS:
+
+- The etcd v3 client is KernDNS's own (KV.Range, Lease.LeaseTimeToLive,
+  Auth.Authenticate over gRPC on hyper's HTTP/2 client, protobuf by hand)
+  rather than the `etcd-client` crate, which needs `protoc` at build time
+  (not in CI, the image build or a plain Rust toolchain) and tonic/prost.
+  It spreads calls round robin over the endpoints and skips unreachable
+  ones, connects lazily, and fetches the auth token on first use (and
+  again when etcd calls it invalid or stale); unlike `clientv3` it sends
+  no keepalive pings and does not back off and retry within the 5 s
+  budget beyond trying each endpoint once. Lease lookups get the same
+  5 s timeout (CoreDNS uses none).
+- Service JSON matches field names case-insensitively in ASCII only
+  (Go also folds `K`/`ſ`), and invalid UTF-8 is an error (Go replaces
+  it); integers beyond 32 bits keep their low bits earlier than in Go.
+- Error messages in logs differ in wording.
+
+Porting it fixed three bugs in the shared backend (none affected
+`kubernetes`): SRV address records for IP services ignored `targetstrip`,
+MX deduplicated on the wrong name, and TXT strings of exactly 255·n
+bytes lacked CoreDNS's trailing empty string.
 
 `tls`, `tsig`, `header` and `transfer` are ported (with DoT and DoH
 listeners), and so are `secondary` (with RFC 9432 catalog zones) and `dynupdate`
@@ -554,10 +597,11 @@ Each scenario runs N times and reports the median and spread.
   other zones refused), split
   horizon (`view`, queried from an internal and from an external client
   with dnsperf `-a`), a DoT and a DoH frontend (cache and forward behind
-  the listener), and a mixed bridge chain vs all-Go CoreDNS (CoreDNS's
-  etcd example: `etcd` in Go through the bridge, the rest in Rust, with
-  and without the cache). `# bridge: etcd` makes the harness build the
-  bridge and start KernDNS with `-bridge`; `# needs: etcd` starts a
+  the listener), CoreDNS's etcd example with and without the cache, all
+  in Rust (`etcd`) and as a mixed bridge chain vs all-Go CoreDNS
+  (`bridge`: `etcd` in Go through the bridge, the rest in Rust).
+  `# bridge: etcd` makes the harness build the bridge and start KernDNS
+  with `-bridge` and `-bridge.prefer etcd`; `# needs: etcd` starts a
   throwaway etcd with 500 SkyDNS services. `kubeadm` is kubeadm's
   default Corefile against the fake API server (1000 Services) with what
   pods send through the `ndots:5` search path (A and AAAA for each

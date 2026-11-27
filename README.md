@@ -43,13 +43,14 @@ Milestones **M0**, **M1** and **M2** are done.
 | Corefile parser: server blocks, snippets, `import`, env vars, caddy-compatible dispenser | done |
 | Plugin model mirroring CoreDNS (`Handler`, `ResponseWriter`, `plugin.cfg` order, `ClientWrite` rules) | done |
 | Server: multi-socket UDP (`SO_REUSEPORT`), TCP, DoT (`tls://`), DoH (`https://`, HTTP/1.1 and HTTP/2), DoH3 (`https3://`, HTTP/3), DoQ (`quic://`, RFC 9250) and gRPC (`grpc://`, CoreDNS's `DnsService`), with the `https`, `https3`, `quic` and `grpc_server` connection and stream limits, CoreDNS routing and error semantics, TSIG signing of every response including multi-message transfers, hot reload without dropping listeners | done |
-| Plugins | `acl`, `any`, `auto`, `autopath`, `bind`, `bufsize`, `cache`, `cancel`, `chaos`, `debug`, `dns64`, `dnssec`, `dnstap`, `dynupdate`, `erratic`, `errors`, `file`, `forward` (UDP/TCP/DoT), `geoip`, `grpc`, `grpc_server`, `header`, `health`, `hosts`, `https`, `https3`, `k8s_external`, `kubernetes`, `loadbalance`, `local`, `log`, `loop`, `metadata`, `minimal`, `multisocket`, `nsid`, `on`, `pprof`, `prometheus`, `proxyproto`, `quic`, `ready`, `reload`, `rewrite`, `root`, `secondary`, `shed`, `sign`, `siit`, `template`, `timeouts`, `tls`, `trace`, `transfer`, `tsig`, `view`, `whoami` |
+| Plugins | `acl`, `any`, `auto`, `autopath`, `bind`, `bufsize`, `cache`, `cancel`, `chaos`, `debug`, `dns64`, `dnssec`, `dnstap`, `dynupdate`, `erratic`, `errors`, `etcd`, `file`, `forward` (UDP/TCP/DoT), `geoip`, `grpc`, `grpc_server`, `header`, `health`, `hosts`, `https`, `https3`, `k8s_external`, `kubernetes`, `loadbalance`, `local`, `log`, `loop`, `metadata`, `minimal`, `multisocket`, `nsid`, `on`, `pprof`, `prometheus`, `proxyproto`, `quic`, `ready`, `reload`, `rewrite`, `root`, `secondary`, `shed`, `sign`, `siit`, `template`, `timeouts`, `tls`, `trace`, `transfer`, `tsig`, `view`, `whoami` |
 | Metrics with CoreDNS's names, labels and buckets (text and protobuf exposition) | done |
-| CoreDNS integration tests against KernDNS | 106 pass, 1 expected failure, 11 skipped (Go internals, checks of the Go source, a shared in-process metrics registry), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 117 of 118 (`TestDynUpdateKeaLifecycle` skips without Kea; `TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself) |
+| CoreDNS integration tests against KernDNS | 108 pass, 2 expected failures, 12 skipped (Go internals, checks of the Go source, a shared in-process metrics registry), see [expectations](go/compat/expectations.txt); harness check: real CoreDNS passes 120 of 122 (`TestDynUpdateKeaLifecycle` skips without Kea; `TestQUICReloadDoesNotPanic` is flaky on CoreDNS itself; `TestEtcdStubAndProxyLookup` expects an outdated address for example.com) |
 | Differential test against CoreDNS (`file` zones from CoreDNS's tests, 15k+ queries) | no differences |
+| Differential test of `etcd` against CoreDNS (one throwaway etcd: 500 services plus the unit tests' records, leases, weights, out-of-zone targets, broken JSON; 2 Corefiles, 32k queries) | no differences |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin and level 3 common setups, see below |
 | `kubernetes` + `k8s_external` | every option of CoreDNS 1.15.0 incl. `multicluster`, `zonal`, `apiserver_*` limits, zone transfers, `kubernetes/*` metadata and `coredns_kubernetes_*` metrics ([parity table](docs/PLAN.md#parity-with-coredns-1150-pluginkubernetes-plugink8s_external)); CoreDNS's own tests replay with identical results (130 kubernetes and 38 k8s_external handler cases, transfers, metadata); 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants); coredns/ci's end-to-end tests run in CI ([expectations](go/compat/expectations-kind.txt)) |
-| Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `etcd`) | done (M3) |
+| Go plugin bridge: CoreDNS plugins without a Rust port run in Go inside the chain (e.g. `route53`; `-bridge.prefer etcd` runs `etcd` in Go instead of its Rust port) | done (M3) |
 
 ### Benchmarks
 
@@ -89,6 +90,8 @@ where other builds were running at the same time, so differences of a few
 | dynupdate/update | +1361.1 | +494.3 | 1k → 2k | 66 → 33 MiB |
 | erratic | +3.2 | -7.4 | 75k → 196k | 60 → 9 MiB |
 | errors | +5.1 | +1.8 | 78k → 128k | 61 → 9 MiB |
+| etcd⁴ | +139.2 | +85.6 | 7k → 9k | 78 → 25 MiB |
+| etcd/bridge⁴ (KernDNS: Go etcd through the bridge) | +144.1 | +194.9 | 8k → 8k | 80 → 63 MiB |
 | file | +12.6 | +8.3 | 96k → 124k | 71 → 31 MiB |
 | file/100k² | +53.8 | +17.6 | 14k → 35k | 145 → 63 MiB |
 | file/8a | +3.6 | -2.2 | 106k → 183k | 62 → 11 MiB |
@@ -131,6 +134,11 @@ KernDNS's cache throughput in half.
 ² After the fixes for the three follow-ups below, from a separate run of
 only these cases on a heavily loaded machine (`whoami` reached only 67k →
 59k QPS), so only the relative CPU and memory numbers mean much.
+
+⁴ From a later run of only the etcd cases against a throwaway etcd with
+500 services (its own `whoami` baseline: 45.3 and 24.6 µs). etcd's
+latency dominates and max QPS swings with it: an earlier run had 12k →
+7k (CoreDNS → KernDNS) for `etcd` at +122.5 vs +110.6 µs.
 
 What stood out in the first full run, and what it was:
 
@@ -184,9 +192,10 @@ Level 3, common setups ([`bench/setups/`](bench/setups/)): whole
 Corefiles of typical deployments, run the same way (`cargo xtask bench
 --level 3`). `split/external` queries the split horizon setup from another
 source address (dnsperf `-a 127.0.0.2`), so the internal view rejects it.
-In the `bridge` setups (CoreDNS's etcd example, against a throwaway etcd
-with 500 services) KernDNS runs `etcd` in Go through the bridge and the
-rest in Rust. One `--duration 3 --runs 3` run on the same loaded laptop
+The `etcd` setups are CoreDNS's etcd example against a throwaway etcd
+with 500 services, all in Rust in KernDNS; the `bridge` setups are the
+same Corefiles with KernDNS running `etcd` in Go through the bridge
+(`-bridge.prefer etcd`) and the rest in Rust. One `--duration 3 --runs 3` run on the same loaded laptop
 (load average 20 to 90 from other builds), so these are indicative only;
 both servers answered with the same response codes in every case.
 
@@ -201,10 +210,19 @@ both servers answered with the same response codes in every case.
 | frontend/doh (DoH over HTTP/2) | 19k → 32k | 163.5 → 74.2 | 78 → 21 MiB |
 | bridge (etcd in Go, cache, loadbalance, forward) | 13k → 15k | 87.7 → 89.1 | 77 → 52 MiB |
 | bridge/uncached (every etcd query crosses the bridge) | 3k → 3k | 231.7 → 289.5 | 80 → 61 MiB |
+| etcd³ (etcd in Rust, cache, loadbalance, forward) | 25k → 65k | 78.5 → 44.8 | 72 → 22 MiB |
+| etcd/uncached³ (every query reads etcd) | 13k → 22k | 170.7 → 101.2 | 84 → 26 MiB |
+| bridge³ | 31k → 63k | 76.9 → 61.2 | 82 → 54 MiB |
+| bridge/uncached³ | 14k → 18k | 154.5 → 144.5 | 88 → 63 MiB |
 
-With every query going to etcd through the bridge, KernDNS spends more
-CPU per query than CoreDNS (a second run: 169 vs 303 µs); latency in
-both is dominated by etcd and swings a lot between runs.
+With every query going to etcd through the bridge, KernDNS spent more
+CPU per query than CoreDNS in the first runs (169 vs 303 µs in a second
+one); latency in both is dominated by etcd and swings a lot between runs.
+
+³ A later run of only the etcd and bridge setups (with the Rust `etcd`
+port; the bridge rows run Go's etcd through `-bridge.prefer etcd`). With
+every query reading etcd, the Rust port needs about 40% less CPU per
+query than CoreDNS and 30% less than the bridge.
 
 Single laptop runs: treat them as indicative; the plan calls for a
 dedicated benchmark machine.
@@ -334,6 +352,7 @@ cargo xtask compat-test --run TestEDNS0 # a subset
 cargo xtask compat-test --update        # accept the current results
 cargo xtask compat-test --target coredns  # same tests against real CoreDNS (checks the harness)
 cargo xtask difftest                    # same zones in CoreDNS and kerndns, diff the answers
+cargo xtask etcd-difftest               # same etcd records in CoreDNS and kerndns (--bridge: Go etcd in kerndns)
 cargo xtask bench                       # CoreDNS vs kerndns with dnsperf, every scenario
 cargo xtask bench --plugin cache,forward  # level 2 cases of some plugins (+ whoami baseline)
 cargo xtask bench --level 3             # common setups only

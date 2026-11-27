@@ -8,5 +8,5 @@
 # <status> <test> <reason>
 pass  TestEtcdCache
 pass  TestEtcdCredentials
-xfail TestEtcdStubAndProxyLookup expects example.org at 93.184.216.34 (a live internet lookup); CoreDNS fails it too
+xfail TestEtcdStubAndProxyLookup expects example.com at 93.184.216.34 (a live internet lookup); CoreDNS fails it too
 skip  TestEtcdStubLoop           does not start a server through the test helpers

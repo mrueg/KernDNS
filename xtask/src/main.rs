@@ -42,6 +42,7 @@ const USAGE: &str =
        cargo xtask kind-test --ci-dir PATH [--target kerndns|coredns] [--run REGEX] [--update]
        cargo xtask k8s-cases
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
+       cargo xtask etcd-difftest [--show N] [--bridge]
        cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS] [--coredns PATH]
        cargo xtask fake-api KUBECONFIG [--services N]
 
@@ -61,6 +62,7 @@ fn main() -> Result<()> {
         Some("kind-test") => kind::run(&args[1..]),
         Some("k8s-cases") => k8s_cases(),
         Some("k8s-difftest") => difftest::k8s(&args[1..]),
+        Some("etcd-difftest") => difftest::etcd(&args[1..]),
         Some("k8s-bench") => bench::k8s(&args[1..]),
         Some("fake-api") => fake_api(&args[1..]),
         _ => {
@@ -229,15 +231,12 @@ fn compat_test(args: &[String]) -> Result<()> {
         .join("kerndns");
 
     // --bridge: CoreDNS's etcd tests (build tag `etcd`) with the Go etcd
-    // plugin running inside kerndns through the bridge, against a local etcd
+    // plugin running inside kerndns through the bridge (-bridge.prefer)
+    // instead of the Rust port. Both run against a throwaway local etcd.
     let bridge_lib = match &bridge {
         None => None,
         Some(Some(p)) => Some(p.clone()),
         Some(None) => Some(build_bridge(&root, DEFAULT_BRIDGE_PLUGINS, None)?),
-    };
-    let etcd_guard = match bridge_lib {
-        Some(_) => Some(EtcdGuard::start(&root.join("target/compat"))?),
-        None => None,
     };
     let run = match (&bridge_lib, run) {
         (Some(_), None) => Some("Etcd".to_string()),
@@ -274,20 +273,12 @@ fn compat_test(args: &[String]) -> Result<()> {
     // 3. compile the upstream test package once, then run every test in its
     //    own process: a panic in one test (e.g. calling Stop on the nil
     //    instance a failed start returns) must not hide the others.
-    let test_bin = work.join(if bridge_lib.is_some() {
-        "coredns-test-etcd.test"
-    } else {
-        "coredns-test.test"
-    });
+    let test_bin = work.join("coredns-test-etcd.test");
     let st = Command::new("go")
         .current_dir(&upstream)
         .args(["test", "-c", "-overlay"])
         .arg(&overlay)
-        .args(if bridge_lib.is_some() {
-            &["-tags", "etcd"][..]
-        } else {
-            &[][..]
-        })
+        .args(["-tags", "etcd"])
         .arg("-o")
         .arg(&test_bin)
         .arg("./test/")
@@ -311,6 +302,11 @@ fn compat_test(args: &[String]) -> Result<()> {
     if names.is_empty() {
         bail!("no upstream tests matched");
     }
+    let etcd_guard = if names.iter().any(|n| n.contains("Etcd")) {
+        Some(EtcdGuard::start(&work)?)
+    } else {
+        None
+    };
     eprintln!(
         "running {} CoreDNS integration tests against {} ...",
         names.len(),
@@ -349,6 +345,7 @@ fn compat_test(args: &[String]) -> Result<()> {
             .env("KERNDNS_BIN", &bin)
             .env("KERNDNS_COMPAT_TRACE", &trace)
             .env("KERNDNS_BRIDGE", bridge_for_test.unwrap_or(Path::new("")))
+            .env("KERNDNS_BRIDGE_PREFER", if bridge_lib.is_some() { "etcd" } else { "" })
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
         if target_coredns {

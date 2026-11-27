@@ -1,0 +1,10 @@
+# about: the same with KernDNS running etcd in Go through the bridge (-bridge.prefer etcd)
+# queries: {FIX}/q-etcd.txt
+# needs: etcd
+# bridge: etcd
+.:{PORT} {
+    etcd skydns.local {
+        endpoint http://127.0.0.1:{ETCD}
+    }
+    whoami
+}

@@ -299,6 +299,18 @@ fn http_status_code(status: u16) -> Code {
 }
 
 async fn read_response(resp: hyper::Response<hyper::body::Incoming>) -> Result<Vec<u8>, RpcError> {
+    let pb = read_unary(resp, MAX_PAYLOAD).await?;
+    decode_packet(&pb).ok_or_else(|| {
+        RpcError::new(
+            Code::INTERNAL,
+            "grpc: failed to unmarshal the received message: proto: cannot parse invalid wire-format data",
+        )
+    })
+}
+
+/// The one message of a unary call's response (its protobuf bytes), or the
+/// call's status as an error. Messages larger than `max` are refused.
+pub(crate) async fn read_unary(resp: hyper::Response<hyper::body::Incoming>, max: usize) -> Result<Vec<u8>, RpcError> {
     let status = resp.status();
     // trailers-only: the status is in the headers
     if let Some(st) = status_of(resp.headers()) {
@@ -333,10 +345,10 @@ async fn read_response(resp: hyper::Response<hyper::body::Incoming>) -> Result<V
                 }
                 if buf.len() >= 5 {
                     let n = u32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]) as usize;
-                    if n > MAX_PAYLOAD {
+                    if n > max {
                         return Err(RpcError::new(
                             Code::RESOURCE_EXHAUSTED,
-                            format!("grpc: received message larger than max ({n} vs. {MAX_PAYLOAD})"),
+                            format!("grpc: received message larger than max ({n} vs. {max})"),
                         ));
                     }
                 }
@@ -371,12 +383,8 @@ async fn read_response(resp: hyper::Response<hyper::body::Incoming>) -> Result<V
     if buf.len() < n + 5 {
         return Err(RpcError::new(Code::INTERNAL, "unexpected EOF"));
     }
-    decode_packet(&buf[5..n + 5]).ok_or_else(|| {
-        RpcError::new(
-            Code::INTERNAL,
-            "grpc: failed to unmarshal the received message: proto: cannot parse invalid wire-format data",
-        )
-    })
+    buf.truncate(n + 5);
+    Ok(buf.split_off(5).to_vec())
 }
 
 #[cfg(test)]

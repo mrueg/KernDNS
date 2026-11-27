@@ -11,6 +11,7 @@ const USAGE: &str = "Usage of kerndns:
         Go bridge library with CoreDNS plugins (default $KERNDNS_BRIDGE)
   -bridge.prefer string
         Comma-separated plugins to run in Go even if a Rust port exists
+        (default $KERNDNS_BRIDGE_PREFER)
   -bridge.sync string
         Comma-separated Go plugins to run on the calling thread (faster; for
         plugins that don't wait on the network)
@@ -192,7 +193,17 @@ fn main() -> ExitCode {
         match kerndns_go_bridge::Bridge::load(std::path::Path::new(&path)) {
             Ok(b) => {
                 kerndns_go_bridge::set_sync(flags.bridge_sync.clone());
-                b.register(&mut registry, &flags.bridge_prefer);
+                let prefer = if flags.bridge_prefer.is_empty() {
+                    std::env::var("KERNDNS_BRIDGE_PREFER")
+                        .unwrap_or_default()
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                } else {
+                    flags.bridge_prefer.clone()
+                };
+                b.register(&mut registry, &prefer);
             }
             Err(e) => {
                 eprintln!("{e}");

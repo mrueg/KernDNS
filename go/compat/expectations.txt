@@ -33,6 +33,10 @@ pass  TestDynUpdateRejectsUnsignedRequest
 pass  TestDynUpdateUDPAndTCP
 pass  TestEDNS0
 pass  TestEmptySecondaryZone
+pass  TestEtcdCache
+pass  TestEtcdCredentials
+xfail TestEtcdStubAndProxyLookup                      expects example.com at 93.184.216.34 (a live internet lookup); CoreDNS fails it too
+skip  TestEtcdStubLoop                                does not start a server through the test helpers
 pass  TestFileCnameOrigin
 pass  TestFileLoop
 skip  TestFileNameHyphen                              presubmit check of CoreDNS's Go source tree (file names), no server

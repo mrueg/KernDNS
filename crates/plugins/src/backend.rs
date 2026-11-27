@@ -140,12 +140,10 @@ impl Service {
     }
 
     pub fn new_txt(&self, owner: &str) -> Record {
-        let chunks: Vec<Vec<u8>> = self.text.as_bytes().chunks(255).map(<[u8]>::to_vec).collect();
-        let chunks = if chunks.is_empty() { vec![Vec::new()] } else { chunks };
         rr(
             owner,
             self.ttl,
-            RData::TXT(TXT::try_new(chunks.into_iter()).expect("chunks of at most 255 bytes")),
+            RData::TXT(TXT::try_new(split255(&self.text).into_iter()).expect("chunks of at most 255 bytes")),
         )
     }
 
@@ -156,6 +154,20 @@ impl Service {
     pub fn new_ns(&self, owner: &str) -> Record {
         rr(owner, self.ttl, RData::NS(NS(name(&self.target()))))
     }
+}
+
+/// `split255`: TXT strings of at most 255 bytes. Like CoreDNS, a text whose
+/// length is a non-zero multiple of 255 gets an empty string at the end.
+pub fn split255(s: &str) -> Vec<Vec<u8>> {
+    let b = s.as_bytes();
+    if b.len() < 255 {
+        return vec![b.to_vec()];
+    }
+    let mut v: Vec<Vec<u8>> = b.chunks(255).map(<[u8]>::to_vec).collect();
+    if b.len().is_multiple_of(255) {
+        v.push(Vec::new());
+    }
+    v
 }
 
 /// `msg.Path`: `/prefix/` + the labels of `s` in reverse order.
@@ -448,7 +460,7 @@ pub async fn srv(
                 let addr = s.host.clone();
                 s.host = domain(&s.key);
                 let r = s.new_srv(&st.qname(), weight);
-                let target = fqdn(&s.host);
+                let target = s.target();
                 if dup.insert((target.clone(), s.port as u16, String::new())) {
                     records.push(r);
                 }
@@ -504,12 +516,12 @@ pub async fn mx(
                 let addr = s.host.clone();
                 s.host = domain(&s.key);
                 let r = s.new_mx(&st.qname());
-                let target = fqdn(&s.host);
+                let (target, host) = (s.target(), fqdn(&s.host));
                 if dup.insert((target.clone(), s.priority as u16, String::new())) {
                     records.push(r);
                 }
-                if dup.insert((target.clone(), 0, addr))
-                    && let Some(x) = new_address(&s, &target, ht)
+                if dup.insert((host.clone(), 0, addr))
+                    && let Some(x) = new_address(&s, &host, ht)
                 {
                     extra.push(x);
                 }
