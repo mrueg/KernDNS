@@ -12,6 +12,9 @@
 //!               --check: every registered plugin has a scenario.
 //! loadgen       DNS load generator for DoQ, DoH3 and gRPC with dnsperf's
 //!               arguments and output (bench uses it for -m doq|doh3|grpc).
+//! kind-test     Run coredns/ci's end-to-end Kubernetes tests against the
+//!               cluster DNS of a kind cluster and compare with
+//!               go/compat/expectations-kind.txt (CI job `kind`).
 //! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_cases.json by
 //!               running CoreDNS's kubernetes handler test suites in Go.
 
@@ -26,6 +29,7 @@ use anyhow::{Context, Result, bail};
 mod bench;
 mod difftest;
 mod fakeapi;
+mod kind;
 mod loadgen;
 
 const USAGE: &str =
@@ -35,6 +39,7 @@ const USAGE: &str =
        cargo xtask bench [--level 2,3] [--plugin NAME,...] [--scenario CASE,...] [--duration SECONDS] [--runs N] [--coredns PATH] [--kubeconfig PATH] [--list]
        cargo xtask bench --check
        cargo xtask loadgen -m doq|doh3|grpc -p PORT -d QUERYFILE [-s IP] [-c CLIENTS] [-T THREADS] [-q OUTSTANDING] [-l SECONDS] [-Q QPS] [-t TIMEOUT] [--ca PEM] [--tls]
+       cargo xtask kind-test --ci-dir PATH [--target kerndns|coredns] [--run REGEX] [--update]
        cargo xtask k8s-cases
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
        cargo xtask k8s-bench [--sizes 1000,10000,50000] [--duration SECONDS] [--coredns PATH]
@@ -52,6 +57,7 @@ fn main() -> Result<()> {
         Some("difftest") => difftest::run(&args[1..]),
         Some("bench") => bench::run(&args[1..]),
         Some("loadgen") => loadgen::run(&args[1..]),
+        Some("kind-test") => kind::run(&args[1..]),
         Some("k8s-cases") => k8s_cases(),
         Some("k8s-difftest") => difftest::k8s(&args[1..]),
         Some("k8s-bench") => bench::k8s(&args[1..]),
@@ -120,17 +126,17 @@ fn read_expectations(path: &Path) -> Result<BTreeMap<String, (Status, String)>> 
     Ok(out)
 }
 
-fn write_expectations(path: &Path, exp: &BTreeMap<String, (Status, String)>) -> Result<()> {
-    let mut s = String::from(
-        "# Expected results of CoreDNS's integration tests (third_party/coredns/test) against KernDNS.\n\
+const COMPAT_HEADER: &str = "# Expected results of CoreDNS's integration tests (third_party/coredns/test) against KernDNS.\n\
          # Maintained by `cargo xtask compat-test --update`; edit reasons by hand.\n\
          #\n\
          #   pass   must pass\n\
          #   xfail  fails today; the run fails if it starts passing, so it gets promoted\n\
          #   skip   not run: tests Go internals, or never starts a server through the helpers\n\
          #\n\
-         # <status> <test> <reason>\n",
-    );
+         # <status> <test> <reason>\n";
+
+fn write_expectations(path: &Path, exp: &BTreeMap<String, (Status, String)>, header: &str) -> Result<()> {
+    let mut s = String::from(header);
     let width = exp.keys().map(String::len).max().unwrap_or(0);
     for (name, (st, reason)) in exp {
         let line = format!("{:<5} {:<width$} {}", st.as_str(), name, reason);
@@ -415,7 +421,7 @@ fn compat_test(args: &[String]) -> Result<()> {
             // a filtered run only updates the tests it ran
             println!("updating the {} tests that ran", tests.len());
         }
-        write_expectations(&exp_path, &new_exp)?;
+        write_expectations(&exp_path, &new_exp, COMPAT_HEADER)?;
         println!("wrote {}", exp_path.display());
         return Ok(());
     }
