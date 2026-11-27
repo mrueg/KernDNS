@@ -20,6 +20,7 @@ pub mod dnstap;
 pub mod dynupdate;
 pub mod erratic;
 pub mod errors;
+pub mod etcd;
 pub mod expr;
 pub mod file;
 pub mod forward;
@@ -79,6 +80,7 @@ pub fn registry() -> Registry {
     r.register(debug::Setup);
     r.register(dnstap::Setup);
     r.register(errors::Setup);
+    r.register(etcd::Setup);
     r.register(file::Setup);
     r.register(forward::Setup);
     r.register(grpc::Setup);

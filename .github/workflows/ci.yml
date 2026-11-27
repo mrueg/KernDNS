@@ -25,14 +25,16 @@ jobs:
       - run: cargo test --workspace
       - name: Every plugin has a benchmark scenario
         run: cargo xtask bench --check
+      - name: Install etcd (for the etcd tests)
+        run: sudo apt-get install -y etcd-server
       - name: CoreDNS integration tests
         run: cargo xtask compat-test
       - name: Differential test against CoreDNS
         run: cargo xtask difftest
+      - name: Differential test of etcd against CoreDNS
+        run: cargo xtask etcd-difftest
       - name: Go bridge (CoreDNS's etcd tests with Go etcd inside KernDNS)
-        run: |
-          sudo apt-get install -y etcd-server
-          cargo xtask compat-test --bridge
+        run: cargo xtask compat-test --bridge
 
   bench-smoke:
     # a short level 2 run of a few scenarios: checks that the harness and

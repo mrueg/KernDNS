@@ -1,0 +1,14 @@
+# about: etcd service discovery as in CoreDNS's etcd docs, all in Rust in KernDNS (the bridge setup without the bridge)
+# queries: {FIX}/q-etcd.txt
+# needs: etcd
+.:{PORT} {
+    errors
+    prometheus 127.0.0.1:0
+    etcd skydns.local {
+        path /skydns
+        endpoint http://127.0.0.1:{ETCD}
+    }
+    cache 160 skydns.local
+    loadbalance
+    forward . 127.0.0.1:{BACKEND}
+}

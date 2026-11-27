@@ -1,0 +1,9 @@
+# about: etcd with 500 SkyDNS services: A, AAAA and SRV hits and NXDOMAIN read etcd on every query; names outside the zone go to whoami
+# queries: {FIX}/q-etcd.txt
+# needs: etcd
+.:{PORT} {
+    etcd skydns.local {
+        endpoint http://127.0.0.1:{ETCD}
+    }
+    whoami
+}

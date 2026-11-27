@@ -10,6 +10,7 @@
 //! validity times, which differ by design, and every RRSIG from either
 //! server must verify with the key.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
@@ -66,8 +67,9 @@ fn probe(port: u16) -> bool {
 }
 
 /// Start a server; `Ok(None)` if it exited (rejected the config).
-fn start(bin: &Path, corefile: &Path, port: u16, log: &Path) -> Result<Option<Server>> {
+fn start(bin: &Path, args: &[String], corefile: &Path, port: u16, log: &Path) -> Result<Option<Server>> {
     let child = Command::new(bin)
+        .args(args)
         .arg("-conf")
         .arg(corefile)
         .arg("-quiet")
@@ -229,8 +231,8 @@ pub fn run(args: &[String]) -> Result<()> {
         );
         fs::write(&cfa, cf(pa))?;
         fs::write(&cfb, cf(pb))?;
-        let a = start(&coredns, &cfa, pa, &work.join(format!("{name}.coredns.log")))?;
-        let b = start(&kerndns, &cfb, pb, &work.join(format!("{name}.kerndns.log")))?;
+        let a = start(&coredns, &[], &cfa, pa, &work.join(format!("{name}.coredns.log")))?;
+        let b = start(&kerndns, &[], &cfb, pb, &work.join(format!("{name}.kerndns.log")))?;
         match (&a, &b) {
             (None, None) => {
                 summary.push(format!("  ok    {name}: both reject the zone"));
@@ -542,8 +544,8 @@ pub fn k8s(args: &[String]) -> Result<()> {
         );
         fs::write(&cfa, cf(pa))?;
         fs::write(&cfb, cf(pb))?;
-        let a = start(&coredns, &cfa, pa, &work.join(format!("{name}.coredns.log")))?;
-        let b = start(&kerndns, &cfb, pb, &work.join(format!("{name}.kerndns.log")))?;
+        let a = start(&coredns, &[], &cfa, pa, &work.join(format!("{name}.coredns.log")))?;
+        let b = start(&kerndns, &[], &cfb, pb, &work.join(format!("{name}.kerndns.log")))?;
         if a.is_none() || b.is_none() {
             bail!("{name}: a server failed to start (see {})", work.display());
         }
@@ -584,6 +586,415 @@ pub fn k8s(args: &[String]) -> Result<()> {
         }
     }
     println!("\nvariants:");
+    for s in &summary {
+        println!("{s}");
+    }
+    if total_diffs > 0 {
+        println!("\n{total_diffs} differences");
+        std::process::exit(1);
+    }
+    println!("\nno differences");
+    Ok(())
+}
+
+/// One SkyDNS record for the etcd difftest: the name it is stored under,
+/// its JSON, and whether it is attached to a lease.
+struct EtcdRecord {
+    name: String,
+    json: String,
+    lease: bool,
+}
+
+/// The services of CoreDNS's etcd unit tests (each test's set in its own
+/// zone), plus weights, leases, TTLs, out-of-zone targets, long TXT
+/// strings, IPv4-mapped addresses and broken records.
+fn etcd_rich_records() -> Vec<EtcdRecord> {
+    let mut v = Vec::new();
+    let mut add = |name: &str, json: &str, lease: bool| {
+        v.push(EtcdRecord {
+            name: name.to_string(),
+            json: json.to_string(),
+            lease,
+        })
+    };
+    let h = |host: &str| format!(r#"{{"host":"{host}"}}"#);
+    let hp = |host: &str, port: u16| format!(r#"{{"host":"{host}","port":{port}}}"#);
+    let t = |text: &str| format!(r#"{{"text":"{text}"}}"#);
+    let mx = |host: &str, prio: u16| format!(r#"{{"host":"{host}","priority":{prio},"mail":true}}"#);
+    let records: Vec<(&str, String)> = vec![
+        // lookup_test.go (zone skydns.test. and friends)
+        ("a.server1.dev.region1.skydns.test.", hp("dev.server1", 8080)),
+        ("a.server1.prod.region1.skydns.test.", hp("10.0.0.1", 8080)),
+        ("b.server1.prod.region1.skydns.test.", hp("10.0.0.2", 8080)),
+        ("b.server6.prod.region1.skydns.test.", hp("::1", 8080)),
+        ("a.txt.server1.prod.region1.skydns.test.", t("sometext")),
+        ("b.txt.server1.prod.region1.skydns.test.", t("moretext")),
+        ("cname.prod.region1.skydns.test.", h("unresolvable.skydns.test")),
+        (
+            "priority.skydns.test.",
+            r#"{"host":"priority.server1","port":8080,"priority":333}"#.into(),
+        ),
+        ("a.sub.region1.skydns.test.", h("sub.server1")),
+        ("b.sub.region1.skydns.test.", hp("sub.server2", 80)),
+        ("c.sub.region1.skydns.test.", hp("10.0.0.1", 8080)),
+        (
+            "a.targetstrip.skydns.test.",
+            r#"{"host":"10.0.0.1","port":8080,"targetstrip":1}"#.into(),
+        ),
+        ("b.cname.skydns.test.", h("a.cname.skydns.test")),
+        ("a.cname.skydns.test.", h("b.cname.skydns.test")),
+        ("a.ns.dns.skydns.test.", h("10.0.0.2")),
+        ("b.ns.dns.skydns.test.", h("10.0.0.3")),
+        (
+            "ns1.c.ns.dns.skydns.test.",
+            r#"{"host":"10.0.0.4","targetstrip":1}"#.into(),
+        ),
+        (
+            "ns2.c.ns.dns.skydns.test.",
+            r#"{"host":"10.0.0.5","targetstrip":1}"#.into(),
+        ),
+        ("x.skydns_zonea.test.", h("10.0.0.2")),
+        ("y.skydns_zonea.test.", h("10.0.0.3")),
+        ("x.skydns_zoneb.test.", h("10.0.0.2")),
+        ("y.skydns_zoneb.test.", h("10.0.0.3")),
+        ("apex.dns.skydns_zoneb.test.", h("10.0.0.4")),
+        ("a1.apex.dns.skydns_zoned.test.", h("10.0.0.4")),
+        ("a3.apex.dns.skydns_zoned.test.", h("2003::8:1")),
+        ("x.skydns_zoned.test.", h("10.0.0.2")),
+        ("1.0.0.10.in-addr.arpa.", h("reverse.example.com")),
+        ("2.0.0.10.in-addr.arpa.", h("10.0.0.2")),
+        // cname_test.go (zone cname.test.)
+        ("a.server1.dev.region1.cname.test.", h("cname1.region2.cname.test")),
+        ("cname1.region2.cname.test.", h("cname2.region2.cname.test")),
+        ("cname2.region2.cname.test.", h("cname3.region2.cname.test")),
+        ("cname3.region2.cname.test.", h("cname4.region2.cname.test")),
+        ("cname4.region2.cname.test.", h("cname5.region2.cname.test")),
+        ("cname5.region2.cname.test.", h("cname6.region2.cname.test")),
+        ("cname6.region2.cname.test.", h("endpoint.region2.cname.test")),
+        ("endpoint.region2.cname.test.", h("10.240.0.1")),
+        ("region2.cname.test.", h("mainendpoint.region2.cname.test")),
+        ("cname3.region3.cname.test.", h("cname2.region3.cname.test")),
+        ("cname2.region3.cname.test.", h("cname1.region3.cname.test")),
+        ("cname1.region3.cname.test.", h("endpoint.region3.cname.test")),
+        ("endpoint.region3.cname.test.", t("SOME-RECORD-TEXT")),
+        // group_test.go (zone group.test.)
+        ("a.dom.group.test.", r#"{"host":"127.0.0.1","group":"g1"}"#.into()),
+        ("b.sub.dom.group.test.", r#"{"host":"127.0.0.2","group":"g1"}"#.into()),
+        ("a.dom2.group.test.", r#"{"host":"127.0.0.1","group":"g1"}"#.into()),
+        ("b.sub.dom2.group.test.", r#"{"host":"127.0.0.2"}"#.into()),
+        ("a.dom1.group.test.", r#"{"host":"127.0.0.1","group":"g1"}"#.into()),
+        ("b.sub.dom1.group.test.", r#"{"host":"127.0.0.2","group":"g2"}"#.into()),
+        ("a.dom3.group.test.", r#"{"text":"foo","group":"g1"}"#.into()),
+        ("b.sub.dom3.group.test.", r#"{"text":"bar","group":"g1"}"#.into()),
+        // other_test.go (zone other.test.)
+        ("a.server1.dev.region1.other.test.", hp("dev.server1", 8080)),
+        ("a.mail.other.test.", mx("mx.other.test", 50)),
+        ("b.mail.other.test.", mx("mx.example.org", 50)),
+        ("a.mx.other.test.", mx("a.ipaddr.other.test", 30)),
+        ("a.mx2.other.test.", mx("a.ipaddr.other.test", 0)),
+        ("b.mx2.other.test.", mx("b.ipaddr.other.test", 0)),
+        ("a.mx3.other.test.", mx("a.ipaddr.other.test", 20)),
+        ("b.mx3.other.test.", mx("a.ipaddr.other.test", 30)),
+        (
+            "c.mx3.other.test.",
+            r#"{"host":"172.16.1.9","priority":40,"mail":true,"targetstrip":1}"#.into(),
+        ),
+        ("mx.other.test.", h("a.ipaddr.other.test")),
+        ("a.ipaddr.other.test.", h("172.16.1.1")),
+        ("b.ipaddr.other.test.", h("172.16.1.2")),
+        ("a1.txt.other.test.", t("abc")),
+        ("a2.txt.other.test.", t("abc abc")),
+        ("large255.other.test.", t(&"0".repeat(255))),
+        ("large400.other.test.", t(&"0".repeat(400))),
+        ("large600.other.test.", t(&"1".repeat(600))),
+        ("http.multiport.http.other.test.", hp("10.11.11.10", 80)),
+        ("https.multiport.http.other.test.", hp("10.11.11.10", 443)),
+        // weights within and across priorities, an invalid port
+        (
+            "a.weights.other.test.",
+            r#"{"host":"w1.example.org","port":1,"weight":50}"#.into(),
+        ),
+        (
+            "b.weights.other.test.",
+            r#"{"host":"w2.example.org","port":2,"weight":150}"#.into(),
+        ),
+        ("c.weights.other.test.", r#"{"host":"10.0.9.1","port":3}"#.into()),
+        (
+            "d.weights.other.test.",
+            r#"{"host":"10.0.9.2","port":4,"priority":20,"weight":7}"#.into(),
+        ),
+        ("e.weights.other.test.", r#"{"host":"10.0.9.3","port":-1}"#.into()),
+        // out-of-zone targets, resolved through the server (hosts)
+        ("ext.other.test.", h("www.example.org")),
+        ("srv.ext.other.test.", hp("www.example.org", 443)),
+        ("mapped.other.test.", h("::ffff:10.0.0.9")),
+        ("ttl.other.test.", r#"{"host":"10.0.0.10","ttl":60}"#.into()),
+        (
+            "mixed.case.other.test.",
+            r#"{"HOST":"10.0.0.11","Port":53,"unknown":[1,2]}"#.into(),
+        ),
+        ("null.other.test.", "null".into()),
+        ("empty.other.test.", "{}".into()),
+        ("x.ns.dns.other.test.", h("ns.example.org")),
+        // records that are not valid JSON (zone bad.test.)
+        ("broken.bad.test.", "{".into()),
+        ("type.bad.test.", r#"{"port":"80"}"#.into()),
+        ("ok.bad.test.", h("10.0.0.1")),
+    ];
+    for (name, json) in records {
+        add(name, &json, false);
+    }
+    // a CNAME chain longer than CoreDNS follows
+    for i in 0..14 {
+        add(
+            &format!("c{i}.long.cname.test."),
+            &h(&format!("c{}.long.cname.test", i + 1)),
+            false,
+        );
+    }
+    add("c14.long.cname.test.", &h("10.1.1.1"), false);
+    // leases: the lease's TTL is clamped (and compared with the service's)
+    add("a.lease.other.test.", &h("10.0.8.1"), true);
+    add("b.lease.other.test.", r#"{"host":"10.0.8.2","ttl":90}"#, true);
+    add("c.lease.other.test.", r#"{"text":"leased"}"#, true);
+    v
+}
+
+/// Names to ask about: every record's name and its parents up to the
+/// zone, wildcard forms of them, names that don't exist, and mixed-case
+/// copies; each with every record type the plugin answers (and two it
+/// does not).
+fn etcd_queries(records: &[EtcdRecord], zones: &[&str], extra: &str) -> String {
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    for r in records {
+        let zone = zones.iter().find(|z| r.name.ends_with(*z)).copied().unwrap_or(".");
+        let labels: Vec<&str> = r.name.trim_end_matches('.').split('.').collect();
+        let zone_labels = zone.trim_end_matches('.').split('.').filter(|l| !l.is_empty()).count();
+        for i in 0..=labels.len().saturating_sub(zone_labels) {
+            names.insert(format!("{}.", labels[i..].join(".")));
+            if i + 1 < labels.len() {
+                // the first label as a wildcard, and the second as `any`
+                names.insert(format!("*.{}.", labels[i + 1..].join(".")));
+                if i + 2 < labels.len() {
+                    names.insert(format!("{}.any.{}.", labels[i], labels[i + 2..].join(".")));
+                }
+            }
+        }
+        names.insert(format!("nx.{}", r.name));
+    }
+    for z in zones {
+        for n in [
+            String::new(),
+            "doesnotexist.".into(),
+            "ns.dns.".into(),
+            "apex.dns.".into(),
+        ] {
+            names.insert(format!("{n}{z}"));
+        }
+    }
+    let mixed: Vec<String> = names
+        .iter()
+        .step_by(5)
+        .map(|n| {
+            n.chars()
+                .enumerate()
+                .map(|(i, c)| if i % 2 == 0 { c.to_ascii_uppercase() } else { c })
+                .collect()
+        })
+        .collect();
+    names.extend(mixed);
+    let mut q = String::new();
+    for n in &names {
+        for t in [
+            "A", "AAAA", "SRV", "TXT", "MX", "CNAME", "NS", "SOA", "PTR", "HINFO", "AXFR",
+        ] {
+            q.push_str(&format!("{n} {t}\n"));
+        }
+    }
+    q.push_str(extra);
+    q
+}
+
+/// `cargo xtask etcd-difftest`: CoreDNS's etcd (Go) and KernDNS's (Rust,
+/// or Go through the bridge with `--bridge`) against the same throwaway
+/// etcd: the benchmark's 500 services plus [`etcd_rich_records`].
+pub fn etcd(args: &[String]) -> Result<()> {
+    let mut show = "10".to_string();
+    let mut bridge = false;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--show" => show = it.next().context("--show needs a value")?.clone(),
+            "--bridge" => bridge = true,
+            other => bail!("unknown argument {other}"),
+        }
+    }
+    let root = root();
+    let upstream = root.join("third_party/coredns");
+    let work = root.join("target/etcd-difftest");
+    fs::create_dir_all(&work)?;
+    if !Command::new(env!("CARGO"))
+        .current_dir(&root)
+        .args(["build", "--package", "kerndns"])
+        .status()?
+        .success()
+    {
+        bail!("building kerndns failed");
+    }
+    let kerndns = root.join("target/debug/kerndns");
+    let coredns = root.join("target/coredns-ref");
+    let tool = root.join("target/difftest-tool");
+    for (dir, out) in [(upstream, &coredns), (root.join("go/difftest"), &tool)] {
+        if !Command::new("go")
+            .current_dir(&dir)
+            .args(["build", "-o"])
+            .arg(out)
+            .arg(".")
+            .status()?
+            .success()
+        {
+            bail!("building {} failed", out.display());
+        }
+    }
+    let kerndns_args = if bridge {
+        let lib = crate::build_bridge(&root, crate::DEFAULT_BRIDGE_PLUGINS, None)?;
+        vec![
+            "-bridge".to_string(),
+            lib.display().to_string(),
+            "-bridge.prefer".into(),
+            "etcd".into(),
+        ]
+    } else {
+        Vec::new()
+    };
+
+    // etcd with the benchmark's services (zone skydns.local.) and the rest
+    let etcd_port = crate::bench::free_port()?;
+    let cpus = format!(
+        "0-{}",
+        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1) - 1
+    );
+    let _etcd = crate::bench::start_etcd(&work, etcd_port, &cpus, &work)?;
+    let grant = crate::bench::etcd_post(etcd_port, "/v3/lease/grant", r#"{"TTL":"7200"}"#)?
+        .context("granting a lease failed")?;
+    let lease: i64 = grant
+        .split("\"ID\":\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .and_then(|s| s.parse().ok())
+        .context("no lease ID in etcd's answer")?;
+    let records = etcd_rich_records();
+    for r in &records {
+        let mut labels: Vec<&str> = r.name.trim_end_matches('.').split('.').collect();
+        labels.reverse();
+        let key = format!("/skydns/{}", labels.join("/"));
+        if !crate::bench::etcd_put(etcd_port, &key, &r.json, if r.lease { lease } else { 0 })? {
+            bail!("etcd: writing {key} failed");
+        }
+    }
+    let zones = [
+        "skydns.local.",
+        "skydns.test.",
+        "skydns_zonea.test.",
+        "skydns_zoneb.test.",
+        "skydns_zoned.test.",
+        "cname.test.",
+        "group.test.",
+        "other.test.",
+        "bad.test.",
+        "in-addr.arpa.",
+    ];
+    let bench_queries = fs::read_to_string(work.join("q-etcd.txt"))?;
+    let qs = etcd_queries(&records, &zones, &bench_queries);
+    let queries = work.join("queries.txt");
+    eprintln!("{} query names/types", qs.lines().count());
+    fs::write(&queries, qs)?;
+    let hosts = work.join("hosts");
+    fs::write(
+        &hosts,
+        "192.0.2.80 www.example.org\n2001:db8::80 www.example.org\n192.0.2.1 w1.example.org\n192.0.2.25 mx.example.org\n",
+    )?;
+
+    let z = zones.join(" ");
+    let variants = [
+        (
+            "default",
+            format!(
+                "etcd {z} {{\n        path /skydns\n        endpoint http://127.0.0.1:{etcd_port}\n        max-lease-ttl 1h\n    }}"
+            ),
+        ),
+        (
+            "fallthrough",
+            format!(
+                "etcd {z} {{\n        endpoint 127.0.0.1:{etcd_port}\n        fallthrough other.test in-addr.arpa\n        no_apex_fallback\n        min-lease-ttl 2h30m\n        max-lease-ttl 24h\n    }}"
+            ),
+        ),
+    ];
+    let mut total_diffs = 0;
+    let mut summary = Vec::new();
+    for (name, etcd_block) in &variants {
+        let (pa, pb) = two_ports()?;
+        let cf = |port: u16| {
+            format!(
+                ".:{port} {{\n    bind 127.0.0.1\n    {etcd_block}\n    hosts {} {{\n        fallthrough\n    }}\n}}\n",
+                hosts.display()
+            )
+        };
+        let (cfa, cfb) = (
+            work.join(format!("{name}.coredns.conf")),
+            work.join(format!("{name}.kerndns.conf")),
+        );
+        fs::write(&cfa, cf(pa))?;
+        fs::write(&cfb, cf(pb))?;
+        let a = start(&coredns, &[], &cfa, pa, &work.join(format!("{name}.coredns.log")))?;
+        let b = start(
+            &kerndns,
+            &kerndns_args,
+            &cfb,
+            pb,
+            &work.join(format!("{name}.kerndns.log")),
+        )?;
+        if a.is_none() || b.is_none() {
+            bail!("{name}: a server failed to start (see {})", work.display());
+        }
+        let out = Command::new(&tool)
+            .args([
+                "-a",
+                &format!("127.0.0.1:{pa}"),
+                "-b",
+                &format!("127.0.0.1:{pb}"),
+                "-ignore-soa-serial",
+                "-show",
+                &show,
+                "-queries",
+            ])
+            .arg(&queries)
+            .output()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let last = text.lines().last().unwrap_or("").to_string();
+        let answers = text
+            .lines()
+            .find(|l| l.starts_with("answers from A"))
+            .unwrap_or("")
+            .replace("answers from A", "CoreDNS answers");
+        if out.status.success() {
+            summary.push(format!("  ok    {name}: {last}\n          {answers}"));
+        } else {
+            let d: usize = last
+                .split(", ")
+                .nth(1)
+                .and_then(|s| s.split(' ').next())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1);
+            total_diffs += d;
+            summary.push(format!("  DIFF  {name}: {last}"));
+            print!("== {name}\n{text}");
+        }
+    }
+    println!(
+        "\nvariants (KernDNS with the {} etcd plugin):",
+        if bridge { "Go (bridged)" } else { "Rust" }
+    );
     for s in &summary {
         println!("{s}");
     }
