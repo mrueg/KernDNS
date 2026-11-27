@@ -1,0 +1,6 @@
+# about: search path done server-side: the first search domain misses, the next hits (CNAME synthesized)
+# queries: {DIR}/queries.txt
+example.org:{PORT} {
+    autopath {DIR}/resolv.conf
+    file {FIX}/db.example.org
+}

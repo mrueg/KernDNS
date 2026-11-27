@@ -1,0 +1,9 @@
+# about: AAAA for names with only A records, synthesized from the A lookup (3 in 4), native AAAA otherwise
+# queries: {DIR}/queries.txt
+example.org:{PORT} {
+    dns64 {
+        prefix 64:ff9b::/96
+        allow_ipv4
+    }
+    file {FIX}/db.example.org
+}
