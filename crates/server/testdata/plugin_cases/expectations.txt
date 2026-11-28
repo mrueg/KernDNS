@@ -236,7 +236,7 @@ skip tls TestTLS/tests#2 needs test_cert.pem/test_key.pem/test_ca.pem from the G
 skip tls TestTLS/tests#3 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
 skip tls TestTLS/tests#4 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
 skip tls TestTLS/tests#5 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
-xfail tls TestTLS/tests#6 tls { keylog } is not supported by KernDNS yet
+skip tls TestTLS/tests#6 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory); keylog is covered by the tls unit tests
 skip template TestVar/tests#5 sets metadata in the Go test context, which no plugin of a server sets (the template unit tests cover metadata in var)
 skip template TestExpr/tests#10 sets metadata in the Go test context, which no plugin of a server sets (the template unit tests cover metadata in expr)
 skip grpc TestSetupResolvconf/tests#0 the Go test writes the resolv.conf into its working directory

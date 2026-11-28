@@ -85,10 +85,12 @@ pub enum ClientAuth {
     RequireAndVerify,
 }
 
-/// A server config from `tls CERT KEY [CA]`, like `NewTLSConfig`. Client
-/// certificates are checked against CA (or the system roots); rustls only
-/// accepts verified client certificates, so `request` behaves like
-/// `verify_if_given` and `require` like `require_and_verify`.
+/// A server config from `tls CERT KEY [CA]`, like `NewTLSConfig`. With
+/// `verify_if_given` and `require_and_verify` client certificates are
+/// checked against CA (or the system roots); `request` and `require` ask
+/// for any certificate without verifying its chain (Go's
+/// `RequestClientCert` and `RequireAnyClientCert`), only the handshake
+/// signature that proves the client holds its key.
 pub fn server_config(
     cert: &str,
     key: &str,
@@ -99,23 +101,128 @@ pub fn server_config(
     let certs = load_certs(cert)?;
     let key = load_key(key)?;
     let builder = rustls::ServerConfig::builder();
-    let builder = match auth {
-        ClientAuth::NoCert => builder.with_no_client_auth(),
-        _ => {
-            let roots = Arc::new(roots(ca)?);
-            let v = rustls::server::WebPkiClientVerifier::builder(roots);
-            let v = if matches!(auth, ClientAuth::Request | ClientAuth::VerifyIfGiven) {
-                v.allow_unauthenticated()
-            } else {
-                v
-            };
-            builder.with_client_cert_verifier(v.build().map_err(|e| format!("client verifier: {e}"))?)
-        }
+    let builder = match client_verifier(ca, auth)? {
+        None => builder.with_no_client_auth(),
+        Some(v) => builder.with_client_cert_verifier(v),
     };
     let cfg = builder
         .with_single_cert(certs, key)
         .map_err(|e| format!("could not load TLS cert: {e}"))?;
     Ok(Arc::new(cfg))
+}
+
+/// The client certificate verifier for `auth` (`None`: no client auth).
+fn client_verifier(
+    ca: Option<&str>,
+    auth: ClientAuth,
+) -> Result<Option<Arc<dyn rustls::server::danger::ClientCertVerifier>>, String> {
+    Ok(Some(match auth {
+        ClientAuth::NoCert => return Ok(None),
+        ClientAuth::Request | ClientAuth::Require => {
+            // the CA is still loaded (and must be valid), as in Go
+            roots(ca)?;
+            Arc::new(AnyClientCert {
+                provider: Arc::new(rustls::crypto::ring::default_provider()),
+                mandatory: auth == ClientAuth::Require,
+            })
+        }
+        ClientAuth::VerifyIfGiven | ClientAuth::RequireAndVerify => {
+            let roots = Arc::new(roots(ca)?);
+            let v = rustls::server::WebPkiClientVerifier::builder(roots);
+            let v = if auth == ClientAuth::VerifyIfGiven {
+                v.allow_unauthenticated()
+            } else {
+                v
+            };
+            v.build().map_err(|e| format!("client verifier: {e}"))?
+        }
+    }))
+}
+
+/// Accepts any client certificate (`client_auth request|require`).
+#[derive(Debug)]
+struct AnyClientCert {
+    provider: Arc<rustls::crypto::CryptoProvider>,
+    mandatory: bool,
+}
+
+impl rustls::server::danger::ClientCertVerifier for AnyClientCert {
+    fn client_auth_mandatory(&self) -> bool {
+        self.mandatory
+    }
+
+    fn root_hint_subjects(&self) -> &[rustls::DistinguishedName] {
+        &[]
+    }
+
+    fn verify_client_cert(
+        &self,
+        _: &CertificateDer<'_>,
+        _: &[CertificateDer<'_>],
+        _: rustls_pki_types::UnixTime,
+    ) -> Result<rustls::server::danger::ClientCertVerified, rustls::Error> {
+        Ok(rustls::server::danger::ClientCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls12_signature(message, cert, dss, &self.provider.signature_verification_algorithms)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        rustls::crypto::verify_tls13_signature(message, cert, dss, &self.provider.signature_verification_algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        self.provider.signature_verification_algorithms.supported_schemes()
+    }
+}
+
+/// Writes TLS secrets in the NSS key log format to a file (`tls { keylog
+/// FILE }`, Go's `tls.Config.KeyLogWriter`).
+pub struct KeyLogFile(std::sync::Mutex<std::fs::File>);
+
+impl std::fmt::Debug for KeyLogFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("KeyLogFile")
+    }
+}
+
+impl KeyLogFile {
+    /// Open `path` for appending (created with mode 0600), like CoreDNS.
+    pub fn open(path: &std::path::Path) -> std::io::Result<KeyLogFile> {
+        use std::os::unix::fs::OpenOptionsExt;
+        let f = std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .mode(0o600)
+            .open(path)?;
+        Ok(KeyLogFile(std::sync::Mutex::new(f)))
+    }
+}
+
+impl rustls::KeyLog for KeyLogFile {
+    fn log(&self, label: &str, client_random: &[u8], secret: &[u8]) {
+        use std::io::Write;
+        // Go's crypto/tls doesn't write the exporter secret
+        if label == "EXPORTER_SECRET" {
+            return;
+        }
+        let hex = |b: &[u8]| b.iter().map(|x| format!("{x:02x}")).collect::<String>();
+        let line = format!("{label} {} {}\n", hex(client_random), hex(secret));
+        if let Ok(mut f) = self.0.lock() {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
 }
 
 /// A client config that accepts any server certificate (`skipverify`,
@@ -167,4 +274,35 @@ pub fn insecure_client_config() -> Arc<ClientConfig> {
         .with_custom_certificate_verifier(Arc::new(NoVerify(provider)))
         .with_no_client_auth();
     Arc::new(cfg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../third_party/coredns/plugin/tls");
+
+    /// `request` and `require` accept a client certificate without
+    /// verifying it (Go's `RequestClientCert`, `RequireAnyClientCert`);
+    /// the verifying modes check it against the CA.
+    #[test]
+    fn client_auth_modes() {
+        install_provider();
+        let ca = format!("{DIR}/test_ca.pem");
+        assert!(client_verifier(Some(&ca), ClientAuth::NoCert).unwrap().is_none());
+        for (auth, mandatory, accepts_any) in [
+            (ClientAuth::Request, false, true),
+            (ClientAuth::Require, true, true),
+            (ClientAuth::VerifyIfGiven, false, false),
+            (ClientAuth::RequireAndVerify, true, false),
+        ] {
+            let v = client_verifier(Some(&ca), auth).unwrap().unwrap();
+            assert!(v.offer_client_auth(), "{auth:?}");
+            assert_eq!(v.client_auth_mandatory(), mandatory, "{auth:?}");
+            let bogus = CertificateDer::from(b"not a certificate".to_vec());
+            let res = v.verify_client_cert(&bogus, &[], rustls_pki_types::UnixTime::now());
+            assert_eq!(res.is_ok(), accepts_any, "{auth:?}");
+        }
+        assert!(client_verifier(Some("/nonexistent/ca.pem"), ClientAuth::Request).is_err());
+    }
 }
