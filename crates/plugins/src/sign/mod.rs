@@ -66,10 +66,7 @@ fn unix(t: SystemTime) -> i64 {
 
 /// A random number in [0, 1), like `rand.Float32`.
 fn random_f32() -> f32 {
-    use ring::rand::SecureRandom;
-    let mut b = [0u8; 4];
-    let _ = ring::rand::SystemRandom::new().fill(&mut b);
-    (u32::from_le_bytes(b) >> 8) as f32 / (1u32 << 24) as f32
+    rand::random()
 }
 
 /// `lifetime`: inception and expiration of signatures made at `now`.

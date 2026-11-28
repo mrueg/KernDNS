@@ -49,3 +49,6 @@ pprof = { version = "0.15", default-features = false }
 flate2 = "1"
 maxminddb = "0.33"
 serde = "1"
+# OS-seeded CSPRNG for DNS message ids and other randomness; the same rand that
+# hickory-proto and quinn-proto use
+rand = "0.10"

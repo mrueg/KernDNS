@@ -49,6 +49,7 @@ use std::time::{Duration, Instant};
 use kerndns_core::duration::parse_duration;
 use kerndns_core::proto::op::ResponseCode;
 use kerndns_core::proto::rr::Name;
+use kerndns_core::random::rand_below;
 use kerndns_core::zones::normalize_exact;
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
@@ -58,7 +59,7 @@ use rustls_pki_types::ServerName;
 
 use policy::Picker;
 pub use policy::Policy;
-use proxy::{ExchangeError, Options, Proto, Proxy, TlsSettings, Transport, rand_below};
+use proxy::{ExchangeError, Options, Proto, Proxy, TlsSettings, Transport};
 
 use crate::dnstap::Taps;
 

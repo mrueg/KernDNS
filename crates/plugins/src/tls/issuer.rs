@@ -317,10 +317,7 @@ async fn resolve(server: &str, host: &str) -> io::Result<Vec<IpAddr>> {
     let name = Name::from_ascii(format!("{}.", host.trim_end_matches('.'))).map_err(io::Error::other)?;
     let mut ips = Vec::new();
     for qtype in [RecordType::A, RecordType::AAAA] {
-        let mut id = [0u8; 2];
-        ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut id)
-            .map_err(|_| io::Error::other("rng"))?;
-        let id = u16::from_be_bytes(id);
+        let id = kerndns_core::random::rand_id();
         let mut m = Message::new(id, MessageType::Query, OpCode::Query);
         m.metadata.recursion_desired = true;
         m.add_query(Query::query(name.clone(), qtype));

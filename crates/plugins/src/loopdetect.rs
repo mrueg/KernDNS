@@ -8,13 +8,12 @@ use std::time::Duration;
 
 use kerndns_core::proto::op::{Message, MessageType, OpCode, Query};
 use kerndns_core::proto::rr::{Name, RecordType};
+use kerndns_core::random::rand_id;
 use kerndns_core::zones::{is_subdomain, normalize_exact};
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginFactory, Request, ResponseWriter, SetupError, async_trait,
     next_or_failure,
 };
-
-use crate::forward::proxy::rand_id;
 
 pub struct Setup;
 
@@ -27,12 +26,8 @@ struct State {
 }
 
 fn random_label() -> String {
-    // two 62-bit random numbers, like CoreDNS's qname()
-    let mut n: u64 = 0;
-    for _ in 0..4 {
-        n = (n << 16) | rand_id() as u64;
-    }
-    (n >> 2).to_string()
+    // a random 62-bit integer, like CoreDNS's secureRandIntString()
+    (rand::random::<u64>() >> 2).to_string()
 }
 
 impl PluginFactory for Setup {

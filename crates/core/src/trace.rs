@@ -22,13 +22,8 @@ pub struct SpanRef {
 
 /// A random 64-bit span id (never 0).
 pub fn new_id() -> u64 {
-    use std::hash::{BuildHasher, Hasher};
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static N: AtomicU64 = AtomicU64::new(0);
     loop {
-        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-        h.write_u64(N.fetch_add(1, Ordering::Relaxed));
-        let id = h.finish();
+        let id = rand::random();
         if id != 0 {
             return id;
         }

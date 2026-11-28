@@ -17,12 +17,11 @@ use std::time::Duration;
 use kerndns_core::duration::parse_duration;
 use kerndns_core::proto::op::{Message, ResponseCode};
 use kerndns_core::proto::rr::{RData, Record, RecordType};
+use kerndns_core::random::rand_below;
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginFactory, Request, ResponseWriter, SetupError, async_trait,
     next_or_failure,
 };
-
-use crate::forward::proxy::rand_below;
 
 // ------------------------------------------------------------ round robin
 

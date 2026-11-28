@@ -16,7 +16,6 @@
 //! startup commands of every configuration it has loaded so far).
 
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use kerndns_core::{Controller, Event, PluginFactory, SetupError};
 
@@ -181,15 +180,7 @@ fn shlex_split(s: &str) -> Result<Vec<String>, String> {
 
 /// A unique hook ID (caddy uses a random UUID).
 fn new_id() -> String {
-    static N: AtomicU64 = AtomicU64::new(0);
-    use std::hash::{BuildHasher, Hasher};
-    let mut bytes = [0u8; 16];
-    for (i, chunk) in bytes.chunks_mut(8).enumerate() {
-        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-        h.write_u64(N.fetch_add(1, Ordering::Relaxed));
-        h.write_usize(i);
-        chunk.copy_from_slice(&h.finish().to_le_bytes());
-    }
+    let mut bytes: [u8; 16] = rand::random();
     // version 4, RFC 4122 variant
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
