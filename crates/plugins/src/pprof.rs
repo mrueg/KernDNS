@@ -332,7 +332,7 @@ struct Server {
 
 fn start(addr: &str) -> std::io::Result<Server> {
     let addr = listen_addr(addr);
-    let std_listener = match std::net::TcpListener::bind(&addr) {
+    let std_listener = match std::net::TcpListener::bind(&addr).map_err(crate::http::go_bind_error) {
         Ok(l) => l,
         Err(e) if addr.starts_with("[::]") => {
             std::net::TcpListener::bind(addr.replacen("[::]", "0.0.0.0", 1)).map_err(|_| e)?
