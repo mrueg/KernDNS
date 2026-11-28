@@ -51,7 +51,11 @@ jobs:
           submodules: true
       - uses: actions/setup-go@v7
         with:
-          go-version-file: third_party/coredns/go.mod
+          # the latest patch release of the Go version CoreDNS's go.mod asks
+          # for (go-version-file would install exactly 1.26.0): govulncheck
+          # also checks the standard library of the toolchain it runs with
+          go-version: '1.26.x'
+          check-latest: true
           cache-dependency-path: |
             third_party/coredns/go.sum
             go/bridge/go.sum
