@@ -146,17 +146,7 @@ pub fn run(args: &[String]) -> Result<()> {
         .join("target")
         .join(if release { "release" } else { "debug" })
         .join("kerndns");
-    let coredns = root.join("target/coredns-ref");
-    if !Command::new("go")
-        .current_dir(&upstream)
-        .args(["build", "-o"])
-        .arg(&coredns)
-        .arg(".")
-        .status()?
-        .success()
-    {
-        bail!("building CoreDNS failed");
-    }
+    let coredns = crate::coredns_ref(&root)?;
     let tool = root.join("target/difftest-tool");
     if !Command::new("go")
         .current_dir(root.join("go/difftest"))
@@ -454,7 +444,6 @@ pub fn k8s(args: &[String]) -> Result<()> {
         }
     }
     let root = root();
-    let upstream = root.join("third_party/coredns");
     let work = root.join("target/k8s-difftest");
     fs::create_dir_all(&work)?;
 
@@ -476,17 +465,7 @@ pub fn k8s(args: &[String]) -> Result<()> {
         bail!("building kerndns failed");
     }
     let kerndns = root.join("target/debug/kerndns");
-    let coredns = root.join("target/coredns-ref");
-    if !Command::new("go")
-        .current_dir(&upstream)
-        .args(["build", "-o"])
-        .arg(&coredns)
-        .arg(".")
-        .status()?
-        .success()
-    {
-        bail!("building CoreDNS failed");
-    }
+    let coredns = crate::coredns_ref(&root)?;
     let tool = root.join("target/difftest-tool");
     if !Command::new("go")
         .current_dir(root.join("go/difftest"))
@@ -830,7 +809,6 @@ pub fn etcd(args: &[String]) -> Result<()> {
         }
     }
     let root = root();
-    let upstream = root.join("third_party/coredns");
     let work = root.join("target/etcd-difftest");
     fs::create_dir_all(&work)?;
     if !Command::new(env!("CARGO"))
@@ -842,19 +820,17 @@ pub fn etcd(args: &[String]) -> Result<()> {
         bail!("building kerndns failed");
     }
     let kerndns = root.join("target/debug/kerndns");
-    let coredns = root.join("target/coredns-ref");
+    let coredns = crate::coredns_ref(&root)?;
     let tool = root.join("target/difftest-tool");
-    for (dir, out) in [(upstream, &coredns), (root.join("go/difftest"), &tool)] {
-        if !Command::new("go")
-            .current_dir(&dir)
-            .args(["build", "-o"])
-            .arg(out)
-            .arg(".")
-            .status()?
-            .success()
-        {
-            bail!("building {} failed", out.display());
-        }
+    if !Command::new("go")
+        .current_dir(root.join("go/difftest"))
+        .args(["build", "-o"])
+        .arg(&tool)
+        .arg(".")
+        .status()?
+        .success()
+    {
+        bail!("building {} failed", tool.display());
     }
     let kerndns_args = if bridge {
         let lib = crate::build_bridge(&root, crate::DEFAULT_BRIDGE_PLUGINS, None)?;

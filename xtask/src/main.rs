@@ -104,6 +104,35 @@ fn fake_api(args: &[String]) -> Result<()> {
     })
 }
 
+/// The reference CoreDNS at `target/coredns-ref`, built from the submodule.
+///
+/// A symlink there is left alone (several checkouts can share one binary
+/// that way; building through the link would overwrite the shared file,
+/// or fail with "text file busy" while another checkout runs it).
+/// Otherwise the binary is built next to it and renamed into place, so a
+/// CoreDNS still running from the old file keeps working.
+pub(crate) fn coredns_ref(root: &Path) -> Result<PathBuf> {
+    let coredns = root.join("target/coredns-ref");
+    if fs::symlink_metadata(&coredns).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Ok(coredns);
+    }
+    let tmp = root.join(format!("target/coredns-ref.tmp.{}", std::process::id()));
+    if !Command::new("go")
+        .current_dir(root.join("third_party/coredns"))
+        .args(["build", "-o"])
+        .arg(&tmp)
+        .arg(".")
+        .status()
+        .context("running `go build` for CoreDNS (is Go installed?)")?
+        .success()
+    {
+        let _ = fs::remove_file(&tmp);
+        bail!("building CoreDNS failed");
+    }
+    fs::rename(&tmp, &coredns)?;
+    Ok(coredns)
+}
+
 pub(crate) fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
 }

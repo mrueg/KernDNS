@@ -762,18 +762,7 @@ fn coredns(root: &Path, path: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(p) = path {
         return Ok(p);
     }
-    let coredns = root.join("target/coredns-ref");
-    if !Command::new("go")
-        .current_dir(root.join("third_party/coredns"))
-        .args(["build", "-o"])
-        .arg(&coredns)
-        .arg(".")
-        .status()?
-        .success()
-    {
-        bail!("building CoreDNS failed");
-    }
-    Ok(coredns)
+    crate::coredns_ref(root)
 }
 
 fn split_list(v: &str) -> Vec<String> {
