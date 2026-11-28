@@ -219,6 +219,8 @@ pub type EventHook = Arc<dyn Fn(Event) -> Result<(), String> + Send + Sync>;
 pub struct Hooks {
     pub startup: Vec<(&'static str, StartupHook)>,
     pub shutdown: Vec<(&'static str, ShutdownHook)>,
+    /// Run only when the process exits, not on reload.
+    pub final_shutdown: Vec<(&'static str, ShutdownHook)>,
     /// Event hooks by name (`on-<id>`), in registration order.
     pub events: Vec<(String, EventHook)>,
     /// State shared by all server blocks of one Corefile load, like
@@ -293,6 +295,13 @@ impl<'a> Controller<'a> {
     /// Run `f` when the server shuts down (or reloads).
     pub fn on_shutdown(&mut self, f: impl FnOnce() + Send + 'static) {
         self.hooks.shutdown.push((self.directive, Box::new(f)));
+    }
+
+    /// Run `f` when the process shuts down, not on a reload (caddy's
+    /// `OnFinalShutdown`), before the [`on_shutdown`](Self::on_shutdown)
+    /// hooks.
+    pub fn on_final_shutdown(&mut self, f: impl FnOnce() + Send + 'static) {
+        self.hooks.final_shutdown.push((self.directive, Box::new(f)));
     }
 
     /// Register an event hook named `name` (`caddy.RegisterEventHook`).

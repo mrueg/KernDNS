@@ -66,6 +66,8 @@ pub struct Instance {
     running: Vec<Running>,
     listeners: Vec<ListenerInfo>,
     shutdown_hooks: Vec<(&'static str, ShutdownHook)>,
+    /// Hooks for the final shutdown only (not run on reload).
+    final_hooks: Vec<(&'static str, ShutdownHook)>,
     /// Event hooks of the running configuration (`on`).
     event_hooks: Vec<(String, kerndns_core::EventHook)>,
 }
@@ -106,6 +108,7 @@ impl Instance {
             listeners: running.iter().map(|r| r.info.clone()).collect(),
             running,
             shutdown_hooks: Vec::new(),
+            final_hooks: plan.hooks.final_shutdown,
             event_hooks: plan.hooks.events,
         };
         inst.shutdown_hooks = plan.hooks.shutdown;
@@ -194,6 +197,8 @@ impl Instance {
         self.running = next;
         self.listeners = self.running.iter().map(|r| r.info.clone()).collect();
         self.shutdown_hooks = plan.hooks.shutdown;
+        // the old configuration's final-shutdown hooks never run
+        self.final_hooks = plan.hooks.final_shutdown;
         for (name, hook) in plan.hooks.startup {
             if let Err(e) = hook() {
                 kerndns_core::error!("plugin/{name}: {e}");
@@ -225,7 +230,7 @@ impl Instance {
     /// that e.g. `health`'s lameduck period keeps serving queries, as in
     /// CoreDNS. They may block, so they run on the blocking pool.
     pub async fn stop(&mut self) {
-        for (_, hook) in self.shutdown_hooks.drain(..) {
+        for (_, hook) in self.final_hooks.drain(..).chain(self.shutdown_hooks.drain(..)) {
             let _ = tokio::task::spawn_blocking(hook).await;
         }
         for r in &mut self.running {

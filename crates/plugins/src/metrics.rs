@@ -33,6 +33,7 @@ impl PluginFactory for Setup {
     }
 
     fn setup(&self, c: &mut Controller<'_>) -> Result<(), SetupError> {
+        crate::pluginmetrics::register_process_wide();
         let mut addr = DEFAULT_ADDR.to_string();
         let mut seen = false;
         while c.next() {

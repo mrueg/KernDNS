@@ -70,14 +70,40 @@ pub fn split_host_port(addr: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Bind `addr` with `SO_REUSEPORT` like CoreDNS's `reuseport.Listen`, so
+/// several server blocks (or a reloaded configuration) can listen on the
+/// same address.
+fn bind_reuseport(addr: &str) -> std::io::Result<std::net::TcpListener> {
+    use socket2::{Domain, Socket, Type};
+    use std::net::ToSocketAddrs;
+    let mut last = std::io::Error::new(std::io::ErrorKind::InvalidInput, "no addresses");
+    for sa in addr.to_socket_addrs()? {
+        let res = (|| {
+            let s = Socket::new(Domain::for_address(sa), Type::STREAM, None)?;
+            if sa.is_ipv6() {
+                // dual stack, like Go's ":8080"
+                let _ = s.set_only_v6(false);
+            }
+            s.set_reuse_address(true)?;
+            s.set_reuse_port(true)?;
+            s.bind(&sa.into())?;
+            s.listen(1024)?;
+            Ok::<_, std::io::Error>(std::net::TcpListener::from(s))
+        })();
+        match res {
+            Ok(l) => return Ok(l),
+            Err(e) => last = e,
+        }
+    }
+    Err(last)
+}
+
 /// Bind `addr` (falling back from `[::]` to `0.0.0.0`) and serve `route`.
 pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
     let addr = listen_addr(addr);
-    let std_listener = match std::net::TcpListener::bind(&addr) {
+    let std_listener = match bind_reuseport(&addr) {
         Ok(l) => l,
-        Err(e) if addr.starts_with("[::]") => {
-            std::net::TcpListener::bind(addr.replacen("[::]", "0.0.0.0", 1)).map_err(|_| e)?
-        }
+        Err(e) if addr.starts_with("[::]") => bind_reuseport(&addr.replacen("[::]", "0.0.0.0", 1)).map_err(|_| e)?,
         Err(e) => return Err(e),
     };
     std_listener.set_nonblocking(true)?;
