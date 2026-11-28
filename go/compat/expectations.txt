@@ -91,7 +91,7 @@ pass  TestQUIC
 pass  TestQUICProtocolError
 pass  TestQUICReloadDoesNotPanic
 pass  TestQUICStreamLimits
-xfail TestReadme                                      README examples need what KernDNS lacks: bind interface names (lo), errors consolidate, template var, forward https/quic upstreams, etcd
+xfail TestReadme                                      README examples need what KernDNS lacks: forward https/quic upstreams
 pass  TestReload
 pass  TestReloadConcurrentRestartAndStop
 pass  TestReloadHealth
