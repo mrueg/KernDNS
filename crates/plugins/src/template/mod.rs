@@ -4,6 +4,8 @@
 //! ```text
 //! template CLASS TYPE [ZONE...] {
 //!     match REGEX...
+//!     var NAME EXPRESSION
+//!     expr EXPRESSION
 //!     answer RR
 //!     additional RR
 //!     authority RR
@@ -16,8 +18,9 @@
 //!
 //! The records are rendered with [`gotmpl`], a subset of Go's
 //! `text/template`; anything outside that subset is rejected at setup.
-//! `var` and `expr` (which need the expr language) are not supported and
-//! are rejected at setup as well.
+//! `var` and `expr` are compiled and type checked at setup by
+//! [`crate::expr`], KernDNS's evaluator of the expr language subset
+//! listed there; expressions outside it are rejected at setup.
 
 pub mod gotmpl;
 
@@ -34,6 +37,7 @@ use kerndns_core::{
 };
 use regex::Regex;
 
+use crate::expr::{self, Program, Scope};
 use crate::file::zonefile::new_rr;
 use crate::pluginmetrics as pm;
 use gotmpl::{Data, Question, Template};
@@ -57,6 +61,16 @@ pub struct Tmpl {
     qtype: RecordType,
     ederror: Option<(u16, String)>,
     fall: Fall,
+    /// `var NAME EXPRESSION`, in order.
+    vars: Vec<(String, Program)>,
+    /// `expr EXPRESSION`: all must be true for a match.
+    exprs: Vec<Program>,
+}
+
+/// A valid `var` name (`varNameRegexp`).
+fn valid_var_name(s: &str) -> bool {
+    let mut b = s.bytes();
+    b.next().is_some_and(|c| c.is_ascii_alphabetic() || c == b'_') && b.all(|c| c.is_ascii_alphanumeric() || c == b'_')
 }
 
 /// `dns.StringToClass`.
@@ -153,6 +167,12 @@ pub fn template_parse(c: &mut Controller<'_>) -> Result<(Vec<String>, Vec<Tmpl>)
             qtype,
             ederror: None,
             fall: Fall::default(),
+            vars: Vec::new(),
+            exprs: Vec::new(),
+        };
+        let mut scope = Scope {
+            vars: Vec::new(),
+            group: true,
         };
 
         while c.next_block() {
@@ -197,9 +217,31 @@ pub fn template_parse(c: &mut Controller<'_>) -> Result<(Vec<String>, Vec<Tmpl>)
                         }
                     }
                 }
-                "var" | "expr" => {
-                    let msg = format!("{opt} is not supported by KernDNS (it needs the expr language)");
-                    return Err(c.errf(msg));
+                "var" => {
+                    let args = c.remaining_args();
+                    if args.len() < 2 {
+                        return Err(c.arg_err());
+                    }
+                    let name = &args[0];
+                    if !valid_var_name(name) {
+                        return Err(c.errf(format!("invalid variable name {name:?}")));
+                    }
+                    if scope.reserved(name) {
+                        return Err(c.errf(format!("variable name {name:?} is reserved")));
+                    }
+                    let prog = Program::compile_in(&args[1..].join(" "), &scope)
+                        .map_err(|e| c.errf(format!("could not compile expression: {name}, {e}")))?;
+                    scope.vars.push((name.clone(), prog.result_type()));
+                    t.vars.push((name.clone(), prog));
+                }
+                "expr" => {
+                    let args = c.remaining_args();
+                    if args.is_empty() {
+                        return Err(c.arg_err());
+                    }
+                    let prog = Program::compile_in(&args.join(" "), &scope)
+                        .map_err(|e| c.errf(format!("could not compile expression: {e}")))?;
+                    t.exprs.push(prog);
                 }
                 "rcode" => {
                     if !c.next_arg() {
@@ -323,6 +365,37 @@ impl Tmpl {
             }
             let class = if qclass != DNSClass::ANY { qclass } else { self.qclass };
             let typ = if qtype != RecordType::ANY { qtype } else { self.qtype };
+            let mut vars = Vec::new();
+            if !self.vars.is_empty() || !self.exprs.is_empty() {
+                // evaluation errors are SERVFAIL, even with fallthrough
+                let mut values = Vec::with_capacity(self.vars.len());
+                for (_, prog) in &self.vars {
+                    let env = expr::Env {
+                        vars: &values,
+                        groups: Some(&group),
+                    };
+                    match prog.run_in(ctx, req, &env) {
+                        Ok(v) => values.push(v),
+                        Err(_) => return Match::No { fallthrough: false },
+                    }
+                }
+                for prog in &self.exprs {
+                    let env = expr::Env {
+                        vars: &values,
+                        groups: Some(&group),
+                    };
+                    match prog.run_in(ctx, req, &env) {
+                        Ok(expr::Value::Bool(true)) => {}
+                        Ok(_) => {
+                            return Match::No {
+                                fallthrough: self.fall.through(qname),
+                            };
+                        }
+                        Err(_) => return Match::No { fallthrough: false },
+                    }
+                }
+                vars = self.vars.iter().map(|(n, _)| n.clone()).zip(values).collect();
+            }
             return Match::Yes(Box::new(Data {
                 zone: zone.to_string(),
                 name: qname.to_string(),
@@ -339,6 +412,7 @@ impl Tmpl {
                 }),
                 remote: req.ip().to_string(),
                 meta: Some(&ctx.metadata),
+                vars,
             }));
         }
         Match::No {
@@ -419,7 +493,8 @@ impl Handler for TemplateHandler {
 
             let qtype = req.qtype();
             for a in &t.answer {
-                let rr = execute_rr(ctx, "answer", a, &data).map_err(|e| PluginError::servfail("template", e))?;
+                let rr =
+                    execute_rr(ctx, "answer", a, &data).map_err(|e| PluginError::raw(ResponseCode::ServFail, e))?;
                 let target = match &rr.data {
                     RData::CNAME(c) if matches!(qtype, RecordType::A | RecordType::AAAA) => Some(c.0.clone()),
                     _ => None,
@@ -433,11 +508,13 @@ impl Handler for TemplateHandler {
                 }
             }
             for a in &t.additional {
-                let rr = execute_rr(ctx, "additional", a, &data).map_err(|e| PluginError::servfail("template", e))?;
+                let rr =
+                    execute_rr(ctx, "additional", a, &data).map_err(|e| PluginError::raw(ResponseCode::ServFail, e))?;
                 m.additionals.push(rr);
             }
             for a in &t.authority {
-                let rr = execute_rr(ctx, "authority", a, &data).map_err(|e| PluginError::servfail("template", e))?;
+                let rr =
+                    execute_rr(ctx, "authority", a, &data).map_err(|e| PluginError::raw(ResponseCode::ServFail, e))?;
                 m.authorities.push(rr);
             }
 

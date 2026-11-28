@@ -118,6 +118,8 @@ pub struct Data<'a> {
     pub question: Option<Question>,
     pub remote: String,
     pub meta: Option<&'a HashMap<String, String>>,
+    /// The values of the template's `var` options (`.Var`).
+    pub vars: Vec<(String, crate::expr::Value)>,
 }
 
 // ---------------------------------------------------------------- parse tree
@@ -969,6 +971,19 @@ impl Value {
     }
 }
 
+/// An expr-lang result as the Go value it is in `.Var`.
+fn expr_value(v: &crate::expr::Value) -> Value {
+    use crate::expr::Value as E;
+    match v {
+        E::Nil => Value::Nil,
+        E::Bool(b) => Value::Bool(*b),
+        E::Int(i) => Value::Int(*i, "int"),
+        E::Float(f) => Value::Float(*f),
+        E::Str(s) => Value::Str(s.clone()),
+        E::List(l) => Value::List(l.iter().map(expr_value).collect(), "[]interface {}"),
+    }
+}
+
 /// `%v` formatting.
 fn fmt_v(v: &Value, top: bool) -> String {
     match v {
@@ -1279,8 +1294,10 @@ impl Exec<'_, '_> {
                             .collect(),
                         "map[string]string",
                     ),
-                    // `var` is not supported, so there are never variables.
-                    "Var" => Value::Map(BTreeMap::new(), "map[string]interface {}"),
+                    "Var" => Value::Map(
+                        d.vars.iter().map(|(k, v)| (k.clone(), expr_value(v))).collect(),
+                        "map[string]interface {}",
+                    ),
                     "Message" => match d.message {
                         Some(_) => Value::Message,
                         None => Value::Nil,

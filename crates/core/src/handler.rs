@@ -30,9 +30,10 @@ pub trait Handler: Send + Sync + 'static {
 }
 
 /// An error from a plugin, displayed as `plugin/<name>: <msg>` like
-/// CoreDNS's `plugin.Error`.
+/// CoreDNS's `plugin.Error`, or as just `<msg>` for an error a CoreDNS
+/// plugin returns unwrapped ([`PluginError::raw`]).
 #[derive(Debug, Clone, thiserror::Error)]
-#[error("plugin/{plugin}: {msg}")]
+#[error("{}{msg}", if plugin.is_empty() { String::new() } else { format!("plugin/{plugin}: ") })]
 pub struct PluginError {
     pub plugin: String,
     /// The response code the server uses if nobody wrote a response.
@@ -51,6 +52,12 @@ impl PluginError {
 
     pub fn servfail(plugin: impl Into<String>, msg: impl Into<String>) -> Self {
         Self::new(plugin, ResponseCode::ServFail, msg)
+    }
+
+    /// An error without the `plugin/<name>: ` prefix, for the errors a
+    /// CoreDNS plugin returns as they are (not wrapped in `plugin.Error`).
+    pub fn raw(rcode: ResponseCode, msg: impl Into<String>) -> Self {
+        Self::new("", rcode, msg)
     }
 }
 
