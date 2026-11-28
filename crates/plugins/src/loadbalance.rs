@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
+use kerndns_core::cidr::{IpNet, contains, parse_cidr};
 use kerndns_core::duration::parse_duration;
 use kerndns_core::proto::op::{Message, ResponseCode};
 use kerndns_core::proto::rr::{RData, Record, RecordType};
@@ -209,58 +210,14 @@ impl Weighted {
 
 // --------------------------------------------------------------- preferred
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Cidr {
-    net: IpAddr,
-    bits: u8,
-}
-
-impl Cidr {
-    fn parse(s: &str) -> Option<Cidr> {
-        let (ip, bits) = s.split_once('/')?;
-        let ip: IpAddr = ip.parse().ok()?;
-        let bits: u8 = bits.parse().ok()?;
-        let max = if ip.is_ipv4() { 32 } else { 128 };
-        (bits <= max).then(|| Cidr {
-            net: mask(ip, bits),
-            bits,
-        })
-    }
-
-    fn contains(&self, ip: IpAddr) -> bool {
-        ip.is_ipv4() == self.net.is_ipv4() && mask(ip, self.bits) == self.net
-    }
-}
-
-fn mask(ip: IpAddr, bits: u8) -> IpAddr {
-    match ip {
-        IpAddr::V4(a) => {
-            let m = if bits == 0 {
-                0
-            } else {
-                u32::MAX << (32 - u32::from(bits))
-            };
-            IpAddr::V4((u32::from(a) & m).into())
-        }
-        IpAddr::V6(a) => {
-            let m = if bits == 0 {
-                0
-            } else {
-                u128::MAX << (128 - u32::from(bits))
-            };
-            IpAddr::V6((u128::from(a) & m).into())
-        }
-    }
-}
-
 /// `reorderRecords`: addresses in a preferred subnet first, in subnet order.
-fn prefer(records: Vec<Record>, subnets: &[Cidr]) -> Vec<Record> {
+fn prefer(records: Vec<Record>, subnets: &[IpNet]) -> Vec<Record> {
     let (mut out, address, mx, rest) = split(records);
     let mut taken = vec![false; address.len()];
     let mut sorted = Vec::with_capacity(address.len());
     for s in subnets {
         for (i, r) in address.iter().enumerate() {
-            if !taken[i] && ip_of(r).is_some_and(|ip| s.contains(ip)) {
+            if !taken[i] && ip_of(r).is_some_and(|ip| contains(s, ip)) {
                 taken[i] = true;
                 sorted.push(r.clone());
             }
@@ -282,7 +239,7 @@ enum Policy {
 
 struct Config {
     policy: Policy,
-    prefer: Vec<Cidr>,
+    prefer: Vec<IpNet>,
 }
 
 impl Config {
@@ -410,9 +367,7 @@ impl PluginFactory for Setup {
                     }
                     "prefer" => {
                         for a in c.remaining_args() {
-                            let Some(s) = Cidr::parse(&a) else {
-                                return Err(c.errf(format!("invalid CIDR {a:?}: invalid CIDR address: {a}")));
-                            };
+                            let s = parse_cidr(&a).map_err(|e| c.errf(format!("invalid CIDR {a:?}: {e}")))?;
                             cfg.prefer.push(s);
                         }
                     }
@@ -564,7 +519,7 @@ mod tests {
 
     #[test]
     fn preferred_subnets_first() {
-        let s = [Cidr::parse("10.0.0.0/8").unwrap(), Cidr::parse("192.0.2.0/24").unwrap()];
+        let s = [parse_cidr("10.0.0.0/8").unwrap(), parse_cidr("192.0.2.0/24").unwrap()];
         let out = prefer(vec![a([1, 1, 1, 1]), a([192, 0, 2, 1]), a([10, 1, 2, 3])], &s);
         let ips: Vec<_> = out.iter().map(|r| ip_of(r).unwrap().to_string()).collect();
         assert_eq!(ips, ["10.1.2.3", "192.0.2.1", "1.1.1.1"]);

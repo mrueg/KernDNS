@@ -17,6 +17,7 @@
 //! Messages are hickory-proto [`Message`](proto::op::Message)s.
 
 pub mod address;
+pub mod cidr;
 pub mod duration;
 pub mod handler;
 pub mod log;

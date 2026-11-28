@@ -10,9 +10,9 @@
 //! ACTION is `allow`, `block` (REFUSED with EDE "Blocked"), `filter`
 //! (empty NOERROR with EDE "Filtered") or `drop` (no answer).
 
-use std::net::IpAddr;
 use std::sync::Arc;
 
+use kerndns_core::cidr::{IpNet, parse_cidr};
 use kerndns_core::proto::op::{Edns, ResponseCode};
 use kerndns_core::proto::rr::RecordType;
 use kerndns_core::proto::rr::rdata::opt::EdnsOption;
@@ -37,43 +37,12 @@ enum Action {
     Drop,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Net {
-    addr: IpAddr,
-    bits: u8,
-}
-
-impl Net {
-    fn contains(&self, ip: IpAddr) -> bool {
-        let ip = ip.to_canonical();
-        match (ip, self.addr) {
-            (IpAddr::V4(a), IpAddr::V4(n)) => {
-                let m = if self.bits == 0 {
-                    0
-                } else {
-                    u32::MAX << (32 - u32::from(self.bits))
-                };
-                u32::from(a) & m == u32::from(n) & m
-            }
-            (IpAddr::V6(a), IpAddr::V6(n)) => {
-                let m = if self.bits == 0 {
-                    0
-                } else {
-                    u128::MAX << (128 - u32::from(self.bits))
-                };
-                u128::from(a) & m == u128::from(n) & m
-            }
-            _ => false,
-        }
-    }
-}
-
 struct Policy {
     action: Action,
     /// `None` matches every type.
     qtypes: Option<Vec<RecordType>>,
     /// `None` matches every address.
-    nets: Option<Vec<Net>>,
+    nets: Option<Vec<IpNet>>,
 }
 
 struct Rule {
@@ -93,7 +62,7 @@ fn decide(policies: &[Policy], req: &Request) -> Option<Action> {
         .iter()
         .find(|p| {
             p.qtypes.as_ref().is_none_or(|t| t.contains(&qtype))
-                && p.nets.as_ref().is_none_or(|n| n.iter().any(|n| n.contains(ip)))
+                && p.nets.as_ref().is_none_or(|n| n.iter().any(|n| n.contains(&ip)))
         })
         .map(|p| p.action)
 }
@@ -151,17 +120,16 @@ fn is_section(t: &str) -> bool {
     matches!(t.to_ascii_lowercase().as_str(), "type" | "net")
 }
 
-/// `normalize`: a bare address is a /32 or /128.
-fn parse_net(s: &str) -> Option<Net> {
-    let (ip, bits) = match s.split_once('/') {
-        Some((ip, b)) => (ip.parse::<IpAddr>().ok()?, b.parse::<u8>().ok()?),
-        None => {
-            let ip: IpAddr = s.parse().ok()?;
-            (ip, if ip.is_ipv4() { 32 } else { 128 })
-        }
+/// `normalize` and `net.ParseCIDR`: a bare address is a /32 or /128.
+fn parse_net(s: &str) -> Option<IpNet> {
+    let suffix = if s.contains('/') {
+        ""
+    } else if s.contains(':') {
+        "/128"
+    } else {
+        "/32"
     };
-    let max = if ip.is_ipv4() { 32 } else { 128 };
-    (bits <= max).then_some(Net { addr: ip, bits })
+    parse_cidr(&format!("{s}{suffix}")).ok()
 }
 
 fn parse_type(s: &str) -> Option<RecordType> {

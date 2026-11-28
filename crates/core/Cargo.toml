@@ -14,3 +14,4 @@ thiserror.workspace = true
 prometheus.workspace = true
 rustls.workspace = true
 rand.workspace = true
+ipnet.workspace = true
