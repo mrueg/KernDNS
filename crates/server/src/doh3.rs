@@ -7,19 +7,23 @@
 //! to 16 KiB. Limits (`https3` plugin): `max_streams` concurrent QUIC
 //! streams per connection (default 256, 0 = QUIC's default) and
 //! `max_connections` (default 200, 0 = unbounded; extra connections are
-//! closed with `H3_EXCESSIVE_LOAD`).
+//! closed with `H3_EXCESSIVE_LOAD`). With `proxyproto`, datagrams may
+//! carry PROXY v2 headers, as on DoQ ([`crate::proxyproto::QuicSocket`]).
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::{Buf, Bytes};
 use kerndns_core::Protocol;
 use kerndns_core::plugin::ListenerLimits;
+use kerndns_core::proxyproto::ProxyProtoConfig;
 use quinn::{Endpoint, VarInt};
 use tokio::task::JoinSet;
 
 use crate::dispatch::Dispatcher;
-use crate::doh::{MAX_QUERY, connection_limit, respond};
+use crate::doh::{MAX_QUERY, connection_limit, respond_with_tlvs};
+use crate::proxyproto::QuicSocket;
 use crate::quic::CloseOnDrop;
 
 const DEFAULT_MAX_STREAMS: u64 = 256;
@@ -53,13 +57,19 @@ impl Settings {
 }
 
 /// Serve DoH3 on `ep` until the returned tasks are aborted.
-pub fn serve(ep: Endpoint, d: Dispatcher, local: SocketAddr, s: Settings) -> JoinSet<()> {
+pub fn serve(
+    ep: Endpoint,
+    d: Dispatcher,
+    local: SocketAddr,
+    s: Settings,
+    proxy: Option<Arc<QuicSocket>>,
+) -> JoinSet<()> {
     let limit = connection_limit(s.max_connections);
     let mut set = JoinSet::new();
     set.spawn(async move {
         let ep = CloseOnDrop(ep);
         while let Some(incoming) = ep.0.accept().await {
-            let (d, limit) = (d.clone(), limit.clone());
+            let (d, limit, proxy) = (d.clone(), limit.clone(), proxy.clone());
             tokio::spawn(async move {
                 let Ok(conn) = incoming.await else { return };
                 let permit = match limit.map(tokio::sync::Semaphore::try_acquire_owned) {
@@ -70,7 +80,9 @@ pub fn serve(ep: Endpoint, d: Dispatcher, local: SocketAddr, s: Settings) -> Joi
                         return;
                     }
                 };
-                connection(d, conn, local).await;
+                // like the remote address, the TLVs are those of the connection's start
+                let tlvs = proxy.and_then(|p| p.tlvs(conn.remote_address()));
+                connection(d, conn, local, tlvs).await;
                 drop(permit);
             });
         }
@@ -78,7 +90,7 @@ pub fn serve(ep: Endpoint, d: Dispatcher, local: SocketAddr, s: Settings) -> Joi
     set
 }
 
-async fn connection(d: Dispatcher, conn: quinn::Connection, local: SocketAddr) {
+async fn connection(d: Dispatcher, conn: quinn::Connection, local: SocketAddr, tlvs: Option<Arc<[u8]>>) {
     let src = conn.remote_address();
     let mut h3 = match h3::server::builder()
         .max_field_section_size(MAX_HEADER_BYTES)
@@ -94,7 +106,7 @@ async fn connection(d: Dispatcher, conn: quinn::Connection, local: SocketAddr) {
             Ok(Some(r)) => r,
             Ok(None) | Err(_) => return,
         };
-        let d = d.clone();
+        let (d, tlvs) = (d.clone(), tlvs.clone());
         tokio::spawn(async move {
             let Ok((req, mut stream)) = resolver.resolve_request().await else {
                 return;
@@ -115,7 +127,7 @@ async fn connection(d: Dispatcher, conn: quinn::Connection, local: SocketAddr) {
                 }
                 Ok(buf)
             };
-            let resp = respond(
+            let resp = respond_with_tlvs(
                 &d,
                 &parts.method,
                 &parts.uri,
@@ -124,6 +136,7 @@ async fn connection(d: Dispatcher, conn: quinn::Connection, local: SocketAddr) {
                 local,
                 Protocol::Https3,
                 &kerndns_core::metrics::HTTPS3_RESPONSES,
+                tlvs,
             )
             .await;
             let (parts, body) = resp.into_parts();
@@ -143,6 +156,11 @@ async fn connection(d: Dispatcher, conn: quinn::Connection, local: SocketAddr) {
 }
 
 /// The endpoint for a DoH3 listener.
-pub fn endpoint(sock: std::net::UdpSocket, tls: &rustls::ServerConfig, s: &Settings) -> Result<Endpoint, String> {
-    crate::quic::endpoint(sock, tls, &[b"h3"], s.max_streams, s.idle_timeout)
+pub fn endpoint(
+    sock: std::net::UdpSocket,
+    tls: &rustls::ServerConfig,
+    s: &Settings,
+    proxy: Option<Arc<ProxyProtoConfig>>,
+) -> Result<(Endpoint, Option<Arc<QuicSocket>>), String> {
+    crate::quic::endpoint(sock, tls, &[b"h3"], s.max_streams, s.idle_timeout, proxy)
 }

@@ -2,19 +2,25 @@
 //! v2 header in front of the DNS message (CoreDNS's
 //! `plugin/pkg/proxyproto.PacketConn`), TCP connections start with a v1 or
 //! v2 header (`go-proxyproto`'s `Listener`). The client address plugins see
-//! is the header's source; responses still go to the proxy.
+//! is the header's source; responses still go to the proxy. QUIC
+//! listeners (`quic://`, `https3://`) take v2 headers on every datagram
+//! under the QUIC endpoint, like CoreDNS's `PacketConn` under quic-go
+//! ([`QuicSocket`]).
 
-use std::collections::HashMap;
-use std::io;
-use std::net::SocketAddr;
+use std::collections::{HashMap, VecDeque};
+use std::fmt;
+use std::io::{self, IoSliceMut};
+use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, ready};
 use std::time::{Duration, Instant};
 
 use kerndns_core::proxyproto::{
     Header, Parsed, Policy, ProxyProtoConfig, READ_HEADER_TIMEOUT, UDP_SESSION_MAX_ENTRIES, parse, parse_eof,
 };
+use quinn::udp::{EcnCodepoint, RecvMeta, Transmit};
+use quinn::{AsyncUdpSocket, UdpPoller};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf};
 
 /// A socket address as Go prints it (IPv4-mapped addresses as IPv4).
@@ -161,6 +167,188 @@ impl UdpProxy {
             _ => {}
         }
         Ok(Some(d))
+    }
+}
+
+/// Where datagrams for a client behind the proxy go.
+struct Route {
+    proxy: SocketAddr,
+    tlvs: Option<Arc<[u8]>>,
+    last: Instant,
+}
+
+/// A received datagram, its header stripped.
+struct Received {
+    from: SocketAddr,
+    data: Vec<u8>,
+    ecn: Option<EcnCodepoint>,
+    dst_ip: Option<IpAddr>,
+}
+
+struct RecvState {
+    buf: Box<[u8]>,
+    ready: VecDeque<Received>,
+}
+
+/// The UDP socket under a QUIC endpoint with PROXY protocol: every
+/// datagram may start with a v2 header (CoreDNS wraps quic-go's socket in
+/// the same `PacketConn` as plain UDP). The endpoint sees each datagram
+/// as coming from the header's source, so a connection's remote address
+/// is the client's; what it sends to that address goes to the proxy the
+/// client's datagrams came from.
+pub struct QuicSocket {
+    inner: Arc<dyn AsyncUdpSocket>,
+    proxy: UdpProxy,
+    recv: Mutex<RecvState>,
+    routes: Mutex<HashMap<SocketAddr, Route>>,
+    /// How long a route is kept without datagrams when the table is full.
+    ttl: Duration,
+}
+
+impl fmt::Debug for QuicSocket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QuicSocket").field("inner", &self.inner).finish()
+    }
+}
+
+impl QuicSocket {
+    /// `ttl` is the QUIC idle timeout: a connection without datagrams for
+    /// longer is gone.
+    pub fn new(inner: Arc<dyn AsyncUdpSocket>, cfg: Arc<ProxyProtoConfig>, ttl: Duration) -> Self {
+        QuicSocket {
+            inner,
+            proxy: UdpProxy::new(cfg),
+            recv: Mutex::new(RecvState {
+                buf: vec![0u8; 1 << 16].into_boxed_slice(),
+                ready: VecDeque::new(),
+            }),
+            routes: Mutex::new(HashMap::new()),
+            ttl,
+        }
+    }
+
+    /// The PPv2 TLVs of `client`'s latest header (with `tlv_metadata`).
+    pub fn tlvs(&self, client: SocketAddr) -> Option<Arc<[u8]>> {
+        self.routes.lock().unwrap().get(&client).and_then(|r| r.tlvs.clone())
+    }
+
+    fn route(&self, client: SocketAddr, from: SocketAddr, tlvs: Option<Arc<[u8]>>) {
+        let mut routes = self.routes.lock().unwrap();
+        if client == from {
+            // a client talking to us directly
+            routes.remove(&client);
+            return;
+        }
+        let now = Instant::now();
+        if routes.len() >= UDP_SESSION_MAX_ENTRIES && !routes.contains_key(&client) {
+            routes.retain(|_, r| now.duration_since(r.last) < self.ttl);
+            if routes.len() >= UDP_SESSION_MAX_ENTRIES
+                && let Some(oldest) = routes.iter().min_by_key(|(_, r)| r.last).map(|(k, _)| *k)
+            {
+                routes.remove(&oldest);
+            }
+        }
+        routes.insert(
+            client,
+            Route {
+                proxy: from,
+                tlvs,
+                last: now,
+            },
+        );
+    }
+
+    /// Strip the headers of what the socket received (one datagram, or
+    /// several of the same size with GRO).
+    fn strip(&self, state: &mut RecvState, meta: &RecvMeta) {
+        let RecvState { buf, ready } = state;
+        let len = meta.len.min(buf.len());
+        for seg in buf[..len].chunks(meta.stride.max(1)) {
+            match self.proxy.read(seg, meta.addr) {
+                Ok(Some(d)) => {
+                    self.route(d.client, meta.addr, d.tlvs);
+                    ready.push_back(Received {
+                        from: d.client,
+                        data: seg[d.offset..].to_vec(),
+                        ecn: meta.ecn,
+                        dst_ip: meta.dst_ip,
+                    });
+                }
+                Ok(None) => {}
+                Err(e) => kerndns_core::warning!(
+                    "dropping invalid Proxy Protocol packet from {}: {e}",
+                    canonical(meta.addr)
+                ),
+            }
+        }
+    }
+}
+
+impl AsyncUdpSocket for QuicSocket {
+    fn create_io_poller(self: Arc<Self>) -> Pin<Box<dyn UdpPoller>> {
+        self.inner.clone().create_io_poller()
+    }
+
+    fn try_send(&self, t: &Transmit) -> io::Result<()> {
+        let proxy = self.routes.lock().unwrap().get(&t.destination).map(|r| r.proxy);
+        match proxy {
+            None => self.inner.try_send(t),
+            Some(destination) => self.inner.try_send(&Transmit {
+                destination,
+                ecn: t.ecn,
+                contents: t.contents,
+                segment_size: t.segment_size,
+                src_ip: t.src_ip,
+            }),
+        }
+    }
+
+    fn poll_recv(
+        &self,
+        cx: &mut Context,
+        bufs: &mut [IoSliceMut<'_>],
+        meta: &mut [RecvMeta],
+    ) -> Poll<io::Result<usize>> {
+        let mut state = self.recv.lock().unwrap();
+        loop {
+            if !state.ready.is_empty() {
+                let mut n = 0;
+                while n < bufs.len().min(meta.len()) {
+                    let Some(d) = state.ready.pop_front() else { break };
+                    let len = d.data.len().min(bufs[n].len());
+                    bufs[n][..len].copy_from_slice(&d.data[..len]);
+                    meta[n] = RecvMeta {
+                        addr: d.from,
+                        len,
+                        stride: len,
+                        ecn: d.ecn,
+                        dst_ip: d.dst_ip,
+                    };
+                    n += 1;
+                }
+                return Poll::Ready(Ok(n));
+            }
+            let mut m = [RecvMeta::default()];
+            let n = {
+                let mut io = [IoSliceMut::new(&mut state.buf)];
+                ready!(self.inner.poll_recv(cx, &mut io, &mut m))?
+            };
+            if n > 0 {
+                self.strip(&mut state, &m[0]);
+            }
+        }
+    }
+
+    fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
+    }
+
+    fn max_transmit_segments(&self) -> usize {
+        self.inner.max_transmit_segments()
+    }
+
+    fn may_fragment(&self) -> bool {
+        self.inner.may_fragment()
     }
 }
 

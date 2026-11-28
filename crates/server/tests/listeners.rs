@@ -502,3 +502,172 @@ fn conflicting_doh_max_streams() {
         "conflicting max_streams values for shared HTTPS listener https://:8443: 7 and 8"
     );
 }
+
+/// A UDP proxy on a local port that puts a PROXY v2 header for `client`
+/// (with `tlvs`) in front of every datagram to `server` and relays the
+/// answers back, like a QUIC load balancer.
+async fn ppv2_relay(server: SocketAddr, client: SocketAddr, tlvs: &[u8]) -> u16 {
+    let SocketAddr::V4(c) = client else { panic!("IPv4 only") };
+    let mut header = b"\r\n\r\n\0\r\nQUIT\n\x21\x12".to_vec();
+    header.extend_from_slice(&(12 + tlvs.len() as u16).to_be_bytes());
+    header.extend_from_slice(&c.ip().octets());
+    header.extend_from_slice(&[127, 0, 0, 1]);
+    header.extend_from_slice(&c.port().to_be_bytes());
+    header.extend_from_slice(&server.port().to_be_bytes());
+    header.extend_from_slice(tlvs);
+    let front = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let back = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let port = front.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let (mut a, mut b) = (vec![0u8; 65536], vec![0u8; 65536]);
+        let mut from = None;
+        loop {
+            tokio::select! {
+                r = front.recv_from(&mut a) => {
+                    let (n, src) = r.unwrap();
+                    from = Some(src);
+                    let mut pkt = header.clone();
+                    pkt.extend_from_slice(&a[..n]);
+                    let _ = back.send_to(&pkt, server).await;
+                }
+                r = back.recv_from(&mut b) => {
+                    let (n, _) = r.unwrap();
+                    if let Some(c) = from {
+                        let _ = front.send_to(&b[..n], c).await;
+                    }
+                }
+            }
+        }
+    });
+    port
+}
+
+/// whoami's address and port.
+fn whoami_addr(wire: &[u8]) -> (String, u16) {
+    let m = Message::from_vec(wire).unwrap();
+    let mut addr = String::new();
+    let mut port = 0;
+    for r in &m.additionals {
+        match &r.data {
+            kerndns_core::proto::rr::RData::A(a) => addr = a.to_string(),
+            kerndns_core::proto::rr::RData::SRV(s) => port = s.port,
+            _ => {}
+        }
+    }
+    (addr, port)
+}
+
+/// What whoami (address and port) or the TXT template (the TLVs) says.
+fn seen(wire: &[u8]) -> String {
+    let m = Message::from_vec(wire).unwrap();
+    if let Some(txt) = m.answers.first() {
+        return txt.data.to_string();
+    }
+    let (addr, port) = whoami_addr(wire);
+    format!("{addr}:{port}")
+}
+
+fn txt_query() -> Vec<u8> {
+    let mut m = Message::new(0, MessageType::Query, OpCode::Query);
+    m.add_query(Query::query(Name::from_ascii("x.example.").unwrap(), RecordType::TXT));
+    m.to_vec().unwrap()
+}
+
+async fn doh3_get(port: u16, q: &[u8]) -> Vec<u8> {
+    let b64 = data_encoding::BASE64URL_NOPAD.encode(q);
+    let get = http::Request::get(format!("https://localhost:{port}/dns-query?dns={b64}"))
+        .body(())
+        .unwrap();
+    let (status, _, body) = h3_request(port, get, None).await;
+    assert_eq!(status, 200);
+    body
+}
+
+/// DoQ and DoH3 behind a proxy that sends PROXY v2 headers: what a
+/// proxied client is told (twice on one DoQ connection), then a direct
+/// one (its port left out), then the TLVs of a proxied client.
+async fn quic_proxyproto(doq: u16, doh3: u16) -> Vec<String> {
+    let client: SocketAddr = "203.0.113.7:4242".parse().unwrap();
+    let tlvs = [0xe0, 0, 2, 0xab, 0xcd];
+    let mut out = Vec::new();
+
+    let relay = ppv2_relay(localhost(doq), client, &tlvs).await;
+    let conn = quic_connect(relay, b"doq").await;
+    out.push(seen(&doq_exchange(&conn, &query(0)).await.unwrap()));
+    out.push(seen(&doq_exchange(&conn, &query(0)).await.unwrap()));
+    let direct = quic_connect(doq, b"doq").await;
+    out.push(whoami_addr(&doq_exchange(&direct, &query(0)).await.unwrap()).0);
+    out.push(seen(&doq_exchange(&conn, &txt_query()).await.unwrap()));
+
+    let relay = ppv2_relay(localhost(doh3), client, &tlvs).await;
+    out.push(seen(&doh3_get(relay, &query(0)).await));
+    out.push(whoami_addr(&doh3_get(doh3, &query(0)).await).0);
+    out.push(seen(&doh3_get(relay, &txt_query()).await));
+    out
+}
+
+/// One block per listener: CoreDNS sets plugins up for the first key of a
+/// block only, and doesn't pass `proxyproto` on to the others.
+fn quic_proxyproto_corefile(doq: u16, doh3: u16) -> String {
+    let block = |key: String| {
+        format!(
+            "{key} {{\n bind 127.0.0.1\n {}\n metadata\n proxyproto {{\n  allow 127.0.0.1/32\n  tlv_metadata\n }}\n template IN TXT {{\n  answer \"{{{{ .Name }}}} 60 IN TXT \\\"{{{{ .Meta \\\"proxyproto/tlv\\\" }}}}\\\"\"\n }}\n whoami\n}}\n",
+            tls_line()
+        )
+    };
+    block(format!("quic://.:{doq}")) + &block(format!("https3://.:{doh3}"))
+}
+
+/// What CoreDNS answers in [`quic_proxyproto`].
+fn quic_proxyproto_want() -> Vec<String> {
+    [
+        "203.0.113.7:4242",
+        "203.0.113.7:4242",
+        "127.0.0.1",
+        "e00002abcd",
+        "203.0.113.7:4242",
+        "127.0.0.1",
+        "e00002abcd",
+    ]
+    .map(String::from)
+    .to_vec()
+}
+
+fn free_udp_port() -> u16 {
+    std::net::UdpSocket::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port()
+}
+
+#[tokio::test]
+async fn quic_proxyproto_client() {
+    let (doq, doh3) = (free_udp_port(), free_udp_port());
+    let _inst = start(&quic_proxyproto_corefile(doq, doh3)).await;
+    assert_eq!(quic_proxyproto(doq, doh3).await, quic_proxyproto_want());
+}
+
+/// [`quic_proxyproto_client`] against CoreDNS (`target/coredns-ref`, from
+/// `cargo xtask difftest`, or `$COREDNS_REF`).
+#[tokio::test]
+#[ignore = "needs a CoreDNS binary"]
+async fn quic_proxyproto_against_coredns() {
+    let bin = std::env::var("COREDNS_REF")
+        .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/coredns-ref").to_string());
+    let (doq, doh3) = (free_udp_port(), free_udp_port());
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("quic-proxyproto-{doq}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("Corefile"), quic_proxyproto_corefile(doq, doh3)).unwrap();
+    let mut child = std::process::Command::new(bin)
+        .arg("-conf")
+        .arg(dir.join("Corefile"))
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let got = tokio::time::timeout(Duration::from_secs(20), quic_proxyproto(doq, doh3)).await;
+    let _ = child.kill();
+    let _ = child.wait();
+    assert_eq!(got.expect("CoreDNS answered"), quic_proxyproto_want());
+}

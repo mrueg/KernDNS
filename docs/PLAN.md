@@ -390,11 +390,15 @@ More wave 5 ports:
 - `proxyproto`: PROXY v1/v2 headers parsed with go-proxyproto's rules and
   error messages (`kerndns_core::proxyproto`). UDP takes v2 headers in
   front of the query, with Spectrum-style `udp_session_tracking`; TCP
-  takes v1 or v2 before the first message. The client address plugins
-  see is the header's source on `dns://`, `tls://`, `https://` and
-  `grpc://`; `tlv_metadata` publishes `proxyproto/tlv` for `dns://` and
-  `tls://`. Not supported yet: `quic://` and `https3://`. Settings are
-  fixed when a listener starts (a reload that changes them warns).
+  takes v1 or v2 before the first message. QUIC listeners (`quic://`,
+  `https3://`) take v2 headers on every datagram under the QUIC
+  endpoint, like CoreDNS's `PacketConn` under quic-go: the endpoint sees
+  the header's source as the peer, and what it sends there goes to the
+  proxy. The client address plugins see is the header's source on
+  `dns://`, `tls://`, `https://`, `grpc://`, `quic://` and `https3://`;
+  `tlv_metadata` publishes `proxyproto/tlv` for `dns://`, `tls://`,
+  `quic://` and `https3://`. Settings are fixed when a listener starts
+  (a reload that changes them warns).
 - `on` (caddy's `onevent`): `startup` commands run after the server
   starts and after every reload, `shutdown` commands on SIGTERM/SIGINT,
   `&` runs one in the background, `certrenew` is accepted and never fires.
@@ -491,7 +495,8 @@ strings) are not repeated.
 | `cancel` | stops the rest of the chain at the timeout instead of cancelling a context plugins watch | not done: same SERVFAIL for the client |
 | `tsig` | a secret that isn't base64 fails at startup; CoreDNS fails each request it signs | not done: the startup error is clearer |
 | `multisocket` | `quic://` and `https3://` always use one socket | not done: QUIC listeners share one socket by design |
-| `proxyproto` | `quic://` and `https3://` (see above) | not done yet |
+| `proxyproto` | `quic://` and `https3://`: PROXY v2 headers on every datagram, the client and TLVs from the header (see above) | done |
+| `proxyproto` | in a block with several keys (`quic://.:853 https3://.:443 { proxyproto }`) CoreDNS applies it to the first key's listener only (plugins are set up for the first key, and `propagateConfigParams` doesn't copy the PROXY settings); KernDNS applies it to every key | not done: CoreDNS's behavior looks unintended |
 | `dynupdate` | the ZONE argument isn't normalized like `plugin.Host` (reverse CIDRs, `dns://`, ports) | not done: zones are given as names in practice |
 | `loadbalance` | `prefer` inside a `weighted` block is accepted; CoreDNS rejects it | not done: harmless |
 | `grpc` | an upstream with a scheme other than `dns://`/`unix://` is a setup error (see above) | not done, deliberate |
@@ -784,8 +789,7 @@ Open:
   RSASHA1 keys in `dnssec` (which ring can't sign; see the parity table
   of the other plugins).
 - The gaps marked "not done yet" in the parity table of the other
-  plugins: `prometheus`'s `tls` option, PROXY protocol on QUIC
-  listeners.
+  plugins: `prometheus`'s `tls` option.
 - A reload whose startup hook fails keeps the new configuration, where
   CoreDNS rolls back to the old one.
 

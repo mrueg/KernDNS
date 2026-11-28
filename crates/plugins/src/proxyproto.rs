@@ -11,11 +11,11 @@
 //! ```
 //!
 //! The listeners do the work (`kerndns_server::proxyproto`): on `dns://`
-//! (UDP v2 headers, TCP v1/v2), `tls://`, `https://` and `grpc://`, the
-//! client address plugins see is the header's source. With `tlv_metadata`
-//! the PPv2 TLVs of `dns://` and `tls://` requests are published as the
-//! `proxyproto/tlv` metadata label (hex). `quic://` and `https3://` don't
-//! support PROXY headers in KernDNS yet.
+//! (UDP v2 headers, TCP v1/v2), `tls://`, `https://`, `grpc://`, and
+//! `quic://` and `https3://` (v2 headers on every datagram), the client
+//! address plugins see is the header's source. With `tlv_metadata` the
+//! PPv2 TLVs of `dns://`, `tls://`, `quic://` and `https3://` requests are
+//! published as the `proxyproto/tlv` metadata label (hex).
 
 use std::sync::Arc;
 
