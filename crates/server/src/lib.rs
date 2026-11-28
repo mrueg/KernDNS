@@ -393,6 +393,29 @@ fn merge(mut a: tokio::task::JoinSet<()>, b: tokio::task::JoinSet<()>) -> tokio:
 /// Bind `udp_count` UDP sockets and `tcp_count` TCP listeners on
 /// `host:port`, all with `SO_REUSEPORT`. An empty host means all
 /// interfaces: `[::]` (dual stack), falling back to `0.0.0.0` without IPv6.
+/// Parse a listen address, `[fe80::1%eth0]:53` included: `bind` gives
+/// IPv6 link-local addresses of an interface with the interface as zone,
+/// which becomes the socket's scope id.
+fn socket_addr(addr: &str) -> Result<std::net::SocketAddr, String> {
+    if let Some((host, port)) = addr.strip_prefix('[').and_then(|a| a.rsplit_once("]:"))
+        && let Some((ip, zone)) = host.split_once('%')
+    {
+        let ip: std::net::Ipv6Addr = ip.parse().map_err(|e| format!("{e}"))?;
+        let port: u16 = port.parse().map_err(|e| format!("invalid port {port:?}: {e}"))?;
+        let scope = match zone.parse::<u32>() {
+            Ok(n) => n,
+            Err(_) => if_addrs::get_if_addrs()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .find(|i| i.name == zone)
+                .and_then(|i| i.index)
+                .ok_or_else(|| format!("unknown interface {zone:?}"))?,
+        };
+        return Ok(std::net::SocketAddrV6::new(ip, port, 0, scope).into());
+    }
+    addr.parse().map_err(|e| format!("{e}"))
+}
+
 async fn bind(
     host: &str,
     port: &str,
@@ -408,7 +431,7 @@ async fn bind(
     };
     let mut last_err = None;
     for addr in &candidates {
-        let sa: std::net::SocketAddr = match addr.parse() {
+        let sa = match socket_addr(addr) {
             Ok(a) => a,
             Err(e) => {
                 last_err = Some((addr.clone(), std::io::Error::new(std::io::ErrorKind::InvalidInput, e)));
@@ -443,4 +466,30 @@ async fn bind(
     }
     let (addr, source) = last_err.expect("at least one candidate");
     Err(StartError::Bind { addr, source })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::socket_addr;
+
+    #[test]
+    fn listen_address_with_zone() {
+        assert_eq!(socket_addr("127.0.0.1:53").unwrap().to_string(), "127.0.0.1:53");
+        assert_eq!(socket_addr("[::1]:53").unwrap().to_string(), "[::1]:53");
+        let std::net::SocketAddr::V6(v6) = socket_addr("[fe80::1%7]:1053").unwrap() else {
+            panic!("not IPv6")
+        };
+        assert_eq!((v6.scope_id(), v6.port()), (7, 1053));
+        if let Some(lo) = if_addrs::get_if_addrs().unwrap().into_iter().find(|i| i.name == "lo") {
+            let std::net::SocketAddr::V6(v6) = socket_addr("[fe80::1%lo]:53").unwrap() else {
+                panic!("not IPv6")
+            };
+            assert_eq!(Some(v6.scope_id()), lo.index);
+        }
+        assert!(
+            socket_addr("[fe80::1%nosuchif0]:53")
+                .unwrap_err()
+                .contains("unknown interface")
+        );
+    }
 }
