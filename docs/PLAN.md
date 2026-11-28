@@ -544,6 +544,28 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
    compared with `go/compat/expectations-kind.txt`. A second run with
    CoreDNS's own image is the control: it separates failures of the
    harness or the runner from KernDNS's.
+   **Kubernetes' conformance DNS tests** (`cargo xtask k8s-conformance`,
+   done): the CI job `k8s-conformance` swaps the KernDNS image into the
+   kube-system/coredns Deployment of a kind cluster (`kubectl set image`,
+   kubeadm's Corefile unchanged) and runs Kubernetes' own e2e specs from
+   the release's prebuilt `e2e.test` and `ginkgo`
+   (kubernetes-test-linux-amd64.tar.gz, checksum-pinned; kind v0.33.0 and
+   `kindest/node:v1.37.0` pinned by digest to the same version): every
+   `[sig-network] DNS` spec of test/e2e/network/dns*.go (the 8
+   `[Conformance]` ones, partial names, search path limits, hostNetwork,
+   configurable resolv.conf, and the `[Serial]` ConfigMap tests that
+   change the Corefile to stubDomain/upstream forwarding and back),
+   `Networking ... using DNS`, the `[sig-network] Services` conformance
+   specs (Services reached by name, ExternalName) and `should create
+   endpoints for unready pods`. Skipped: `[Provider:gce]` and the
+   `[Feature:PerformanceDNS]` capacity test. ginkgo runs 4 parallel
+   processes (`[Serial]` specs last, alone) and writes a JSON report, which
+   is compared with `go/compat/expectations-conformance.txt`; a second run
+   with CoreDNS 1.15.0's image is the control. The specs take under two
+   minutes; the whole job, with the image build and the cluster, 6 to 8.
+   Result: all 37 pass, for CoreDNS too. Hydrophone or sonobuoy would run
+   the same `e2e.test` inside the cluster from the conformance image; the
+   binary on the runner is simpler and its report needs no copying out.
 3. **Plugin unit tests** (`cargo xtask plugin-cases`, done): the tables of
    each plugin's `*_test.go` are extracted from the Go source into JSON
    fixtures and replayed against KernDNS through a Corefile
@@ -679,6 +701,10 @@ Done:
   cluster's CoreDNS.
 - **`coredns/ci` kind tests** in CI with the image: all 13 that exercise
   the cluster DNS pass (the same as CoreDNS's own image); see Testing.
+- **Kubernetes' own DNS conformance tests** in CI with the image in
+  kind's kube-system/coredns Deployment (kubeadm's Corefile): all 37
+  `[sig-network] DNS` and `Services` conformance specs of Kubernetes
+  v1.37.0 pass, the same as CoreDNS's own image; see Testing.
 - **Kubernetes parity** with CoreDNS 1.15.0 (see its parity table).
 - **Level 3 setups:** resolver, kubeadm, forwarder, authoritative, split
   horizon, DoT/DoH frontend, etcd and the mixed bridge chain.
