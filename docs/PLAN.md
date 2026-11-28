@@ -778,9 +778,9 @@ Open:
   Benchmarks), which need a dedicated machine.
 - The optional out-of-process bridge, and the bridge gaps listed under M3.
 - Features the plugin table tests and `TestReadme` show as missing:
-  `serve_stale` refresh options and `serve_stale_policy`, `forward`
-  `resolver` and HTTPS/QUIC upstreams, and RSASHA1 keys in `dnssec`
-  (which ring can't sign; see the parity table of the other plugins).
+  `forward` `resolver` and HTTPS/QUIC upstreams, and RSASHA1 keys in
+  `dnssec` (which ring can't sign; see the parity table of the other
+  plugins).
 - The gaps marked "not done yet" in the parity table of the other
   plugins: `timeouts` on DoH listeners, the `plugin` label of
   `coredns_dns_responses_total`, `prometheus`'s `tls` option, PROXY
