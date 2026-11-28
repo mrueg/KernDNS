@@ -8,8 +8,10 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use kerndns_core::proto::op::{Message, ResponseCode};
+use kerndns_core::typify::{ResponseClass, ResponseType, typify};
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginFactory, Recorder, Request, ResponseWriter, SetupError,
     async_trait, client_write, next_or_failure, result_rcode,
@@ -43,23 +45,17 @@ impl Class {
             _ => None,
         }
     }
-
-    /// Classify a response like `response.Typify` + `response.Classify`.
-    pub fn of(msg: Option<&Message>) -> Class {
-        let Some(m) = msg else { return Class::Error };
-        match m.metadata.response_code {
-            ResponseCode::NXDomain => Class::Denial,
-            ResponseCode::NoError if m.answers.is_empty() && !is_delegation(m) => Class::Denial,
-            ResponseCode::NoError => Class::Success,
-            _ => Class::Error,
-        }
-    }
 }
 
-fn is_delegation(m: &Message) -> bool {
-    use kerndns_core::proto::rr::RecordType;
-    m.authorities.iter().any(|r| r.record_type() == RecordType::NS)
-        && !m.authorities.iter().any(|r| r.record_type() == RecordType::SOA)
+impl From<ResponseClass> for Class {
+    fn from(c: ResponseClass) -> Class {
+        match c {
+            ResponseClass::All => Class::All,
+            ResponseClass::Success => Class::Success,
+            ResponseClass::Denial => Class::Denial,
+            ResponseClass::Error => Class::Error,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -115,7 +111,10 @@ impl PluginFactory for Setup {
                             classes.insert(k);
                         }
                     }
-                    _ => return Err(c.arg_err()),
+                    other => {
+                        let msg = format!("unknown property '{other}'");
+                        return Err(c.errf(msg));
+                    }
                 }
             }
             if classes.is_empty() {
@@ -126,10 +125,13 @@ impl PluginFactory for Setup {
             }
         }
         let rules = Arc::new(rules);
+        let meta = kerndns_core::plugin::Metadata::of(c.config);
         c.add_plugin(move |next| {
             Arc::new(Logger {
                 next,
                 rules: rules.clone(),
+                meta: meta.clone(),
+                meta_enabled: std::sync::OnceLock::new(),
             })
         });
         Ok(())
@@ -152,6 +154,10 @@ pub fn name_matches(zone: &str, name: &str) -> bool {
 pub struct Logger {
     next: Next,
     rules: Arc<Vec<Rule>>,
+    /// The block's metadata registry, for `log/type` and `log/class`.
+    meta: kerndns_core::plugin::Metadata,
+    /// Whether the `metadata` plugin is on (known once setup is done).
+    meta_enabled: std::sync::OnceLock<bool>,
 }
 
 #[async_trait]
@@ -169,14 +175,28 @@ impl Handler for Logger {
         let res = next_or_failure("log", &self.next, ctx, &mut rec, req).await;
         let rc = result_rcode(&res);
 
-        let wanted = rule.class.contains(&Class::All) || {
-            // A response the server will still write (SERVFAIL etc.) is an error.
-            let class = if rec.msg.is_none() && !client_write(rc) {
-                Class::Error
-            } else {
-                Class::of(rec.msg.as_ref())
+        let meta = *self.meta_enabled.get_or_init(|| self.meta.enabled());
+        let wanted = if !meta && rule.class.contains(&Class::All) {
+            true
+        } else {
+            // classify what the client gets: a response the server still
+            // writes (SERVFAIL etc.) is a message with just the rcode
+            let synth;
+            let msg = match &rec.msg {
+                Some(m) => Some(m),
+                None if !client_write(rc) => {
+                    synth = req.error_reply(rc);
+                    Some(&synth)
+                }
+                None => None,
             };
-            rule.class.contains(&class)
+            let tpe = msg.map_or(ResponseType::OtherError, |m| typify(m, SystemTime::now()));
+            let class = tpe.class();
+            if meta {
+                ctx.metadata.insert("log/type".into(), tpe.as_str().into());
+                ctx.metadata.insert("log/class".into(), class.as_str().into());
+            }
+            rule.class.contains(&Class::All) || rule.class.contains(&Class::from(class))
         };
         if wanted {
             let line = replace(&rule.format, ctx, req, &rec, rc);
@@ -255,7 +275,7 @@ fn value(key: &str, ctx: &Context, req: &Request, rec: &Recorder<'_>, rc: Respon
         }
         "duration" => format!("{}s", ctx.start.elapsed().as_secs_f64()),
         ">id" => req.id().to_string(),
-        ">opcode" => format!("{:?}", req.msg.metadata.op_code).to_uppercase(),
+        ">opcode" => u8::from(req.msg.metadata.op_code).to_string(),
         ">do" => req.do_bit().to_string(),
         ">bufsize" => req.size().to_string(),
         ">rflags" => match &rec.msg {
@@ -334,7 +354,7 @@ mod tests {
         assert!(setup_ok(&Setup, "log {\n class denial error\n}"));
         assert!(setup_err(&Setup, "log {\n class\n}").contains("Wrong argument count"));
         assert!(setup_err(&Setup, "log {\n class foo\n}").contains("invalid class: foo"));
-        assert!(setup_err(&Setup, "log {\n foo\n}").contains("Wrong argument count"));
+        assert!(setup_err(&Setup, "log {\n foo\n}").contains("unknown property 'foo'"));
     }
 
     #[tokio::test]
@@ -367,6 +387,59 @@ mod tests {
             ResponseCode::NoError,
         );
         assert_eq!(line, "ns - example.org.");
+    }
+
+    /// `class` filters with `response.Typify`/`Classify`, and the
+    /// `log/type` and `log/class` metadata with the `metadata` plugin on.
+    #[tokio::test]
+    async fn classes_and_metadata() {
+        use kerndns_core::proto::rr::rdata::A;
+        use kerndns_core::proto::rr::{Name, RData, Record};
+        let run = |rcode: ResponseCode, answer: bool, meta: bool| async move {
+            let m = kerndns_core::plugin::Metadata::default();
+            if meta {
+                m.enable(vec![".".into()]);
+            }
+            let next = reply(move |r: &Request| {
+                let mut m = r.reply();
+                m.metadata.response_code = rcode;
+                if answer {
+                    let name = Name::from_ascii("example.org.").unwrap();
+                    m.answers
+                        .push(Record::from_rdata(name, 60, RData::A(A::new(1, 2, 3, 4))));
+                }
+                m
+            });
+            let l = Logger {
+                next,
+                rules: Arc::new(vec![Rule {
+                    name_scope: ".".into(),
+                    format: COMMON_LOG_FORMAT.into(),
+                    class: [Class::Denial].into_iter().collect(),
+                }]),
+                meta: m,
+                meta_enabled: std::sync::OnceLock::new(),
+            };
+            let req = query("example.org.", RecordType::A, "10.0.0.1:4242");
+            let mut ctx = Context::new(".", "dns://:53");
+            let mut w = CaptureWriter::new();
+            l.serve_dns(&mut ctx, &mut w, &req).await.unwrap();
+            (
+                ctx.metadata.get("log/type").cloned(),
+                ctx.metadata.get("log/class").cloned(),
+            )
+        };
+        let s = |a: &str, b: &str| (Some(a.to_string()), Some(b.to_string()));
+        // NOERROR without answers, SOA or NS is NOERROR/success in CoreDNS
+        assert_eq!(run(ResponseCode::NoError, false, true).await, s("NOERROR", "success"));
+        assert_eq!(run(ResponseCode::NXDomain, false, true).await, s("NXDOMAIN", "denial"));
+        // NXDOMAIN with an answer is an error
+        assert_eq!(run(ResponseCode::NXDomain, true, true).await, s("OTHERERROR", "error"));
+        assert_eq!(
+            run(ResponseCode::ServFail, false, true).await,
+            s("SERVERERROR", "error")
+        );
+        assert_eq!(run(ResponseCode::NoError, true, false).await, (None, None));
     }
 
     #[test]
