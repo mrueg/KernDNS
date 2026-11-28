@@ -82,7 +82,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `dnstap` | 4 | 0 | 0 | 4 | 1 | - | `io_test.go`, `listener_test.go`, `setup_test.go` |
 | `dynupdate` | 42 | 0 | 0 | 42 | 0 | - | `dynupdate_test.go`, `store_test.go` |
 | `erratic` | 18 | 18 | 0 | 0 | 0 | `erratic_test.go`, `setup_test.go` | - |
-| `errors` | 44 | 19 | 7 | 18 | 0 | `setup_test.go` | `errors_test.go` |
+| `errors` | 44 | 26 | 0 | 18 | 0 | `setup_test.go` | `errors_test.go` |
 | `file` | 153 | 115 | 0 | 38 | 4 | `alias_delegation_test.go`, `delegation_test.go`, `dnssec_test.go`, `ds_test.go`, `ent_test.go`, `escape_test.go`, `file_test.go`, `glue_test.go`, `lookup_test.go`, `svcb_test.go`, `wildcard_test.go` | `closest_test.go`, `reload_test.go`, `setup_test.go`, `zone_test.go` |
 | `forward` | 201 | 87 | 6 | 108 | 0 | `resolve_test.go`, `setup_policy_test.go`, `setup_test.go` | `forward_test.go` |
 | `geoip` | 27 | 8 | 0 | 19 | 0 | `setup_test.go` | `geoip_test.go` |
@@ -112,15 +112,15 @@ extractable* are listed in the fixture with the reason. Totals from
 | `shed` | 4 | 4 | 0 | 0 | 0 | `setup_test.go` | - |
 | `sign` | 6 | 1 | 0 | 5 | 0 | `setup_test.go` | `nsec_test.go` |
 | `siit` | 43 | 28 | 0 | 15 | 0 | `setup_test.go`, `siit_test.go` | `siit_dns64_test.go` |
-| `template` | 108 | 46 | 39 | 23 | 0 | `expr_test.go`, `setup_test.go`, `var_test.go` | `template_test.go` |
+| `template` | 108 | 83 | 0 | 25 | 0 | `expr_test.go`, `setup_test.go`, `var_test.go` | `template_test.go` |
 | `timeouts` | 0 | 0 | 0 | 0 | 1 | - | `timeouts_test.go` |
-| `tls` | 27 | 14 | 1 | 12 | 0 | `acme_test.go`, `tls_test.go` | - |
+| `tls` | 27 | 14 | 0 | 13 | 0 | `acme_test.go`, `tls_test.go` | - |
 | `trace` | 41 | 30 | 0 | 11 | 0 | `setup_test.go` | `trace_test.go` |
 | `transfer` | 7 | 7 | 0 | 0 | 0 | `setup_test.go` | - |
 | `tsig` | 38 | 0 | 0 | 38 | 1 | - | `setup_test.go`, `tsig_test.go` |
 | `view` | 11 | 7 | 0 | 4 | 0 | `setup_test.go` | `view_test.go` |
 | `whoami` | 4 | 4 | 0 | 0 | 0 | `whoami_test.go` | - |
-| **total** | **1962** | **1213** | **57** | **692** | **13** | | |
+| **total** | **1962** | **1257** | **10** | **695** | **13** | | |
 
 `etcd` and `kubernetes` are covered elsewhere (the etcd port, and
 `cargo xtask k8s-cases`). `bind`, `cancel` and `reload` have no table
@@ -143,8 +143,8 @@ fakes; see the kubernetes crate), `deprecated`, `import`.
   test server's address or another local value can't be evaluated outside
   the test; the fixture lists them with the compiler's message.
 - **Features KernDNS doesn't have yet** are `xfail` rows, each with the
-  missing feature: `errors { consolidate }`, `template` `var`/`expr`, `forward` `resolver` and
-  `https://`/`quic://` upstreams, `tls keylog`, RSASHA1 signing keys.
+  missing feature: `forward` `resolver` and
+  `https://`/`quic://` upstreams, RSASHA1 signing keys.
 - **Files from the Go package directory.** Setup rows that read
   `testdata/...` or files the Go test writes into its working directory
   (resolv.conf, certificates, MaxMind databases) are skipped rows; files
@@ -157,6 +157,10 @@ fakes; see the kubernetes crate), `deprecated`, `import`.
   which CoreDNS accepts and keeps. Fixed.
 - `prometheus` rejected CoreDNS 1.15's `runtime_metrics` option. It is
   accepted now, with a warning (there is no Go runtime to report on).
+- `template`'s `var a group("a")` lost its quotes: KernDNS's Corefile
+  lexer treated a `"` inside a token as a quote, where caddy's only
+  quotes at the start of a token (and starts a comment at any `#`).
+  Fixed in the lexer.
 
 Every other difference is a missing feature (above) or a property of the
 Go unit test rather than of the plugin (a fixed clock, no running server

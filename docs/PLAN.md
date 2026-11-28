@@ -445,6 +445,58 @@ Performance follow-ups from the first benchmarks, done:
 
 Open: prometheus label lookups cost ~1.7k instructions per query.
 
+### Parity with CoreDNS 1.15.0: the other plugins
+
+Every ported plugin except `forward`, `cache`, `kubernetes`,
+`k8s_external` (see its own table) and `etcd` (see above), compared
+option by option (README, `setup.go`) and in its handler with CoreDNS
+1.15.0. Plugins not listed have no known gap: `acl`, `any`, `auto`,
+`autopath`, `bufsize`, `dns64`, `dnstap`, `file`, `geoip`, `grpc_server`,
+`header`, `hosts`, `https`, `https3`, `local`, `metadata`, `minimal`,
+`nsid`, `on`, `quic`, `ready`, `rewrite`, `root`, `secondary`, `shed`,
+`sign`, `siit`, `trace`, `transfer`, `whoami`. Deliberate differences
+described elsewhere in this plan (`pprof`'s Go profiles, `trace`'s B3
+headers, `on`'s hooks on reload, `shed` needing a restart, the `version`
+strings) are not repeated.
+
+| Plugin | Gap | Status |
+|---|---|---|
+| Corefile | caddy's lexer: a `"` only quotes at the start of a token, `#` starts a comment anywhere outside quotes, no backtick quotes (KernDNS stripped quotes inside tokens: `group("a")` became `group(a)`) | done |
+| `bind` | interface names (`bind lo`), IPv6 link-local addresses of an interface with the interface as zone (the listener's scope id) | done |
+| `bind` | `except` applies to its own `bind` directive only; CoreDNS's error messages; startup banner `.:53 on 127.0.0.1` | done |
+| `bind` | when `except` removes every address CoreDNS starts the block without a listener; KernDNS refuses the Corefile | not done: such a block is a mistake, and an error says so |
+| `errors` | `consolidate DURATION REGEXP [LEVEL] [show_first]`, pending summaries printed on reload; `invalid log file` and `Unknown field` errors | done (KernDNS also prints pending summaries on SIGTERM, which CoreDNS drops) |
+| `errors` | `stacktrace` prints a stack trace with recovered panics | not done: accepted, KernDNS logs the panic without a trace |
+| `template` | `var NAME EXPRESSION` (`.Var`) and `expr EXPRESSION` with expr-lang's typing (`'x' + 1` is a setup error), `group()`, reserved names; evaluation errors are SERVFAIL | done, with KernDNS's expr evaluator (`crates/plugins/src/expr.rs`), which covers the README's expressions and most of the language: literals, operators with expr-lang's precedences, `?:`, `??`, indexing, the string, number and list builtins and the predicates `all`/`any`/`none`/`one`/`filter`/`map`/`count` with `#`. Not covered (setup error): maps, member access, slices, ranges, pipes, `let`, `if`, date/JSON/base64 builtins |
+| `template` | template execution errors were logged with a `plugin/template:` prefix | done (logged as CoreDNS does) |
+| `template` | Go `text/template` features beyond the supported subset (`{{ $x := ... }}`, `range`, `with`, `define`, other `.Message` fields) | not done: setup error, see `template/gotmpl.rs` |
+| `view` | expressions: the same evaluator as `template`, so `view` gains `?:`, `??`, predicates and builtins | done |
+| `tls` | `keylog FILE` (NSS key log format, mode 0600, appended) | done |
+| `tls` | `client_auth request` and `require` accept a client certificate without verifying it (Go's `RequestClientCert`, `RequireAnyClientCert`); KernDNS verified it against the CA | done |
+| `dnssec`, `sign` | RSASHA1 (algorithms 5, 7) and RSA keys under 2048 bits | not done: ring can't sign them; RFC 8624 forbids signing with RSASHA1. KernDNS refuses such keys at startup |
+| `dnssec` | `key aws_secretsmanager` | not done: it needs the AWS SDK (a large dependency tree for one option). Run `dnssec` in Go with `-bridge.prefer dnssec` instead |
+| `health` | `lameduck` also slept on every reload; CoreDNS only on the final shutdown | done (`Controller::on_final_shutdown`) |
+| `health` | the self-probe every second, `coredns_health_request_duration_seconds` and `coredns_health_request_failures_total` | done |
+| `health`, `ready`, `prometheus`, `pprof` | `SO_REUSEPORT` on the HTTP listener, so several blocks can share an address | done |
+| `reload` | `Running configuration SHA512` hashes Go's `json.Marshal` of caddy's server blocks: the same hash as CoreDNS for the same Corefile | done |
+| `reload` | `coredns_reload_failed_total`, `coredns_reload_version_info{hash,value}`; a Corefile that failed to load isn't retried until it changes again | done |
+| `log` | `{>opcode}` is the number, as in CoreDNS (KernDNS printed `QUERY`); `class` filters classify with `response.Typify`/`Classify` (NOERROR without SOA is success, NXDOMAIN with answers an error, ...); `log/type` and `log/class` metadata; `unknown property` error | done |
+| `log` | `{duration}` counts from the start of the request, not from when `log` runs; `{rsize}` is `-` instead of `0` when nothing was written | not done: sub-millisecond differences, and `-` is what `{rcode}` shows in the same case |
+| `chaos` | a VERSION over 255 bytes given together with authors panicked on `version.bind`; now there is no answer, as in CoreDNS (the message can't be packed) | done |
+| `chaos` | default authors are KernDNS's, not CoreDNS's OWNERS | not done, deliberate |
+| `timeouts` | `read`, `write` and `idle` don't apply to DoH (`https://`) listeners, and DoH has no idle timeout; CoreDNS sets them on its `http.Server` (defaults 3 s/5 s/10 s) | not done yet |
+| `prometheus` | the `plugin` label of `coredns_dns_responses_total` (the plugin that wrote the response) is always empty | not done yet: needs the writer to know the plugin, like CoreDNS's `pluginWriter` |
+| `prometheus` | `tls` block option (a Prometheus web config file for HTTPS) | not done yet: setup error |
+| `debug` | hex dumps of mismatched upstream replies (`forward`, `grpc`) | not done: only the dump, the FORMERR answer is the same |
+| `cancel` | stops the rest of the chain at the timeout instead of cancelling a context plugins watch | not done: same SERVFAIL for the client |
+| `tsig` | a secret that isn't base64 fails at startup; CoreDNS fails each request it signs | not done: the startup error is clearer |
+| `multisocket` | `quic://` and `https3://` always use one socket | not done: QUIC listeners share one socket by design |
+| `proxyproto` | `quic://` and `https3://` (see above) | not done yet |
+| `dynupdate` | the ZONE argument isn't normalized like `plugin.Host` (reverse CIDRs, `dns://`, ports) | not done: zones are given as names in practice |
+| `loadbalance` | `prefer` inside a `weighted` block is accepted; CoreDNS rejects it | not done: harmless |
+| `grpc` | an upstream with a scheme other than `dns://`/`unix://` is a setup error (see above) | not done, deliberate |
+| `erratic` | readiness is per plugin name, not per server block | not done: only visible with `erratic` in several blocks |
+
 ## Kubernetes plugin port (M2)
 
 - `kube` / `kube-runtime` watchers and reflectors with `k8s-openapi`.
@@ -726,10 +778,13 @@ Open:
   Benchmarks), which need a dedicated machine.
 - The optional out-of-process bridge, and the bridge gaps listed under M3.
 - Features the plugin table tests and `TestReadme` show as missing:
-  `errors { consolidate }`, `serve_stale` refresh options and
-  `serve_stale_policy`, `template` `var`/`expr`, `forward` `resolver` and
-  HTTPS/QUIC upstreams, `tls keylog`, RSASHA1 keys in `dnssec`, interface
-  names in `bind`.
+  `serve_stale` refresh options and `serve_stale_policy`, `forward`
+  `resolver` and HTTPS/QUIC upstreams, and RSASHA1 keys in `dnssec`
+  (which ring can't sign; see the parity table of the other plugins).
+- The gaps marked "not done yet" in the parity table of the other
+  plugins: `timeouts` on DoH listeners, the `plugin` label of
+  `coredns_dns_responses_total`, `prometheus`'s `tls` option, PROXY
+  protocol on QUIC listeners.
 - A reload whose startup hook fails keeps the new configuration, where
   CoreDNS rolls back to the old one.
 
