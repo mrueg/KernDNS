@@ -436,6 +436,12 @@ impl Metadata {
             .cloned()
     }
 
+    /// Whether the block's `metadata` plugin is enabled, so plugins that
+    /// set values while serving (`metadata.SetValueFunc`) should.
+    pub fn enabled(&self) -> bool {
+        self.0.read().unwrap().zones.is_some()
+    }
+
     pub fn add_provider(&self, p: Arc<dyn MetadataProvider>) {
         self.0.write().unwrap().providers.push(p);
     }

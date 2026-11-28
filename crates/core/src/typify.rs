@@ -33,7 +33,33 @@ pub enum ResponseClass {
     Error,
 }
 
+impl ResponseClass {
+    /// `Class.String()`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ResponseClass::All => "all",
+            ResponseClass::Success => "success",
+            ResponseClass::Denial => "denial",
+            ResponseClass::Error => "error",
+        }
+    }
+}
+
 impl ResponseType {
+    /// `Type.String()`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ResponseType::NoError => "NOERROR",
+            ResponseType::NameError => "NXDOMAIN",
+            ResponseType::ServerError => "SERVERERROR",
+            ResponseType::NoData => "NODATA",
+            ResponseType::Delegation => "DELEGATION",
+            ResponseType::Meta => "META",
+            ResponseType::Update => "UPDATE",
+            ResponseType::OtherError => "OTHERERROR",
+        }
+    }
+
     pub fn class(self) -> ResponseClass {
         match self {
             ResponseType::NoError | ResponseType::Delegation => ResponseClass::Success,
