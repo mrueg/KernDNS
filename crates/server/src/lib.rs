@@ -96,7 +96,7 @@ impl Instance {
         check_transports(&plan)?;
         let mut running = Vec::new();
         for l in &plan.listeners {
-            match start_listener(l).await {
+            match start_listener(l, true).await {
                 Ok(r) => running.push(r),
                 Err(e) => {
                     for mut r in running {
@@ -138,7 +138,7 @@ impl Instance {
             if self.running.iter().any(|r| r.info.label == l.label()) {
                 continue;
             }
-            match start_listener(l).await {
+            match start_listener(l, false).await {
                 Ok(r) => fresh.push(r),
                 Err(e) => {
                     for mut r in fresh {
@@ -151,13 +151,6 @@ impl Instance {
 
         for (_, hook) in self.shutdown_hooks.drain(..) {
             let _ = tokio::task::spawn_blocking(hook).await;
-        }
-
-        // the new chains start before they serve (new listeners are held)
-        for (name, hook) in plan.hooks.startup {
-            if let Err(e) = hook() {
-                kerndns_core::error!("plugin/{name}: {e}");
-            }
         }
 
         let mut next: Vec<Running> = Vec::new();
@@ -211,8 +204,10 @@ impl Instance {
         self.shutdown_hooks = plan.hooks.shutdown;
         // the old configuration's final-shutdown hooks never run
         self.final_hooks = plan.hooks.final_shutdown;
-        for r in &self.running {
-            r.handle.open();
+        for (name, hook) in plan.hooks.startup {
+            if let Err(e) = hook() {
+                kerndns_core::error!("plugin/{name}: {e}");
+            }
         }
         self.event_hooks = plan.hooks.events;
         self.emit(kerndns_core::Event::Startup).await;
@@ -285,7 +280,9 @@ fn udp_sockets() -> usize {
         .min(16)
 }
 
-async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError> {
+/// `held`: requests wait until the handle is opened (first start: the
+/// startup hooks run between binding and serving).
+async fn start_listener(l: &config::ListenerPlan, held: bool) -> Result<Running, StartError> {
     // `multisocket` (num_sockets > 0) gives that many UDP sockets and TCP
     // listeners, each a server of its own; without it one TCP listener and
     // one UDP socket per CPU. QUIC listeners use one UDP socket.
@@ -308,8 +305,9 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
         udp_local.unwrap_or(any_local),
         tcp_local.unwrap_or(any_local),
     );
-    // serving starts once the startup hooks have run
-    dispatcher.hold();
+    if held {
+        dispatcher.hold();
+    }
     let handle = dispatcher.handle();
     let conn = tcp::Limits::from(&l.conn);
     let tls = |alpn: &[&[u8]]| {
