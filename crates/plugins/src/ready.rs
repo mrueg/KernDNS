@@ -18,7 +18,10 @@ use crate::http::{self, Endpoint};
 /// One endpoint per address, shared by all server blocks (`uniq.New`).
 /// The endpoint and its "not shutting down" flag.
 type Running = (Endpoint, Arc<AtomicBool>);
-static ENDPOINTS: Mutex<Option<HashMap<String, Running>>> = Mutex::new(None);
+/// `None` marks an address whose listener failed to start: CoreDNS's
+/// `uniq.ForEach` drops that error without a log line, and the address
+/// stays "done" so a reload does not try it again.
+static ENDPOINTS: Mutex<Option<HashMap<String, Option<Running>>>> = Mutex::new(None);
 
 pub struct Setup;
 
@@ -97,13 +100,15 @@ impl PluginFactory for Setup {
                 kerndns_core::info!(plugin = "ready", "Plugins not ready: {list:?}");
                 http::text(503, list)
             });
-            let ep = http::serve(&addr, route).map_err(|e| format!("listen tcp {addr}: {e}"))?;
-            eps.insert(addr.clone(), (ep, up));
+            let ep = http::serve(&addr, route).ok();
+            eps.insert(addr.clone(), ep.map(|ep| (ep, up)));
             Ok(())
         });
         c.on_shutdown(move || {
+            // a failed address stays (CoreDNS's onFinalShutdown skips it)
             if let Some(eps) = ENDPOINTS.lock().unwrap().as_mut()
-                && let Some((ep, up)) = eps.remove(&a2)
+                && eps.get(&a2).is_some_and(Option::is_some)
+                && let Some(Some((ep, up))) = eps.remove(&a2)
             {
                 up.store(false, Ordering::Relaxed);
                 ep.stop();

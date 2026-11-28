@@ -20,8 +20,11 @@ use kerndns_core::{
 
 use crate::http::{self, Endpoint};
 
-/// One endpoint per address, shared by all server blocks.
-static ENDPOINTS: Mutex<Option<HashMap<String, Endpoint>>> = Mutex::new(None);
+/// One endpoint per address, shared by all server blocks (`uniq.New`).
+/// `None` marks an address whose listener failed to start: like CoreDNS,
+/// that is logged, not fatal, and the address stays "done" so a reload
+/// does not try it again.
+static ENDPOINTS: Mutex<Option<HashMap<String, Option<Endpoint>>>> = Mutex::new(None);
 
 pub const DEFAULT_ADDR: &str = "localhost:9153";
 
@@ -90,14 +93,25 @@ impl PluginFactory for Setup {
             });
             // "localhost" binds the loopback address, like Go's listener
             let bind = addr.replacen("localhost:", "127.0.0.1:", 1);
-            let ep = http::serve(&bind, route).map_err(|e| format!("listen tcp {addr}: {e}"))?;
-            metrics::add_listen_addr(ep.addr.to_string());
+            let ep = match http::serve(&bind, route) {
+                Ok(ep) => {
+                    metrics::add_listen_addr(ep.addr.to_string());
+                    Some(ep)
+                }
+                Err(e) => {
+                    // CoreDNS's `uniq.ForEach` drops the error OnStartup returns
+                    kerndns_core::error!("Failed to start metrics handler: listen tcp {addr}: {e}");
+                    None
+                }
+            };
             eps.insert(addr.clone(), ep);
             Ok(())
         });
         c.on_shutdown(move || {
+            // a failed address stays (CoreDNS's OnRestart skips it)
             if let Some(eps) = ENDPOINTS.lock().unwrap().as_mut()
-                && let Some(ep) = eps.remove(&a2)
+                && eps.get(&a2).is_some_and(Option::is_some)
+                && let Some(Some(ep)) = eps.remove(&a2)
             {
                 ep.stop();
             }

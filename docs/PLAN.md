@@ -478,6 +478,7 @@ strings) are not repeated.
 | `health` | `lameduck` also slept on every reload; CoreDNS only on the final shutdown | done (`Controller::on_final_shutdown`) |
 | `health` | the self-probe every second, `coredns_health_request_duration_seconds` and `coredns_health_request_failures_total` | done |
 | `health`, `ready`, `prometheus`, `pprof` | `SO_REUSEPORT` on the HTTP listener, so several blocks can share an address | done |
+| `prometheus`, `ready` | an address that can't be bound is not fatal: CoreDNS's `uniq.ForEach` drops the `OnStartup` error, so `prometheus` logs `[ERROR] Failed to start metrics handler: listen tcp ADDR: bind: ...` and `ready` logs nothing, DNS is served, and the address isn't tried again on reload (KernDNS failed startup). `health` and `pprof` stay fatal, as in CoreDNS; bind errors read `bind: address already in use` like Go's | done |
 | `reload` | `Running configuration SHA512` hashes Go's `json.Marshal` of caddy's server blocks: the same hash as CoreDNS for the same Corefile | done |
 | `reload` | `coredns_reload_failed_total`, `coredns_reload_version_info{hash,value}`; a Corefile that failed to load isn't retried until it changes again | done |
 | `log` | `{>opcode}` is the number, as in CoreDNS (KernDNS printed `QUERY`); `class` filters classify with `response.Typify`/`Classify` (NOERROR without SOA is success, NXDOMAIN with answers an error, ...); `log/type` and `log/class` metadata; `unknown property` error | done |

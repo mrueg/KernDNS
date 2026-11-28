@@ -70,6 +70,23 @@ pub fn split_host_port(addr: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A failed `bind(2)` worded like Go's `*net.OpError` cause, so that
+/// `listen tcp ADDR: {e}` reads `listen tcp ADDR: bind: address already
+/// in use` as in CoreDNS (not `Address already in use (os error 98)`).
+pub fn go_bind_error(e: std::io::Error) -> std::io::Error {
+    let Some(code) = e.raw_os_error() else {
+        return e;
+    };
+    let msg = std::io::Error::from_raw_os_error(code).to_string();
+    let msg = msg.strip_suffix(&format!(" (os error {code})")).unwrap_or(&msg);
+    let mut chars = msg.chars();
+    let lower: String = chars
+        .next()
+        .map(|c| c.to_lowercase().chain(chars).collect())
+        .unwrap_or_default();
+    std::io::Error::new(e.kind(), format!("bind: {lower}"))
+}
+
 /// Bind `addr` with `SO_REUSEPORT` like CoreDNS's `reuseport.Listen`, so
 /// several server blocks (or a reloaded configuration) can listen on the
 /// same address.
@@ -86,7 +103,7 @@ fn bind_reuseport(addr: &str) -> std::io::Result<std::net::TcpListener> {
             }
             s.set_reuse_address(true)?;
             s.set_reuse_port(true)?;
-            s.bind(&sa.into())?;
+            s.bind(&sa.into()).map_err(go_bind_error)?;
             s.listen(1024)?;
             Ok::<_, std::io::Error>(std::net::TcpListener::from(s))
         })();
@@ -151,6 +168,15 @@ pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bind_errors_read_like_go() {
+        let e = go_bind_error(std::io::Error::from_raw_os_error(98));
+        assert_eq!(e.to_string(), "bind: address already in use");
+        assert_eq!(e.kind(), std::io::ErrorKind::AddrInUse);
+        let other = std::io::Error::other("no addresses");
+        assert_eq!(go_bind_error(other).to_string(), "no addresses");
+    }
 
     /// CoreDNS's metrics README has `prometheus localhost:{$PORT}`, which
     /// is `localhost:` with $PORT unset: Go listens on a free port then.
