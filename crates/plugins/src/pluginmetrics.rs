@@ -171,6 +171,54 @@ pub static GRPC_REQUEST_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
     .unwrap()
 });
 
+// health
+pub static HEALTH_DURATION: LazyLock<prometheus::Histogram> = LazyLock::new(|| {
+    prometheus::register_histogram!(
+        HistogramOpts::new(
+            "request_duration_seconds",
+            "Histogram of the time (in seconds) each request took."
+        )
+        .namespace("coredns")
+        .subsystem("health")
+        .buckets(kerndns_core::metrics::slim_time_buckets())
+    )
+    .unwrap()
+});
+pub static HEALTH_FAILURES: LazyLock<prometheus::Counter> = LazyLock::new(|| {
+    prometheus::register_counter!(
+        Opts::new("request_failures_total", "The number of times the health check failed.")
+            .namespace("coredns")
+            .subsystem("health")
+    )
+    .unwrap()
+});
+
+// reload
+pub static RELOAD_FAILED: LazyLock<prometheus::Counter> = LazyLock::new(|| {
+    prometheus::register_counter!(
+        Opts::new("failed_total", "Counter of the number of failed reload attempts.")
+            .namespace("coredns")
+            .subsystem("reload")
+    )
+    .unwrap()
+});
+pub static RELOAD_INFO: LazyLock<GaugeVec> = LazyLock::new(|| {
+    gauge(
+        "reload",
+        "version_info",
+        "A metric with a constant '1' value labeled by hash, and value which type of hash generated.",
+        &["hash", "value"],
+    )
+});
+
+/// Register the metrics CoreDNS registers when its packages load
+/// (`promauto`), so they are exported, at zero, before anything happens.
+pub fn register_process_wide() {
+    LazyLock::force(&RELOAD_FAILED);
+    LazyLock::force(&HEALTH_DURATION);
+    LazyLock::force(&HEALTH_FAILURES);
+}
+
 // hosts
 pub static HOSTS_ENTRIES: LazyLock<GaugeVec> = LazyLock::new(|| {
     gauge(
