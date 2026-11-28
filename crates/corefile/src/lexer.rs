@@ -1,9 +1,11 @@
 //! Tokenizer for the Corefile (Caddyfile) dialect.
 //!
 //! The rules follow `github.com/coredns/caddy/caddyfile/lexer.go`:
-//! tokens are separated by whitespace, `#` starts a comment when it begins a
-//! token, `"..."` and `` `...` `` quote tokens (which may span lines), and
-//! `\"` escapes a quote inside a double-quoted token.
+//! tokens are separated by whitespace, `#` outside quotes starts a comment
+//! that runs to the end of the line (also in the middle of a token), a `"`
+//! that starts a token quotes it up to the closing `"` (which may be on a
+//! later line, and which ends the token), quotes inside a token are kept
+//! as they are, and `\"` escapes a quote inside a quoted token.
 
 use std::sync::Arc;
 
@@ -40,7 +42,6 @@ impl Token {
 }
 
 /// Split `input` into tokens. `file` is used for error messages.
-#[allow(unused_assignments)] // the final flush! resets state that is not read again
 pub fn tokenize(input: &str, file: &str) -> Vec<Token> {
     let file: Arc<str> = Arc::from(file);
     let mut tokens = Vec::new();
@@ -49,93 +50,83 @@ pub fn tokenize(input: &str, file: &str) -> Vec<Token> {
     let mut cur = String::new();
     let mut cur_line = 0usize;
     let mut in_token = false;
-    // quote char currently open, if any
-    let mut quote: Option<char> = None;
+    let mut quoted = false;
     let mut escaped = false;
     let mut in_comment = false;
     // Line breaks inside a quoted token; caddy counts the token at its start line.
     let mut pending_newlines = 0usize;
 
-    macro_rules! flush {
-        () => {
-            if in_token {
-                tokens.push(Token::new(
-                    expand_env(&std::mem::take(&mut cur)),
-                    file.clone(),
-                    cur_line,
-                ));
-                in_token = false;
-                line += pending_newlines;
-                pending_newlines = 0;
-            }
-        };
-    }
+    let mut flush = |cur: &mut String, cur_line: usize, line: &mut usize, pending: &mut usize| {
+        tokens.push(Token::new(expand_env(&std::mem::take(cur)), file.clone(), cur_line));
+        *line += std::mem::take(pending);
+    };
 
     for ch in input.chars() {
-        if in_comment {
-            if ch == '\n' {
-                in_comment = false;
-                line += 1;
-            }
-            continue;
-        }
-
-        if let Some(q) = quote {
-            if q == '"' && escaped {
-                // only \" is an escape; any other backslash is kept verbatim
-                if ch != '"' {
-                    cur.push('\\');
+        if quoted {
+            if !escaped {
+                if ch == '\\' {
+                    escaped = true;
+                    continue;
                 }
-                escaped = false;
-                if ch == '\n' {
-                    pending_newlines += 1;
+                if ch == '"' {
+                    // the closing quote ends the token
+                    quoted = false;
+                    in_token = false;
+                    flush(&mut cur, cur_line, &mut line, &mut pending_newlines);
+                    continue;
                 }
-                cur.push(ch);
-                continue;
-            }
-            if q == '"' && ch == '\\' {
-                escaped = true;
-                continue;
-            }
-            if ch == q {
-                quote = None;
-                continue;
             }
             if ch == '\n' {
                 pending_newlines += 1;
             }
+            // only \" is an escape; any other backslash is kept verbatim
+            if escaped && ch != '"' {
+                cur.push('\\');
+            }
             cur.push(ch);
+            escaped = false;
             continue;
         }
 
         if ch.is_whitespace() {
-            flush!();
+            if ch == '\r' {
+                continue;
+            }
+            if ch == '\n' {
+                in_comment = false;
+            }
+            if in_token {
+                in_token = false;
+                flush(&mut cur, cur_line, &mut line, &mut pending_newlines);
+            }
             if ch == '\n' {
                 line += 1;
             }
             continue;
         }
 
-        if !in_token {
-            if ch == '#' {
-                in_comment = true;
-                continue;
-            }
-            in_token = true;
-            cur_line = line;
+        // `#` starts a comment anywhere outside quotes, also inside a token
+        if ch == '#' {
+            in_comment = true;
         }
-
-        if ch == '"' || ch == '`' {
-            quote = Some(ch);
+        if in_comment {
             continue;
         }
 
+        if !in_token {
+            in_token = true;
+            cur_line = line;
+            if ch == '"' {
+                quoted = true;
+                continue;
+            }
+        }
         cur.push(ch);
     }
-    if escaped {
-        cur.push('\\');
+    // like caddy, an unterminated quote yields its text if it has any
+    if in_token && (!quoted || !cur.is_empty()) {
+        flush(&mut cur, cur_line, &mut line, &mut pending_newlines);
     }
-    flush!();
     tokens
 }
 
@@ -200,21 +191,43 @@ mod tests {
     #[test]
     fn quotes() {
         assert_eq!(
-            texts("a \"b c\" `d \"e\"` \"f\\\"g\" \"x\ny\" z"),
+            texts("a \"b c\" \"f\\\"g\" \"x\ny\" z \"\" \"a\\b\""),
             vec![
                 ("a".into(), 1),
                 ("b c".into(), 1),
-                ("d \"e\"".into(), 1),
                 ("f\"g".into(), 1),
                 ("x\ny".into(), 1),
-                ("z".into(), 2)
+                ("z".into(), 2),
+                ("".into(), 2),
+                ("a\\b".into(), 2),
             ]
         );
     }
 
+    /// Only a quote at the start of a token quotes it (caddy's lexer).
     #[test]
-    fn comment_only_at_token_start() {
-        assert_eq!(texts("a#b # c\nd"), vec![("a#b".into(), 1), ("d".into(), 2)]);
+    fn quotes_inside_tokens_are_kept() {
+        assert_eq!(
+            texts("group(\"a\") `d e` \"a\"b \"open"),
+            vec![
+                ("group(\"a\")".into(), 1),
+                ("`d".into(), 1),
+                ("e`".into(), 1),
+                ("a".into(), 1),
+                ("b".into(), 1),
+                ("open".into(), 1),
+            ]
+        );
+        assert!(texts("x \"").iter().all(|(t, _)| t == "x"));
+    }
+
+    /// `#` starts a comment anywhere outside quotes (caddy's lexer).
+    #[test]
+    fn comments() {
+        assert_eq!(
+            texts("a#b # c\nd \"e#f\"\r\ng"),
+            vec![("a".into(), 1), ("d".into(), 2), ("e#f".into(), 2), ("g".into(), 3)]
+        );
     }
 
     #[test]
