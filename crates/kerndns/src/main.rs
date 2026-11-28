@@ -258,14 +258,22 @@ async fn run(flags: Flags, corefile: String, path: String, port: String, registr
 
     if !flags.quiet {
         for l in inst.listeners() {
-            let scheme = l.label.split("://").next().unwrap_or("dns");
+            let (scheme, addr) = l.label.split_once("://").unwrap_or(("dns", &l.label));
+            // a listener on a specific address (`bind`) says so, like `startUpZones`
+            let host = addr.rsplit_once(':').map_or("", |(h, _)| h);
+            let host = host.trim_start_matches('[').trim_end_matches(']');
+            let on = if host.is_empty() {
+                String::new()
+            } else {
+                format!(" on {host}")
+            };
             for z in &l.zones {
                 let prefix = if scheme == "dns" {
                     String::new()
                 } else {
                     format!("{scheme}://")
                 };
-                println!("{prefix}{z}:{}", l.port());
+                println!("{prefix}{z}:{}{on}", l.port());
             }
         }
         println!("{}", version_string());
