@@ -1,0 +1,11 @@
+# about: every query is an error (a template that falls through to no next plugin), consolidated into one log line a minute
+# queries: {FIX}/q-example.txt
+.:{PORT} {
+    errors {
+        consolidate 1m "^plugin/template: no next plugin" warning
+    }
+    template IN ANY {
+        match ^nothing-matches$
+        fallthrough
+    }
+}
