@@ -168,7 +168,7 @@ reloads like the plain DNS ones:
 | Scheme | Listener | Crates | Limits plugin |
 |---|---|---|---|
 | `tls://` | DoT | tokio-rustls | `timeouts` |
-| `https://` | DoH, HTTP/1.1 and HTTP/2 | hyper | `https` (`max_connections` 200, `max_streams` 250) |
+| `https://` | DoH, HTTP/1.1 and HTTP/2 | hyper | `https` (`max_connections` 200, `max_streams` 250), `timeouts` |
 | `https3://` | DoH over HTTP/3 | quinn, h3, h3-quinn | `https3` (`max_connections` 200, `max_streams` 256) |
 | `quic://` | DoQ, RFC 9250 | quinn | `quic` (`max_connections` 200, `max_streams` 256, `worker_pool_size` 1024) |
 | `grpc://` | CoreDNS's `DnsService` over HTTP/2, h2c without `tls` | hyper | `grpc_server` (`max_connections` 200, `max_streams` 256) |
@@ -484,7 +484,7 @@ strings) are not repeated.
 | `log` | `{duration}` counts from the start of the request, not from when `log` runs; `{rsize}` is `-` instead of `0` when nothing was written | not done: sub-millisecond differences, and `-` is what `{rcode}` shows in the same case |
 | `chaos` | a VERSION over 255 bytes given together with authors panicked on `version.bind`; now there is no answer, as in CoreDNS (the message can't be packed) | done |
 | `chaos` | default authors are KernDNS's, not CoreDNS's OWNERS | not done, deliberate |
-| `timeouts` | `read`, `write` and `idle` don't apply to DoH (`https://`) listeners, and DoH has no idle timeout; CoreDNS sets them on its `http.Server` (defaults 3 s/5 s/10 s) | not done yet |
+| `timeouts` | `read`, `write` and `idle` apply to DoH (`https://`) listeners as on CoreDNS's `http.Server` (defaults 3 s/5 s/10 s): TLS handshake within the shorter of read and write; HTTP/1 requests within read, answers within write after the headers (else the connection closes), kept-alive connections closed after idle; HTTP/2 bodies within read, answers within write (else `RST_STREAM` `INTERNAL_ERROR`), connections without streams closed after idle. A late body is a 400. DoH3 uses only idle, DoQ read and idle, as in CoreDNS | done |
 | `prometheus` | the `plugin` label of `coredns_dns_responses_total` (the plugin that wrote the response) is always empty | not done yet: needs the writer to know the plugin, like CoreDNS's `pluginWriter` |
 | `prometheus` | `tls` block option (a Prometheus web config file for HTTPS) | not done yet: setup error |
 | `debug` | hex dumps of mismatched upstream replies (`forward`, `grpc`) | not done: only the dump, the FORMERR answer is the same |
@@ -784,7 +784,7 @@ Open:
   RSASHA1 keys in `dnssec` (which ring can't sign; see the parity table
   of the other plugins).
 - The gaps marked "not done yet" in the parity table of the other
-  plugins: `timeouts` on DoH listeners, the `plugin` label of
+  plugins: the `plugin` label of
   `coredns_dns_responses_total`, `prometheus`'s `tls` option, PROXY
   protocol on QUIC listeners.
 - A reload whose startup hook fails keeps the new configuration, where

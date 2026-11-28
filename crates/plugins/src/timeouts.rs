@@ -1,5 +1,6 @@
-//! `timeouts`: read, write and idle timeouts and the query limit for
-//! TCP and DoT connections. Port of `plugin/timeouts`.
+//! `timeouts`: read, write and idle timeouts for TCP, DoT and DoH
+//! connections (DoQ uses read and idle, DoH3 idle), and the query limit
+//! for TCP and DoT connections. Port of `plugin/timeouts`.
 //!
 //! ```text
 //! timeouts {
