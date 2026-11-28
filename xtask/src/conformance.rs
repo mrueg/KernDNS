@@ -1,7 +1,9 @@
 //! `cargo xtask k8s-conformance`: Kubernetes' own `[sig-network] DNS`
 //! end-to-end tests (kubernetes/kubernetes test/e2e/network/dns*.go, the
-//! `[Conformance]` ones and the rest that run on kind) against the cluster
-//! DNS of the current kubeconfig's cluster (CI job `k8s-conformance`).
+//! `[Conformance]` ones and the rest that run on kind), plus the
+//! `[sig-network] Services` conformance tests, which reach Services by
+//! name, against the cluster DNS of the current kubeconfig's cluster (CI
+//! job `k8s-conformance`).
 //!
 //! The tests run from the prebuilt `e2e.test` and `ginkgo` of the
 //! Kubernetes release (kubernetes-test-linux-amd64.tar.gz) matching the
@@ -20,11 +22,18 @@ use anyhow::{Context, Result, bail};
 
 use crate::{Status, root};
 
-/// The tests that run: every spec whose full text contains one of these
-/// (ginkgo `--focus`)...
-const FOCUS: &[&str] = &[
-    "[sig-network] DNS ",
-    "[sig-network] Networking should provider Internet connection for containers using DNS",
+/// The tests that run: every spec whose full text contains all the parts
+/// of one of these, in order (ginkgo `--focus`)...
+const FOCUS: &[&[&str]] = &[
+    // test/e2e/network/dns.go and dns_configmap.go
+    &["[sig-network] DNS "],
+    // forward to the upstream from the node's resolv.conf
+    &["[sig-network] Networking should provider Internet connection for containers using DNS"],
+    // reach Services by name through the search path, ExternalName
+    // CNAMEs (the e2e jig's CheckServiceReachability)
+    &["[sig-network] Services ", "[Conformance]"],
+    // publishNotReadyAddresses, by the Service's DNS name
+    &["[sig-network] Services should create endpoints for unready pods"],
 ];
 
 /// ...and none of these (ginkgo `--skip`), each with the reason.
@@ -39,8 +48,8 @@ const SKIP: &[(&str, &str)] = &[
     ),
 ];
 
-const HEADER: &str = "# Expected results of Kubernetes' [sig-network] DNS end-to-end tests (e2e.test of the\n\
-     # Kubernetes release matching kind's node image) with KernDNS as the cluster DNS of a kind\n\
+const HEADER: &str = "# Expected results of Kubernetes' [sig-network] DNS (and Services) end-to-end tests (e2e.test\n\
+     # of the Kubernetes release matching kind's node image) with KernDNS as the cluster DNS of a kind\n\
      # cluster (CI job `k8s-conformance`). Maintained by `cargo xtask k8s-conformance --update`;\n\
      # edit reasons by hand.\n\
      #\n\
@@ -92,24 +101,37 @@ pub fn run(args: &[String]) -> Result<()> {
     compare(&results, target_coredns, update)
 }
 
-/// ginkgo's regex for a list of literal strings.
-fn alternation<'a>(items: impl Iterator<Item = &'a str>) -> String {
-    items
-        .map(|s| {
-            s.chars().fold(String::new(), |mut out, c| {
-                if "\\.+*?()|[]{}^$".contains(c) {
-                    out.push('\\');
-                }
-                out.push(c);
-                out
-            })
-        })
+fn escape(s: &str) -> String {
+    s.chars().fold(String::new(), |mut out, c| {
+        if "\\.+*?()|[]{}^$".contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+        out
+    })
+}
+
+/// ginkgo's regex for groups of literal strings: any group, its parts in order.
+fn alternation<'a>(groups: impl Iterator<Item = &'a [&'a str]>) -> String {
+    groups
+        .map(|g| g.iter().map(|s| escape(s)).collect::<Vec<_>>().join(".*"))
         .collect::<Vec<_>>()
         .join("|")
 }
 
+fn contains_in_order(name: &str, parts: &[&str]) -> bool {
+    let mut rest = name;
+    parts.iter().all(|p| match rest.find(p) {
+        Some(i) => {
+            rest = &rest[i + p.len()..];
+            true
+        }
+        None => false,
+    })
+}
+
 fn selected(name: &str) -> bool {
-    FOCUS.iter().any(|f| name.contains(f)) && !SKIP.iter().any(|(s, _)| name.contains(s))
+    FOCUS.iter().any(|g| contains_in_order(name, g)) && !SKIP.iter().any(|(s, _)| name.contains(s))
 }
 
 /// Runs the focused suite with `ginkgo --nodes N e2e.test`; returns the
@@ -124,12 +146,15 @@ fn run_e2e(dir: &Path, nodes: usize, target: &str) -> Result<PathBuf> {
         .filter(|k| !k.is_empty())
         .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.kube/config")))
         .context("no KUBECONFIG and no HOME")?;
-    eprintln!("running Kubernetes' [sig-network] DNS e2e tests against {target} ...");
+    eprintln!("running Kubernetes' [sig-network] DNS and Services e2e tests against {target} ...");
     let start = std::time::Instant::now();
     let st = Command::new(dir.join("ginkgo"))
         .arg(format!("--nodes={nodes}"))
         .arg(format!("--focus={}", alternation(FOCUS.iter().copied())))
-        .arg(format!("--skip={}", alternation(SKIP.iter().map(|(s, _)| *s))))
+        .arg(format!(
+            "--skip={}",
+            alternation(SKIP.iter().map(|(s, _)| std::slice::from_ref(s)))
+        ))
         .args(["--timeout=60m", "--no-color", "--json-report=report.json"])
         .arg(format!("--output-dir={}", out.display()))
         .arg(dir.join("e2e.test"))
@@ -201,7 +226,7 @@ fn parse_report(path: &Path) -> Result<BTreeMap<String, Outcome>> {
         bail!("the e2e suite itself failed (see above)");
     }
     if out.is_empty() {
-        bail!("no [sig-network] DNS specs in {}", path.display());
+        bail!("no focused specs in {}", path.display());
     }
     Ok(out)
 }
@@ -253,7 +278,7 @@ fn compare(results: &BTreeMap<String, Outcome>, target_coredns: bool, update: bo
     let target = if target_coredns { "CoreDNS" } else { "KernDNS" };
     let exp_path = root().join("go/compat/expectations-conformance.txt");
     let expectations = read_expectations(&exp_path)?;
-    println!("\nKubernetes [sig-network] DNS e2e tests against {target}:");
+    println!("\nKubernetes [sig-network] DNS and Services e2e tests against {target}:");
     for (name, o) in results {
         let tag = match o.state.as_str() {
             "passed" => "PASS",
@@ -345,10 +370,12 @@ mod tests {
 
     #[test]
     fn focus_and_skip_regexes() {
-        assert_eq!(
-            alternation(["[sig-network] DNS ", "a.b"].into_iter()),
-            r"\[sig-network\] DNS |a\.b"
-        );
+        let groups: &[&[&str]] = &[&["[sig-network] DNS "], &["a.b", "[C]"]];
+        assert_eq!(alternation(groups.iter().copied()), r"\[sig-network\] DNS |a\.b.*\[C\]");
+        assert!(selected(
+            "[sig-network] Services should serve a basic endpoint from pods [Conformance]"
+        ));
+        assert!(!selected("[sig-network] Services should be rejected for evicted pods"));
         assert!(selected(
             "[sig-network] DNS should provide DNS for services [Conformance]"
         ));
