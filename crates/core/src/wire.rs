@@ -5,7 +5,8 @@
 //! is most of the CPU a cheap plugin chain spends per query. [`to_wire`]
 //! writes the message directly, with the same name compression rules as
 //! hickory and miekg/dns (owner and question names, and the names inside
-//! CNAME, NS, PTR, MX and SOA; SRV targets are not compressed), and falls
+//! CNAME, NS, PTR, MX and SOA; SRV targets are not compressed; A, AAAA,
+//! TXT and HINFO data are written as they are), and falls
 //! back to hickory for anything else: other record types, EDNS options,
 //! TSIG/SIG(0) or an extended RCODE without EDNS.
 
@@ -265,6 +266,14 @@ impl Encoder {
         Some(())
     }
 
+    /// A `<character-string>`: a length byte, then up to 255 bytes.
+    fn character_string(&mut self, s: &[u8]) -> Option<()> {
+        let len = u8::try_from(s.len()).ok()?;
+        self.buf.push(len);
+        self.buf.extend_from_slice(s);
+        Some(())
+    }
+
     fn record(&mut self, r: &Record) -> Option<()> {
         self.name(&r.name, true)?;
         self.u16(u16::from(r.record_type()));
@@ -299,12 +308,12 @@ impl Encoder {
             }
             RData::TXT(t) => {
                 for s in &t.txt_data {
-                    if s.len() > 255 {
-                        return None;
-                    }
-                    self.buf.push(s.len() as u8);
-                    self.buf.extend_from_slice(s);
+                    self.character_string(s)?;
                 }
+            }
+            RData::HINFO(h) => {
+                self.character_string(&h.cpu)?;
+                self.character_string(&h.os)?;
             }
             RData::Update0(_) => {}
             _ => return None,
@@ -452,7 +461,7 @@ pub fn name_len(name: &Name) -> usize {
 mod tests {
     use super::*;
     use hickory_proto::op::{Edns, OpCode, Query, ResponseCode};
-    use hickory_proto::rr::rdata::{A, AAAA, CNAME, MX, NS, PTR, SOA, SRV, TXT};
+    use hickory_proto::rr::rdata::{A, AAAA, CNAME, HINFO, MX, NS, PTR, SOA, SRV, TXT};
     use hickory_proto::rr::{DNSClass, RecordType};
     use std::str::FromStr;
 
@@ -512,6 +521,10 @@ mod tests {
             "example.org.",
             RData::TXT(TXT::new(vec!["a b".into(), "".into(), "c".into()])),
         ));
+        m.add_answer(rr(
+            "www.example.org.",
+            RData::HINFO(HINFO::new("ANY obsoleted".into(), "See RFC 8482".into())),
+        ));
         m.add_authority(rr("example.org.", RData::NS(NS(n("ns.example.org.")))));
         m.add_authority(rr(
             "example.org.",
@@ -554,6 +567,14 @@ mod tests {
         ));
         assert!(fast(&m).is_none());
         assert_eq!(to_wire(&m).unwrap(), m.to_vec().unwrap());
+        // a character-string over 255 bytes: hickory reports the error
+        let mut m = base();
+        m.add_answer(rr(
+            "example.org.",
+            RData::HINFO(HINFO::new("x".repeat(256), "os".into())),
+        ));
+        assert!(fast(&m).is_none());
+        assert!(to_wire(&m).is_err());
         // extended rcode without EDNS
         let mut m = base();
         m.metadata.response_code = ResponseCode::BADVERS;
@@ -576,6 +597,7 @@ mod tests {
                 RData::SRV(SRV::new(0, 100, 53, n("ns.example.org."))),
             ),
             rr("example.org.", RData::TXT(TXT::new(vec!["a b".into(), "".into()]))),
+            rr("example.org.", RData::HINFO(HINFO::new("".into(), "Linux".into()))),
             rr("example.org.", RData::NS(NS(n("ns.example.org.")))),
             rr("example.org.", RData::NS(NS(n("ns.example.net.")))),
             rr(
