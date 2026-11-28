@@ -98,7 +98,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `log` | 45 | 21 | 0 | 24 | 0 | `setup_test.go` | `json_test.go`, `log_test.go` |
 | `loop` | 3 | 0 | 0 | 3 | 0 | - | `setup_test.go` |
 | `metadata` | 22 | 10 | 0 | 12 | 0 | `setup_test.go` | `metadata_test.go` |
-| `metrics` | 26 | 8 | 0 | 18 | 0 | `setup_test.go` | `metrics_test.go`, `recorder_test.go` |
+| `metrics` | 26 | 20 | 0 | 6 | 0 | `metrics_test.go`, `setup_test.go` | `recorder_test.go` |
 | `minimal` | 16 | 3 | 0 | 13 | 0 | `minimal_test.go` | - |
 | `multisocket` | 10 | 10 | 0 | 0 | 0 | `multisocket_test.go` | - |
 | `nsid` | 2 | 2 | 0 | 0 | 1 | `nsid_test.go` | `setup_test.go` |
@@ -120,7 +120,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `tsig` | 38 | 0 | 0 | 38 | 1 | - | `setup_test.go`, `tsig_test.go` |
 | `view` | 11 | 7 | 0 | 4 | 0 | `setup_test.go` | `view_test.go` |
 | `whoami` | 4 | 4 | 0 | 0 | 0 | `whoami_test.go` | - |
-| **total** | **1962** | **1263** | **4** | **695** | **13** | | |
+| **total** | **1962** | **1275** | **4** | **683** | **13** | | |
 
 `etcd` and `kubernetes` are covered elsewhere (the etcd port, and
 `cargo xtask k8s-cases`). `bind`, `cancel` and `reload` have no table

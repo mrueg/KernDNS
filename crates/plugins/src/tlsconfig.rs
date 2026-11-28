@@ -116,18 +116,31 @@ fn client_verifier(
     ca: Option<&str>,
     auth: ClientAuth,
 ) -> Result<Option<Arc<dyn rustls::server::danger::ClientCertVerifier>>, String> {
+    if auth == ClientAuth::NoCert {
+        return Ok(None);
+    }
+    // the CA is still loaded (and must be valid) for `request` and
+    // `require`, as in Go
+    client_verifier_with_roots(Some(roots(ca)?), auth)
+}
+
+/// The client certificate verifier for `auth`, verifying against `roots`
+/// (`None`: the system roots, Go's nil `ClientCAs`).
+pub fn client_verifier_with_roots(
+    roots_store: Option<rustls::RootCertStore>,
+    auth: ClientAuth,
+) -> Result<Option<Arc<dyn rustls::server::danger::ClientCertVerifier>>, String> {
     Ok(Some(match auth {
         ClientAuth::NoCert => return Ok(None),
-        ClientAuth::Request | ClientAuth::Require => {
-            // the CA is still loaded (and must be valid), as in Go
-            roots(ca)?;
-            Arc::new(AnyClientCert {
-                provider: Arc::new(rustls::crypto::ring::default_provider()),
-                mandatory: auth == ClientAuth::Require,
-            })
-        }
+        ClientAuth::Request | ClientAuth::Require => Arc::new(AnyClientCert {
+            provider: Arc::new(rustls::crypto::ring::default_provider()),
+            mandatory: auth == ClientAuth::Require,
+        }),
         ClientAuth::VerifyIfGiven | ClientAuth::RequireAndVerify => {
-            let roots = Arc::new(roots(ca)?);
+            let roots = Arc::new(match roots_store {
+                Some(r) => r,
+                None => roots(None)?,
+            });
             let v = rustls::server::WebPkiClientVerifier::builder(roots);
             let v = if auth == ClientAuth::VerifyIfGiven {
                 v.allow_unauthenticated()
