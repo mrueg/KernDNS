@@ -66,7 +66,10 @@ impl PluginFactory for Setup {
         type Running = Option<(Endpoint, tokio::task::JoinHandle<()>)>;
         let ep: Arc<Mutex<Running>> = Arc::default();
         let ep2 = ep.clone();
-        c.on_startup(move || {
+        let start = Arc::new(move || {
+            if ep.lock().unwrap().is_some() {
+                return Ok(());
+            }
             let route: http::Route = Arc::new(|path, _| match path {
                 "/health" => http::text(200, "OK"),
                 _ => http::text(404, "404 page not found\n"),
@@ -76,6 +79,23 @@ impl PluginFactory for Setup {
             *ep.lock().unwrap() = Some((e, probe));
             Ok(())
         });
+        let stop = Arc::new(move || {
+            let running = ep2.lock().unwrap().take();
+            if let Some((e, probe)) = running {
+                probe.abort();
+                e.stop();
+            }
+        });
+        let s = start.clone();
+        c.on_startup(move || s());
+        // a reload stops the endpoint before the new configuration starts
+        // (`OnRestart`), a failed one starts it again (`OnRestartFailed`)
+        let s = stop.clone();
+        c.on_restart(move || {
+            s();
+            Ok(())
+        });
+        c.on_restart_failed(move || start());
         // lameduck only when the process exits (`OnFinalShutdown`), not on
         // a reload, which just stops the endpoint (`OnRestart`)
         c.on_final_shutdown(move || {
@@ -88,12 +108,7 @@ impl PluginFactory for Setup {
                 std::thread::sleep(lameduck);
             }
         });
-        c.on_shutdown(move || {
-            if let Some((e, probe)) = ep2.lock().unwrap().take() {
-                probe.abort();
-                e.stop();
-            }
-        });
+        c.on_shutdown(move || stop());
         Ok(())
     }
 }

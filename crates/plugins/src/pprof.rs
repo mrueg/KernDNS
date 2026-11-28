@@ -332,10 +332,12 @@ struct Server {
 
 fn start(addr: &str) -> std::io::Result<Server> {
     let addr = listen_addr(addr);
-    let std_listener = match std::net::TcpListener::bind(&addr) {
+    // with SO_REUSEPORT like CoreDNS's `reuseport.Listen`: a reload starts
+    // the new configuration's endpoint before the old one stops
+    let std_listener = match crate::http::bind_reuseport(&addr) {
         Ok(l) => l,
         Err(e) if addr.starts_with("[::]") => {
-            std::net::TcpListener::bind(addr.replacen("[::]", "0.0.0.0", 1)).map_err(|_| e)?
+            crate::http::bind_reuseport(&addr.replacen("[::]", "0.0.0.0", 1)).map_err(|_| e)?
         }
         Err(e) => return Err(e),
     };
