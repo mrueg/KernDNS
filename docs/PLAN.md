@@ -559,6 +559,13 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
    and every plugin's setup; the wire request path with a representative
    chain; the Rust side of the bridge's message handling (callbacks from Go,
    the plugin list, directive rendering). CI runs each target for 60 s.
+6. **Dependency checks** (done): cargo-deny ([`deny.toml`](../deny.toml):
+   RustSec advisories, licenses, duplicates as warnings, crates.io only)
+   for the workspace and `fuzz/`, and govulncheck for `go/bridge` (with every
+   in-tree CoreDNS plugin, tag `allplugins`) and `go/difftest`, in the
+   `Dependencies` workflow on PRs, pushes to main and weekly. A finding is
+   fixed by bumping the dependency (Go: in the bridge's go.mod, never
+   CoreDNS itself) or ignored in `deny.toml` with the advisory ID and reason.
 
 ## Benchmarks: CoreDNS vs KernDNS
 

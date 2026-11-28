@@ -1,0 +1,78 @@
+# cargo-deny configuration (https://embarkstudios.github.io/cargo-deny/).
+#
+#   cargo deny --all-features --locked check
+#   cargo deny --all-features --locked --manifest-path fuzz/Cargo.toml check
+#
+# The fuzz crate (its own workspace and lock file) finds this file in the
+# parent directory.
+#
+# CI runs both on every push and pull request and once a week, so a new
+# RustSec advisory shows up without a code change (.github/workflows/deps.yml).
+#
+# No [graph] targets: every target in the lock file is checked, so an
+# advisory in a Windows- or macOS-only crate is reported too.
+
+[advisories]
+# Vulnerabilities, unmaintained, unsound and yanked crates all fail the
+# check. An advisory without a fix goes into `ignore` with its ID and a
+# reason, and gets revisited when the weekly run still reports it.
+version = 2
+yanked = "deny"
+unmaintained = "all"
+ignore = []
+
+[licenses]
+version = 2
+# KernDNS is Apache-2.0 (like CoreDNS), so every dependency has to be
+# compatible with distributing an Apache-2.0 binary: permissive licenses only,
+# no copyleft. Where a crate offers a choice (MIT OR Apache-2.0 ...), one
+# allowed license is enough.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    # Unicode data tables (icu_*, unicode-ident)
+    "Unicode-3.0",
+    # the Mozilla root certificates in webpki-root-certs (via
+    # rustls-platform-verifier); a permissive data license
+    "CDLA-Permissive-2.0",
+]
+# Below 0.8 askalono's match is not reliable enough to trust.
+confidence-threshold = 0.8
+exceptions = [
+    # fuzz/ only: libfuzzer-sys bundles LLVM's libFuzzer, under the old LLVM
+    # license (NCSA, permissive, BSD-like). Never part of a KernDNS binary.
+    { allow = ["NCSA"], crate = "libfuzzer-sys" },
+]
+
+[licenses.private]
+# xtask and the fuzz crate are `publish = false` tools that are never
+# distributed; they don't carry a license field.
+ignore = true
+
+[bans]
+# Several versions of one crate cost build time and binary size, but they
+# come from dependencies moving at different speeds (thiserror 1 in protobuf,
+# rustix 0.38 in procfs, bitflags 1 in nix, syn 2 and 3, parking_lot 0.12 and
+# 0.13, ...) and no `cargo update` removes them, so they are warnings, not
+# errors.
+multiple-versions = "warn"
+# A `*` requirement would let any version in. The workspace's own crates are
+# path dependencies with a version (Cargo.toml [workspace.dependencies]), as
+# crates.io would require, so they don't count as wildcards.
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+# Everything comes from crates.io; a git or other-registry dependency must be
+# added here on purpose.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
