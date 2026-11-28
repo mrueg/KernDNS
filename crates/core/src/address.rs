@@ -4,6 +4,8 @@
 use std::fmt;
 use std::net::IpAddr;
 
+use crate::cidr::IpNet;
+
 /// The listener type selected by a key's scheme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Transport {
@@ -172,23 +174,12 @@ pub fn reverse_zones(ip: IpAddr, prefix: u8) -> Result<Vec<String>, &'static str
         IpAddr::V4(_) => (32, 8, "in-addr.arpa."),
         IpAddr::V6(_) => (128, 4, "ip6.arpa."),
     };
-    let prefix = prefix as u32;
-    if prefix > bits {
-        return Err("invalid CIDR");
-    }
+    let network: u128 = match IpNet::new(ip, prefix).map_err(|_| "invalid CIDR")?.network() {
+        IpAddr::V4(v4) => u32::from(v4).into(),
+        IpAddr::V6(v6) => v6.into(),
+    };
+    let prefix = u32::from(prefix);
     let boundary = prefix.div_ceil(digit) * digit;
-    let addr: u128 = match ip {
-        IpAddr::V4(v4) => u32::from(v4) as u128,
-        IpAddr::V6(v6) => u128::from(v6),
-    };
-    let mask = |len: u32| {
-        if len == 0 {
-            0
-        } else {
-            (!0u128 << (bits - len)) & (u128::MAX >> (128 - bits))
-        }
-    };
-    let network = addr & mask(prefix);
     let count = 1u128 << (boundary - prefix);
     let mut zones = Vec::with_capacity(count as usize);
     for i in 0..count {

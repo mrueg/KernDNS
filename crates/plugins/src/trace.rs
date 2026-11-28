@@ -29,7 +29,6 @@
 //! continuing a trace from a DoH request's B3 headers, and `client_server`
 //! (shared spans) has no effect since spans never join a client's.
 
-use std::fmt::Write as _;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -40,6 +39,7 @@ use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginFactory, Recorder, Request, ResponseWriter, SetupError,
     async_trait, client_write, next_or_failure, result_rcode,
 };
+use serde_json::{Value, json};
 use tokio::sync::Notify;
 
 const NAME: &str = "trace";
@@ -234,40 +234,12 @@ fn parse(c: &mut Controller<'_>) -> Result<Config, SetupError> {
     Ok(cfg)
 }
 
-/// Minimal JSON string escaping.
-fn json_str(out: &mut String, s: &str) {
-    out.push('"');
-    for ch in s.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => {
-                let _ = write!(out, "\\u{:04x}", c as u32);
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
+fn json_map(kv: &[(String, String)]) -> Value {
+    Value::Object(kv.iter().map(|(k, v)| (k.clone(), v.as_str().into())).collect())
 }
 
-fn json_map(out: &mut String, kv: &[(String, String)]) {
-    out.push('{');
-    for (i, (k, v)) in kv.iter().enumerate() {
-        if i > 0 {
-            out.push(',');
-        }
-        json_str(out, k);
-        out.push(':');
-        json_str(out, v);
-    }
-    out.push('}');
-}
-
-fn micros(t: SystemTime) -> u128 {
-    t.duration_since(UNIX_EPOCH).unwrap_or_default().as_micros()
+fn micros(t: SystemTime) -> u64 {
+    t.duration_since(UNIX_EPOCH).unwrap_or_default().as_micros() as u64
 }
 
 /// A finished span, in the provider's JSON.
@@ -334,100 +306,71 @@ impl Reporter {
     }
 
     fn zipkin_json(&self, spans: &[FinishedSpan]) -> String {
-        let mut out = String::from("[");
-        for (i, s) in spans.iter().enumerate() {
-            if i > 0 {
-                out.push(',');
-            }
-            let _ = write!(
-                out,
-                "{{\"traceId\":\"{:016x}\",\"id\":\"{:016x}\"",
-                s.trace_id as u64, s.id
-            );
-            if let Some(p) = s.parent {
-                let _ = write!(out, ",\"parentId\":\"{p:016x}\"");
-            }
-            out.push_str(",\"name\":");
-            json_str(&mut out, &s.name);
-            if s.server {
-                out.push_str(",\"kind\":\"SERVER\"");
-            }
-            let _ = write!(
-                out,
-                ",\"timestamp\":{},\"duration\":{}",
-                micros(s.start),
-                s.duration.as_micros().max(1)
-            );
-            out.push_str(",\"localEndpoint\":{\"serviceName\":");
-            json_str(&mut out, &self.cfg.service_name.to_lowercase());
-            match self.local {
-                Some((IpAddr::V4(ip), port)) => {
-                    let _ = write!(out, ",\"ipv4\":\"{ip}\",\"port\":{port}");
-                }
-                Some((IpAddr::V6(ip), port)) => {
-                    let _ = write!(out, ",\"ipv6\":\"{ip}\",\"port\":{port}");
-                }
-                None => {}
-            }
-            out.push('}');
-            if let Some(e) = &s.error {
-                let _ = write!(
-                    out,
-                    ",\"annotations\":[{{\"timestamp\":{},\"value\":",
-                    micros(s.start + s.duration)
-                );
-                json_str(&mut out, &format!("event:error error.object:{e}"));
-                out.push_str("}]");
-            }
-            if !s.tags.is_empty() {
-                out.push_str(",\"tags\":");
-                json_map(&mut out, &s.tags);
-            }
-            out.push('}');
+        let mut endpoint = json!({"serviceName": self.cfg.service_name.to_lowercase()});
+        if let Some((ip, port)) = self.local {
+            endpoint[if ip.is_ipv4() { "ipv4" } else { "ipv6" }] = ip.to_string().into();
+            endpoint["port"] = port.into();
         }
-        out.push(']');
-        out
+        let spans: Vec<Value> = spans
+            .iter()
+            .map(|s| {
+                let mut span = json!({
+                    "traceId": format!("{:016x}", s.trace_id as u64),
+                    "id": format!("{:016x}", s.id),
+                    "name": s.name,
+                    "timestamp": micros(s.start),
+                    "duration": (s.duration.as_micros() as u64).max(1),
+                    "localEndpoint": endpoint,
+                });
+                if let Some(p) = s.parent {
+                    span["parentId"] = format!("{p:016x}").into();
+                }
+                if s.server {
+                    span["kind"] = "SERVER".into();
+                }
+                if let Some(e) = &s.error {
+                    span["annotations"] = json!([{
+                        "timestamp": micros(s.start + s.duration),
+                        "value": format!("event:error error.object:{e}"),
+                    }]);
+                }
+                if !s.tags.is_empty() {
+                    span["tags"] = json_map(&s.tags);
+                }
+                span
+            })
+            .collect();
+        Value::from(spans).to_string()
     }
 
     /// Datadog agent v0.4 traces: one trace per span here.
     fn datadog_json(&self, spans: &[FinishedSpan]) -> String {
-        let mut out = String::from("[");
-        for (i, s) in spans.iter().enumerate() {
-            if i > 0 {
-                out.push(',');
-            }
-            let start = s.start.duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
-            let _ = write!(
-                out,
-                "[{{\"trace_id\":{},\"span_id\":{},\"parent_id\":{},\"name\":",
-                s.trace_id as u64,
-                s.id,
-                s.parent.unwrap_or(0)
-            );
-            json_str(&mut out, &s.name);
-            out.push_str(",\"resource\":");
-            json_str(&mut out, &s.name);
-            out.push_str(",\"service\":");
-            json_str(&mut out, &self.cfg.service_name);
-            let _ = write!(
-                out,
-                ",\"start\":{start},\"duration\":{},\"error\":{}",
-                s.duration.as_nanos(),
-                u8::from(s.error.is_some())
-            );
-            let mut meta = s.tags.clone();
-            meta.push(("dns".into(), "true".into()));
-            meta.push(("_dd.p.tid".into(), format!("{:016x}", (s.trace_id >> 64) as u64)));
-            out.push_str(",\"meta\":");
-            json_map(&mut out, &meta);
-            out.push_str(",\"metrics\":{\"_sampling_priority_v1\":1");
-            if self.cfg.datadog_analytics_rate > 0.0 {
-                let _ = write!(out, ",\"_dd1.sr.eausr\":{}", self.cfg.datadog_analytics_rate);
-            }
-            out.push_str("}}]");
-        }
-        out.push(']');
-        out
+        let traces: Vec<Value> = spans
+            .iter()
+            .map(|s| {
+                let mut meta = s.tags.clone();
+                meta.push(("dns".into(), "true".into()));
+                meta.push(("_dd.p.tid".into(), format!("{:016x}", (s.trace_id >> 64) as u64)));
+                let mut metrics = json!({"_sampling_priority_v1": 1});
+                if self.cfg.datadog_analytics_rate > 0.0 {
+                    metrics["_dd1.sr.eausr"] = self.cfg.datadog_analytics_rate.into();
+                }
+                json!([{
+                    "trace_id": s.trace_id as u64,
+                    "span_id": s.id,
+                    "parent_id": s.parent.unwrap_or(0),
+                    "name": s.name,
+                    "resource": s.name,
+                    "service": self.cfg.service_name,
+                    "start": s.start.duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos() as u64,
+                    "duration": s.duration.as_nanos() as u64,
+                    "error": u8::from(s.error.is_some()),
+                    "meta": json_map(&meta),
+                    "metrics": metrics,
+                }])
+            })
+            .collect();
+        Value::from(traces).to_string()
     }
 
     /// The URL the batches go to, and the body for `spans`.
@@ -1023,12 +966,18 @@ mod tests {
                 Some(&format!("{:016x}", root.trace_id as u64))
             );
             assert!(ctx.span.is_none(), "the span ends with the request");
-            let json = r.zipkin_json(&spans);
-            assert!(json.contains("\"kind\":\"SERVER\""), "{json}");
-            assert!(
-                json.contains("\"localEndpoint\":{\"serviceName\":\"coredns\"}"),
-                "{json}"
-            );
+            let json: Value = serde_json::from_str(&r.zipkin_json(&spans)).unwrap();
+            let (child, root) = (&json[0], &json[1]);
+            assert_eq!(root["kind"], "SERVER", "{json}");
+            assert_eq!(root["name"], TOP_LEVEL_SPAN, "{json}");
+            assert_eq!(root["localEndpoint"], json!({"serviceName": "coredns"}), "{json}");
+            assert_eq!(root["tags"]["coredns.io/name"], qname, "{json}");
+            assert_eq!(child["parentId"], root["id"], "{json}");
+            assert_eq!(child["traceId"], root["traceId"], "{json}");
+            assert_eq!(root["traceId"].as_str().unwrap().len(), 16, "{json}");
+            assert!(root["timestamp"].as_u64().unwrap() > 0, "{json}");
+            assert!(root["duration"].as_u64().unwrap() >= 1, "{json}");
+            assert_eq!(root["annotations"][0]["value"].is_string(), err, "{json}");
         }
     }
 
@@ -1056,8 +1005,20 @@ mod tests {
         assert_eq!(ctx.metadata.get(META_TRACE_ID).unwrap().len(), 32);
         let (url, body) = r.request(&spans);
         assert_eq!(url, "http://localhost:8126/v0.4/traces");
-        assert!(body.starts_with("[[{\"trace_id\":"), "{body}");
-        assert!(body.contains("\"service\":\"coredns\""), "{body}");
+        let body: Value = serde_json::from_str(&body).unwrap();
+        let span = &body[0][0];
+        assert_eq!(span["trace_id"], spans[0].trace_id as u64, "{body}");
+        assert_eq!(span["span_id"], spans[0].id, "{body}");
+        assert_eq!(span["parent_id"], 0, "{body}");
+        assert_eq!(span["name"], TOP_LEVEL_SPAN, "{body}");
+        assert_eq!(span["resource"], TOP_LEVEL_SPAN, "{body}");
+        assert_eq!(span["service"], "coredns", "{body}");
+        assert_eq!(span["error"], 0, "{body}");
+        assert_eq!(span["meta"]["coredns.io@rcode"], "NXDOMAIN", "{body}");
+        assert_eq!(span["meta"]["dns"], "true", "{body}");
+        assert_eq!(span["meta"]["_dd.p.tid"].as_str().unwrap().len(), 16, "{body}");
+        assert_eq!(span["metrics"], json!({"_sampling_priority_v1": 1}), "{body}");
+        assert!(span["start"].as_u64().unwrap() > 0, "{body}");
     }
 
     #[tokio::test]

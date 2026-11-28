@@ -88,29 +88,7 @@ impl ProxyProtoConfig {
 }
 
 fn contains(net: IpAddr, len: u8, ip: IpAddr) -> bool {
-    match (net, ip) {
-        (IpAddr::V4(n), IpAddr::V4(i)) => {
-            let m = if len == 0 { 0 } else { u32::MAX << (32 - u32::from(len)) };
-            u32::from(n) & m == u32::from(i) & m
-        }
-        (IpAddr::V6(n), IpAddr::V6(i)) => {
-            let m = if len == 0 {
-                0
-            } else {
-                u128::MAX << (128 - u32::from(len))
-            };
-            u128::from(n) & m == u128::from(i) & m
-        }
-        // Go's IPNet.Contains matches an IPv4 address against an
-        // IPv4-mapped network and the other way round
-        (IpAddr::V4(n), IpAddr::V6(i)) => i
-            .to_ipv4_mapped()
-            .is_some_and(|i| contains(IpAddr::V4(n), len, IpAddr::V4(i))),
-        (IpAddr::V6(n), IpAddr::V4(i)) => match n.to_ipv4_mapped() {
-            Some(n) if len >= 96 => contains(IpAddr::V4(n), len - 96, IpAddr::V4(i)),
-            _ => false,
-        },
-    }
+    crate::cidr::IpNet::new(net, len).is_ok_and(|n| crate::cidr::contains(&n, ip))
 }
 
 const SIG_V1: &[u8] = b"PROXY";

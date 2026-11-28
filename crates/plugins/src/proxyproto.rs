@@ -19,14 +19,13 @@
 
 use std::sync::Arc;
 
+use kerndns_core::cidr::parse_cidr;
 use kerndns_core::plugin::{Metadata, MetadataProvider};
 use kerndns_core::proxyproto::{Policy, ProxyProtoConfig};
 use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginFactory, Request, ResponseWriter, SetupError, async_trait,
     next_or_failure,
 };
-
-use crate::dns64::parse_cidr;
 
 const NAME: &str = "proxyproto";
 
@@ -70,8 +69,8 @@ fn parse(c: &mut Controller<'_>) -> Result<ProxyProtoConfig, SetupError> {
             match c.val() {
                 "allow" => {
                     for v in c.remaining_args() {
-                        let (net, len, _) = parse_cidr(&v).map_err(|e| SetupError::new(NAME, format!("{v}: {e}")))?;
-                        cfg.allow.push((net, len));
+                        let net = parse_cidr(&v).map_err(|e| SetupError::new(NAME, format!("{v}: {e}")))?;
+                        cfg.allow.push((net.network(), net.prefix_len()));
                     }
                 }
                 "default" => {

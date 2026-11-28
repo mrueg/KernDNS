@@ -12,10 +12,11 @@
 //! The A records are looked up through the server itself (`upstream`), like
 //! CoreDNS.
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use kerndns_core::cidr::{IpNet, Ipv6Net, parse_cidr};
 use kerndns_core::proto::op::{Message, ResponseCode};
 use kerndns_core::proto::rr::rdata::AAAA;
 use kerndns_core::proto::rr::{DNSClass, Name, RData, Record, RecordType};
@@ -31,53 +32,10 @@ const NAME: &str = "dns64";
 
 /// An IPv6 prefix, like the `*net.IPNet` CoreDNS keeps: the address is
 /// masked to the prefix length.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Prefix {
-    pub ip: [u8; 16],
-    pub len: u8,
-}
+pub type Prefix = Ipv6Net;
 
-impl Prefix {
-    /// The well-known prefix `64:ff9b::/96`.
-    pub const WELL_KNOWN: Prefix = Prefix {
-        ip: [0, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        len: 96,
-    };
-}
-
-impl std::fmt::Display for Prefix {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{}", Ipv6Addr::from(self.ip), self.len)
-    }
-}
-
-/// `net.ParseCIDR`: the masked network and the address length in bits, with
-/// Go's error message.
-pub(crate) fn parse_cidr(s: &str) -> Result<(IpAddr, u8, u8), String> {
-    let err = || format!("invalid CIDR address: {s}");
-    let (addr, mask) = s.split_once('/').ok_or_else(err)?;
-    let ip: IpAddr = addr.parse().map_err(|_| err())?;
-    if mask.is_empty() || !mask.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(err());
-    }
-    let total: u8 = if ip.is_ipv4() { 32 } else { 128 };
-    let n: u32 = mask.parse().map_err(|_| err())?;
-    if n > u32::from(total) {
-        return Err(err());
-    }
-    let n = n as u8;
-    let masked = match ip {
-        IpAddr::V4(v4) => {
-            let m = if n == 0 { 0 } else { u32::MAX << (32 - n) };
-            IpAddr::V4(Ipv4Addr::from(u32::from(v4) & m))
-        }
-        IpAddr::V6(v6) => {
-            let m = if n == 0 { 0 } else { u128::MAX << (128 - n) };
-            IpAddr::V6(Ipv6Addr::from(u128::from(v6) & m))
-        }
-    };
-    Ok((masked, n, total))
-}
+/// The well-known prefix `64:ff9b::/96`.
+pub const WELL_KNOWN_PREFIX: Prefix = Ipv6Net::new_assert(Ipv6Addr::new(0x64, 0xff9b, 0, 0, 0, 0, 0, 0), 96);
 
 /// The handler.
 pub struct Dns64 {
@@ -92,7 +50,7 @@ impl Default for Dns64 {
     fn default() -> Self {
         Dns64 {
             next: None,
-            prefix: Prefix::WELL_KNOWN,
+            prefix: WELL_KNOWN_PREFIX,
             translate_all: false,
             allow_ipv4: false,
         }
@@ -187,11 +145,11 @@ impl Dns64 {
 /// 64..71 (the "u" octet) stay zero.
 fn to6(prefix: &Prefix, addr: Ipv4Addr) -> Ipv6Addr {
     let addr = addr.octets();
-    let n = usize::from(prefix.len) / 8;
+    let (n, ip) = (usize::from(prefix.prefix_len()) / 8, prefix.addr().octets());
     let mut v6 = [0u8; 16];
     let (mut i, mut j) = (0, 0);
     while i < n {
-        v6[i] = prefix.ip[i];
+        v6[i] = ip[i];
         i += 1;
     }
     while i < 8 {
@@ -239,15 +197,11 @@ impl Handler for Dns64 {
 
 /// `parsePrefix`: an IPv6 prefix of a length RFC 6052 allows.
 fn parse_prefix(c: &Controller<'_>, addr: &str) -> Result<Prefix, SetupError> {
-    let (ip, n, total) = parse_cidr(addr).map_err(|e| SetupError::new(NAME, e))?;
-    let pref = match ip {
-        IpAddr::V6(v6) => Prefix {
-            ip: v6.octets(),
-            len: n,
-        },
-        IpAddr::V4(_) => return Err(c.errf(format!("invalid netmask {total} IPv6 address: \"{ip}/{n}\""))),
+    let pref = match parse_cidr(addr).map_err(|e| SetupError::new(NAME, e))? {
+        IpNet::V6(p) => p,
+        IpNet::V4(p) => return Err(c.errf(format!("invalid netmask 32 IPv6 address: \"{p}\""))),
     };
-    if !matches!(n, 32 | 40 | 48 | 56 | 64 | 96) {
+    if !matches!(pref.prefix_len(), 32 | 40 | 48 | 56 | 64 | 96) {
         return Err(c.errf(format!("invalid prefix length \"{pref}\"")));
     }
     Ok(pref)
@@ -336,9 +290,10 @@ mod tests {
     }
 
     fn prefix(s: &str) -> Prefix {
-        let (ip, len, _) = parse_cidr(s).unwrap();
-        let IpAddr::V6(v6) = ip else { panic!("not IPv6") };
-        Prefix { ip: v6.octets(), len }
+        let IpNet::V6(p) = parse_cidr(s).unwrap() else {
+            panic!("not IPv6")
+        };
+        p
     }
 
     // setup_test.go: TestSetupDns64PrefixLengths

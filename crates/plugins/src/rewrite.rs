@@ -17,6 +17,7 @@
 use std::net::IpAddr;
 use std::sync::Arc;
 
+use kerndns_core::cidr::IpNet;
 use kerndns_core::proto::op::{Edns, Message, ResponseCode};
 use kerndns_core::proto::rr::rdata::opt::{ClientSubnet, EdnsCode, EdnsOption, NSIDPayload};
 use kerndns_core::proto::rr::{DNSClass, Name, RData, Record, RecordType};
@@ -874,27 +875,6 @@ fn opt_code(o: &EdnsOption) -> u16 {
     u16::from(EdnsCode::from(o))
 }
 
-fn mask_ip(ip: IpAddr, bits: u8) -> IpAddr {
-    match ip {
-        IpAddr::V4(a) => {
-            let m = if bits == 0 {
-                0
-            } else {
-                u32::MAX << (32 - u32::from(bits))
-            };
-            IpAddr::V4((u32::from(a) & m).into())
-        }
-        IpAddr::V6(a) => {
-            let m = if bits == 0 {
-                0
-            } else {
-                u128::MAX << (128 - u32::from(bits))
-            };
-            IpAddr::V6((u128::from(a) & m).into())
-        }
-    }
-}
-
 impl EdnsRule {
     /// `ruleData` for variable rules.
     fn variable(&self, ctx: &Context, req: &Request, var: &str) -> Option<Vec<u8>> {
@@ -928,7 +908,8 @@ impl EdnsRule {
             EdnsKind::Subnet { v4, v6 } => {
                 let ip = req.ip();
                 let bits = if ip.is_ipv4() { *v4 } else { *v6 };
-                EdnsOption::Subnet(ClientSubnet::new(mask_ip(ip, bits), bits, 0))
+                let net = IpNet::new(ip, bits).ok()?.trunc();
+                EdnsOption::Subnet(ClientSubnet::new(net.addr(), bits, 0))
             }
         })
     }

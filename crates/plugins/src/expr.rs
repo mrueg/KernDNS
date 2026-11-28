@@ -1544,27 +1544,7 @@ fn incidr(ip: &str, cidr: &str) -> Result<bool, String> {
     let ip: IpAddr = ip
         .parse()
         .map_err(|_| "first argument is not an IP address".to_string())?;
-    let bad = || format!("invalid CIDR address: {cidr}");
-    let (net, bits) = cidr.split_once('/').ok_or_else(bad)?;
-    let net: IpAddr = net.parse().map_err(|_| bad())?;
-    if bits.is_empty() || !bits.bytes().all(|c| c.is_ascii_digit()) {
-        return Err(bad());
-    }
-    let bits: u32 = bits.parse().map_err(|_| bad())?;
-    let ip = ip.to_canonical();
-    Ok(match (ip, net) {
-        (IpAddr::V4(a), IpAddr::V4(n)) if bits <= 32 => {
-            let m = if bits == 0 { 0 } else { u32::MAX << (32 - bits) };
-            u32::from(a) & m == u32::from(n) & m
-        }
-        (IpAddr::V6(a), IpAddr::V6(n)) if bits <= 128 => {
-            let m = if bits == 0 { 0 } else { u128::MAX << (128 - bits) };
-            u128::from(a) & m == u128::from(n) & m
-        }
-        (_, IpAddr::V4(_)) if bits > 32 => return Err(bad()),
-        (_, _) if bits > 128 => return Err(bad()),
-        _ => false,
-    })
+    Ok(kerndns_core::cidr::contains(&kerndns_core::cidr::parse_cidr(cidr)?, ip))
 }
 
 /// Go's `strings.ReplaceAll` (an empty `old` inserts `new` around every rune).

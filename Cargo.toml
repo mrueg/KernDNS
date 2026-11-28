@@ -52,3 +52,5 @@ serde = "1"
 # OS-seeded CSPRNG for DNS message ids and other randomness; the same rand that
 # hickory-proto and quinn-proto use
 rand = "0.10"
+# the same ipnet that hickory-proto uses
+ipnet = "2.12"

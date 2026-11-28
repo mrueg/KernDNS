@@ -19,6 +19,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use kerndns_core::cidr::{IpNet, parse_cidr};
 use kerndns_core::proto::op::{Message, ResponseCode};
 use kerndns_core::proto::rr::rdata::A;
 use kerndns_core::proto::rr::{DNSClass, Name, RData, Record, RecordType};
@@ -28,7 +29,7 @@ use kerndns_core::{
     ResponseWriter, SetupError, async_trait, next_or_failure,
 };
 
-use crate::dns64::{Prefix, parse_cidr};
+use crate::dns64::{Prefix, WELL_KNOWN_PREFIX};
 use crate::pluginmetrics as pm;
 
 const NAME: &str = "siit";
@@ -45,7 +46,7 @@ impl Default for Siit {
     fn default() -> Self {
         Siit {
             next: None,
-            prefix: Prefix::WELL_KNOWN,
+            prefix: WELL_KNOWN_PREFIX,
             eam: HashMap::new(),
         }
     }
@@ -149,14 +150,6 @@ fn copy_error_response(req: &Request, resp: Message) -> Message {
     ret
 }
 
-impl Prefix {
-    fn contains(&self, addr: &Ipv6Addr) -> bool {
-        let n = u32::from(self.len);
-        let mask = if n == 0 { 0 } else { u128::MAX << (128 - n) };
-        u128::from(*addr) & mask == u128::from_be_bytes(self.ip) & mask
-    }
-}
-
 /// `extractIPv4`: the IPv4 address embedded in `v6` under a prefix of
 /// `prefix_len` bits (RFC 6052 2.2), skipping the reserved "u" octet.
 fn extract_ipv4(v6: &Ipv6Addr, prefix_len: u8) -> Ipv4Addr {
@@ -194,7 +187,7 @@ fn to4(eam: &HashMap<Ipv6Addr, Ipv4Addr>, prefix: &Prefix, addr: Ipv6Addr) -> Op
         if addr.octets()[8] != 0 {
             return None;
         }
-        return Some(extract_ipv4(&addr, prefix.len));
+        return Some(extract_ipv4(&addr, prefix.prefix_len()));
     }
     None
 }
@@ -233,20 +226,16 @@ impl Handler for Siit {
 /// `parseIpv6Prefix`: an IPv6 prefix of a length RFC 6052 allows, with a
 /// zero "u" octet.
 fn parse_ipv6_prefix(c: &Controller<'_>, addr: &str) -> Result<Prefix, SetupError> {
-    let (ip, n, total) = parse_cidr(addr).map_err(|e| SetupError::new(NAME, e))?;
-    let IpAddr::V6(v6) = ip else {
-        return Err(c.errf(format!("invalid netmask {total} IPv6 address: \"{ip}/{n}\"")));
+    let pref = match parse_cidr(addr).map_err(|e| SetupError::new(NAME, e))? {
+        IpNet::V6(p) => p,
+        IpNet::V4(p) => return Err(c.errf(format!("invalid netmask 32 IPv6 address: \"{p}\""))),
     };
-    let pref = Prefix {
-        ip: v6.octets(),
-        len: n,
-    };
-    if !matches!(n, 32 | 40 | 48 | 56 | 64 | 96) {
+    if !matches!(pref.prefix_len(), 32 | 40 | 48 | 56 | 64 | 96) {
         return Err(c.errf(format!(
             "invalid prefix length \"{pref}\": must be one of /32, /40, /48, /56, /64, /96"
         )));
     }
-    if pref.ip[8] != 0 {
+    if pref.addr().octets()[8] != 0 {
         return Err(c.errf(format!(
             "invalid prefix \"{pref}\": reserved octet (byte 8) must be zero"
         )));
@@ -352,9 +341,10 @@ mod tests {
     }
 
     fn prefix(s: &str) -> Prefix {
-        let (ip, len, _) = parse_cidr(s).unwrap();
-        let IpAddr::V6(v6) = ip else { panic!("not IPv6") };
-        Prefix { ip: v6.octets(), len }
+        let IpNet::V6(p) = parse_cidr(s).unwrap() else {
+            panic!("not IPv6")
+        };
+        p
     }
 
     fn parse_siit(input: &str) -> Result<Siit, String> {
@@ -495,7 +485,7 @@ mod tests {
         ];
         for (p, addr) in cases {
             assert_eq!(
-                extract_ipv4(&v6(addr), prefix(p).len),
+                extract_ipv4(&v6(addr), prefix(p).prefix_len()),
                 Ipv4Addr::new(192, 0, 2, 33),
                 "{p}"
             );
