@@ -8,12 +8,12 @@ edition = "2024"
 license = "Apache-2.0"
 
 [workspace.dependencies]
-kerndns-corefile = { path = "crates/corefile" }
-kerndns-core = { path = "crates/core" }
-kerndns-server = { path = "crates/server" }
-kerndns-plugins = { path = "crates/plugins" }
-kerndns-go-bridge = { path = "crates/go-bridge" }
-kerndns-kubernetes = { path = "crates/kubernetes" }
+kerndns-corefile = { path = "crates/corefile", version = "0.1.0" }
+kerndns-core = { path = "crates/core", version = "0.1.0" }
+kerndns-server = { path = "crates/server", version = "0.1.0" }
+kerndns-plugins = { path = "crates/plugins", version = "0.1.0" }
+kerndns-go-bridge = { path = "crates/go-bridge", version = "0.1.0" }
+kerndns-kubernetes = { path = "crates/kubernetes", version = "0.1.0" }
 
 hickory-proto = { version = "0.26", features = ["dnssec-ring"] }
 tokio = { version = "1", features = ["full"] }

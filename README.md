@@ -417,6 +417,26 @@ pass without ever starting the server are classified as `skip`. A test's
 the tests whose plugins live in the Go test binary get them through a Go
 bridge built from [`go/bridge/testplugins`](go/bridge/testplugins/).
 
+### Dependency checks
+
+```sh
+cargo install cargo-deny --locked
+cargo deny --all-features --locked check                                  # workspace
+cargo deny --all-features --locked --manifest-path fuzz/Cargo.toml check  # fuzz crate
+(cd go/bridge && go run golang.org/x/vuln/cmd/govulncheck@latest -tags allplugins ./...)
+(cd go/difftest && go run golang.org/x/vuln/cmd/govulncheck@latest ./...)
+```
+
+[`deny.toml`](deny.toml) checks RustSec advisories (vulnerable, unmaintained,
+unsound or yanked crates), licenses (permissive ones compatible with
+Apache-2.0), duplicate crate versions (warnings) and sources (crates.io
+only). govulncheck checks the Go bridge with every in-tree CoreDNS plugin
+([`go/bridge/allplugins.go`](go/bridge/allplugins.go), with the dependency
+versions the bridge selects; CoreDNS itself stays pinned to the submodule)
+and the difftest server. The [Dependencies](.github/workflows/deps.yml)
+workflow runs both on pull requests, pushes to main and every Monday, so new
+advisories show up without a code change.
+
 ### Fuzzing
 
 [`fuzz/`](fuzz/) has [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz)

@@ -1,0 +1,61 @@
+name: Dependencies
+
+# Dependency and security checks: cargo-deny (RustSec advisories, licenses,
+# duplicate crates, sources) and govulncheck (Go vulnerability database) for
+# the Go modules. A separate workflow from ci.yml so the weekly run checks
+# only the dependencies, not the whole test suite: new advisories show up
+# without a code change.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 5 * * 1' # Mondays 05:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        manifest: [Cargo.toml, fuzz/Cargo.toml]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: ${{ matrix.manifest }}
+          # deny.toml at the repository root covers both
+          arguments: --all-features --locked
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the bridge with every in-tree CoreDNS plugin (allplugins.go), in
+          # the bridge's module graph: CoreDNS stays pinned to the submodule,
+          # its dependencies are the versions go/bridge/go.mod selects
+          - dir: go/bridge
+            tags: allplugins
+          - dir: go/difftest
+            tags: ''
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: third_party/coredns/go.mod
+          cache-dependency-path: |
+            third_party/coredns/go.sum
+            go/bridge/go.sum
+            go/difftest/go.sum
+      - name: govulncheck ${{ matrix.dir }}
+        working-directory: ${{ matrix.dir }}
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest -tags '${{ matrix.tags }}' ./...
