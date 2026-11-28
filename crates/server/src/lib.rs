@@ -70,6 +70,10 @@ pub struct Instance {
     final_hooks: Vec<(&'static str, ShutdownHook)>,
     /// Event hooks of the running configuration (`on`).
     event_hooks: Vec<(String, kerndns_core::EventHook)>,
+    /// Run when a reload starts (`OnRestart`), and when it failed
+    /// (`OnRestartFailed`).
+    restart_hooks: Vec<(&'static str, kerndns_core::RestartHook)>,
+    restart_failed_hooks: Vec<(&'static str, kerndns_core::RestartHook)>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -78,6 +82,10 @@ pub enum StartError {
     Load(#[from] LoadError),
     #[error("listen {addr}: {source}")]
     Bind { addr: String, source: std::io::Error },
+    /// A restart hook of the running configuration failed (the reload
+    /// stopped before the new configuration started).
+    #[error("{0}")]
+    Restart(String),
     #[error("{0}")]
     Other(String),
 }
@@ -93,7 +101,7 @@ impl Instance {
     /// Queries that arrive before the hooks are done wait for them, as
     /// CoreDNS starts its servers only after the `OnStartup` hooks.
     pub async fn start_plan(plan: Plan) -> Result<Self, StartError> {
-        check_transports(&plan)?;
+        check_transports(&plan.listeners)?;
         let mut running = Vec::new();
         for l in &plan.listeners {
             match start_listener(l).await {
@@ -112,6 +120,8 @@ impl Instance {
             shutdown_hooks: Vec::new(),
             final_hooks: plan.hooks.final_shutdown,
             event_hooks: plan.hooks.events,
+            restart_hooks: plan.hooks.restart,
+            restart_failed_hooks: plan.hooks.restart_failed,
         };
         inst.shutdown_hooks = plan.hooks.shutdown;
         for (name, hook) in plan.hooks.startup {
@@ -127,44 +137,119 @@ impl Instance {
         Ok(inst)
     }
 
-    /// Switch to a new configuration. Listeners with the same address keep
-    /// their sockets and get the new plugin chains; new ones are bound,
-    /// removed ones closed. If binding fails, the old configuration stays.
+    /// Switch to a new configuration, like caddy's `Instance.Restart`:
+    ///
+    /// 1. the running configuration's restart hooks (`OnRestart`);
+    /// 2. the new configuration's startup hooks (`OnStartup`), then its
+    ///    new listeners are bound; listeners with the same address keep
+    ///    their sockets and get the new plugin chains;
+    /// 3. on success, listeners no longer configured are closed and the
+    ///    old configuration's shutdown hooks run (`OnShutdown`); its
+    ///    final-shutdown hooks never do.
+    ///
+    /// If a restart hook, a startup hook or a bind fails, the old
+    /// configuration keeps serving: the new one's shutdown hooks run (to
+    /// release what its startup took), the old one's global state
+    /// (readiness checks, `reload` interval) is put back, the old
+    /// configuration's restart-failed hooks run (`OnRestartFailed`), and
+    /// the error is returned. The old listeners answer throughout.
     pub async fn reload(&mut self, plan: Plan) -> Result<(), StartError> {
-        check_transports(&plan)?;
-        // bind what's new first, so a failure leaves everything as it was
-        let mut fresh: Vec<Running> = Vec::new();
-        for l in &plan.listeners {
-            if self.running.iter().any(|r| r.info.label == l.label()) {
-                continue;
-            }
-            match start_listener(l).await {
-                Ok(r) => fresh.push(r),
-                Err(e) => {
-                    for mut r in fresh {
-                        r.shutdown().await;
-                    }
-                    return Err(e);
+        let Plan {
+            listeners,
+            hooks,
+            previous,
+        } = plan;
+        let kerndns_core::Hooks {
+            startup,
+            shutdown,
+            final_shutdown,
+            restart,
+            restart_failed,
+            events,
+            ..
+        } = hooks;
+
+        let mut started = false;
+        let res = async {
+            for (_, hook) in &self.restart_hooks {
+                let hook = hook.clone();
+                match tokio::task::spawn_blocking(move || hook()).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => return Err(StartError::Restart(e)),
+                    Err(e) => return Err(StartError::Restart(e.to_string())),
                 }
             }
+            check_transports(&listeners)?;
+            started = true;
+            for (name, hook) in startup {
+                hook().map_err(|e| StartError::Other(format!("plugin/{name}: {e}")))?;
+            }
+            // bind what's new; kept listeners already have their sockets
+            let mut fresh: Vec<Running> = Vec::new();
+            for l in &listeners {
+                if self.running.iter().any(|r| r.info.label == l.label()) {
+                    continue;
+                }
+                match start_listener(l).await {
+                    Ok(r) => fresh.push(r),
+                    Err(e) => {
+                        for mut r in fresh {
+                            r.shutdown().await;
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+            Ok(fresh)
         }
+        .await;
 
-        for (_, hook) in self.shutdown_hooks.drain(..) {
+        let fresh = match res {
+            Ok(fresh) => fresh,
+            Err(e) => {
+                if started {
+                    for (_, hook) in shutdown {
+                        let _ = tokio::task::spawn_blocking(hook).await;
+                    }
+                }
+                if let Some(p) = previous {
+                    p.restore();
+                }
+                for (_, hook) in &self.restart_failed_hooks {
+                    let hook = hook.clone();
+                    let err = match tokio::task::spawn_blocking(move || hook()).await {
+                        Ok(r) => r.err(),
+                        Err(e) => Some(e.to_string()),
+                    };
+                    if let Some(e) = err {
+                        kerndns_core::error!("Restart failed callback returned error: {e}");
+                    }
+                }
+                return Err(e);
+            }
+        };
+        self.switch(&listeners, fresh).await;
+
+        // the old configuration is done: its shutdown hooks run once the
+        // new chains serve, its final-shutdown hooks never
+        for (_, hook) in std::mem::replace(&mut self.shutdown_hooks, shutdown) {
             let _ = tokio::task::spawn_blocking(hook).await;
         }
+        self.final_hooks = final_shutdown;
+        self.restart_hooks = restart;
+        self.restart_failed_hooks = restart_failed;
+        self.event_hooks = events;
+        self.emit(kerndns_core::Event::Startup).await;
+        Ok(())
+    }
 
-        // the new chains start before they serve (new listeners are held)
-        for (name, hook) in plan.hooks.startup {
-            if let Err(e) = hook() {
-                kerndns_core::error!("plugin/{name}: {e}");
-            }
-        }
-
-        let mut next: Vec<Running> = Vec::new();
+    /// Serve `plan`'s listeners: kept ones get the new chains, `fresh`
+    /// ones join, the rest are closed.
+    async fn switch(&mut self, plan: &[config::ListenerPlan], mut fresh: Vec<Running>) {
         let old = std::mem::take(&mut self.running);
         let mut keep: Vec<Running> = Vec::new();
         for mut r in old {
-            match plan.listeners.iter().find(|l| l.label() == r.info.label) {
+            match plan.iter().find(|l| l.label() == r.info.label) {
                 Some(l) => {
                     // QUIC listeners have one socket whatever `multisocket` says
                     let quic = matches!(l.transport, Transport::Quic | Transport::Https3);
@@ -198,7 +283,8 @@ impl Instance {
             }
         }
         // keep Corefile order
-        for l in &plan.listeners {
+        let mut next: Vec<Running> = Vec::new();
+        for l in plan {
             let label = l.label();
             if let Some(i) = keep.iter().position(|r| r.info.label == label) {
                 next.push(keep.swap_remove(i));
@@ -208,15 +294,11 @@ impl Instance {
         }
         self.running = next;
         self.listeners = self.running.iter().map(|r| r.info.clone()).collect();
-        self.shutdown_hooks = plan.hooks.shutdown;
-        // the old configuration's final-shutdown hooks never run
-        self.final_hooks = plan.hooks.final_shutdown;
+        // new listeners were held until the new startup hooks ran; kept
+        // ones were never held
         for r in &self.running {
             r.handle.open();
         }
-        self.event_hooks = plan.hooks.events;
-        self.emit(kerndns_core::Event::Startup).await;
-        Ok(())
     }
 
     /// Run the event hooks for `event`, like caddy's `EmitEvent`: one
@@ -250,8 +332,8 @@ impl Instance {
     }
 }
 
-fn check_transports(plan: &Plan) -> Result<(), StartError> {
-    for l in &plan.listeners {
+fn check_transports(listeners: &[config::ListenerPlan]) -> Result<(), StartError> {
+    for l in listeners {
         match l.transport {
             Transport::Dns => {}
             // gRPC serves cleartext HTTP/2 without TLS, like CoreDNS

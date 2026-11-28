@@ -124,6 +124,23 @@ impl Tap {
         }
     }
 
+    /// Close the listener for sinks, if any (on reload, so the new
+    /// configuration can bind its address).
+    fn close_listener(&self) {
+        if let Some(l) = &self.listener {
+            l.close();
+        }
+    }
+
+    /// Listen for sinks again after [`close_listener`](Self::close_listener).
+    fn reopen_listener(&self) {
+        if let Some(l) = &self.listener
+            && let Err(e) = l.listen()
+        {
+            kerndns_core::error!(plugin = "dnstap", "Failed to start dnstap listener: {e}");
+        }
+    }
+
     fn stop(&self) {
         if let Some(io) = &self.io {
             io.close();
@@ -301,6 +318,20 @@ impl PluginFactory for Setup {
             let start = t.clone();
             c.on_startup(move || {
                 start.start();
+                Ok(())
+            });
+            // like CoreDNS's `OnRestart`, a reload closes the listener for
+            // sinks before the new configuration listens; a failed reload
+            // opens it again. The outgoing connection stays until the old
+            // configuration shuts down.
+            let close = t.clone();
+            c.on_restart(move || {
+                close.close_listener();
+                Ok(())
+            });
+            let reopen = t.clone();
+            c.on_restart_failed(move || {
+                reopen.reopen_listener();
                 Ok(())
             });
             let stop = t.clone();

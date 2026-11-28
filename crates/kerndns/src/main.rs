@@ -335,7 +335,9 @@ fn report_listeners(inst: &Instance) {
 }
 
 /// Load `text` and switch `inst` to it; on failure the running
-/// configuration stays.
+/// configuration stays. The error reads like caddy's `Instance.Restart`'s:
+/// starting the new configuration fails with `starting with listener file
+/// descriptors: ...`, a restart hook of the running one with its error.
 async fn reload(
     inst: &mut Instance,
     text: &str,
@@ -343,9 +345,13 @@ async fn reload(
     opts: &Options,
     registry: &kerndns_core::Registry,
 ) -> Result<(), String> {
+    let starting = |e: &dyn std::fmt::Display| format!("starting with listener file descriptors: {e}");
     match kerndns_server::load(text, path, registry, opts) {
-        Ok(plan) => inst.reload(plan).await.map_err(|e| e.to_string()),
-        Err(e) => Err(e.to_string()),
+        Ok(plan) => inst.reload(plan).await.map_err(|e| match e {
+            kerndns_server::StartError::Restart(e) => e,
+            e => starting(&e),
+        }),
+        Err(e) => Err(starting(&e)),
     }
 }
 
@@ -533,7 +539,10 @@ async fn serve_until_shutdown(
         let text = match std::fs::read_to_string(path) {
             Ok(t) => t,
             Err(e) => {
-                kerndns_core::error!(plugin = "reload", "Corefile changed but reload failed: {e}");
+                // the reload plugin skips a Corefile it can't load
+                if force {
+                    kerndns_core::error!("SIGUSR1: loading updated Caddyfile: unable to read Corefile {path}: {e}");
+                }
                 continue;
             }
         };
@@ -552,10 +561,8 @@ async fn serve_until_shutdown(
             }
             hash = new_hash.clone();
         }
-        if changed {
-            // caddy's Instance.Restart logs this
-            kerndns_core::info!("Reloading");
-        }
+        // caddy's Instance.Restart logs this
+        kerndns_core::info!("Reloading");
         let res = reload(inst, &text, path, opts, registry).await;
         if changed && let Some(h) = &new_hash {
             pm::RELOAD_INFO.with_label_values(&["sha512", h]).set(1.0);
@@ -574,11 +581,15 @@ async fn serve_until_shutdown(
                 kerndns_core::info!("Reloading complete");
             }
             Err(e) => {
-                if changed {
+                // the old configuration still serves (Instance.Restart logs
+                // this after its restart-failed hooks), then the caller
+                kerndns_core::error!("Restart failed: {e}");
+                if force {
+                    kerndns_core::error!("SIGUSR1: {e}");
+                } else {
                     pm::RELOAD_FAILED.inc();
-                    kerndns_core::error!("Restart failed: {e}");
+                    kerndns_core::error!(plugin = "reload", "Corefile changed but reload failed: {e}");
                 }
-                kerndns_core::error!(plugin = "reload", "Corefile changed but reload failed: {e}")
             }
         }
     }

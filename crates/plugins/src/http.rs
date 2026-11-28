@@ -73,7 +73,7 @@ pub fn split_host_port(addr: &str) -> Result<(), String> {
 /// Bind `addr` with `SO_REUSEPORT` like CoreDNS's `reuseport.Listen`, so
 /// several server blocks (or a reloaded configuration) can listen on the
 /// same address.
-fn bind_reuseport(addr: &str) -> std::io::Result<std::net::TcpListener> {
+pub(crate) fn bind_reuseport(addr: &str) -> std::io::Result<std::net::TcpListener> {
     use socket2::{Domain, Socket, Type};
     use std::net::ToSocketAddrs;
     let mut last = std::io::Error::new(std::io::ErrorKind::InvalidInput, "no addresses");

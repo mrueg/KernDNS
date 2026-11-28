@@ -195,6 +195,10 @@ impl BlockConfig {
 type StartupHook = Box<dyn FnOnce() -> Result<(), String> + Send>;
 type ShutdownHook = Box<dyn FnOnce() + Send>;
 
+/// A hook a reload runs on the running configuration, maybe several times
+/// (caddy's `OnRestart` and `OnRestartFailed` callbacks).
+pub type RestartHook = std::sync::Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
+
 /// Process events that event hooks run on (caddy's `EventName`s that
 /// CoreDNS's `on` plugin supports).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,6 +225,12 @@ pub struct Hooks {
     pub shutdown: Vec<(&'static str, ShutdownHook)>,
     /// Run only when the process exits, not on reload.
     pub final_shutdown: Vec<(&'static str, ShutdownHook)>,
+    /// Run on this configuration when a reload starts, before the new
+    /// configuration's startup hooks (caddy's `OnRestart`).
+    pub restart: Vec<(&'static str, RestartHook)>,
+    /// Run on this configuration when a reload failed and it keeps
+    /// serving (caddy's `OnRestartFailed`): undo the restart hooks.
+    pub restart_failed: Vec<(&'static str, RestartHook)>,
     /// Event hooks by name (`on-<id>`), in registration order.
     pub events: Vec<(String, EventHook)>,
     /// State shared by all server blocks of one Corefile load, like
@@ -302,6 +312,20 @@ impl<'a> Controller<'a> {
     /// hooks.
     pub fn on_final_shutdown(&mut self, f: impl FnOnce() + Send + 'static) {
         self.hooks.final_shutdown.push((self.directive, Box::new(f)));
+    }
+
+    /// Run `f` on this configuration when a reload starts, before the new
+    /// configuration starts up (caddy's `OnRestart`), e.g. to free an
+    /// address the new one binds. An error fails the reload.
+    pub fn on_restart(&mut self, f: impl Fn() -> Result<(), String> + Send + Sync + 'static) {
+        self.hooks.restart.push((self.directive, std::sync::Arc::new(f)));
+    }
+
+    /// Run `f` on this configuration when a reload failed and it keeps
+    /// serving (caddy's `OnRestartFailed`), e.g. to take back what an
+    /// [`on_restart`](Self::on_restart) hook gave up. Errors are logged.
+    pub fn on_restart_failed(&mut self, f: impl Fn() -> Result<(), String> + Send + Sync + 'static) {
+        self.hooks.restart_failed.push((self.directive, std::sync::Arc::new(f)));
     }
 
     /// Register an event hook named `name` (`caddy.RegisterEventHook`).

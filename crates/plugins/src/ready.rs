@@ -73,8 +73,10 @@ impl PluginFactory for Setup {
         }
         readiness::set_monitor_continuously(continuously);
 
-        let a2 = addr.clone();
-        c.on_startup(move || {
+        // whether this block started the address's endpoint (and so stops it)
+        let owner = Arc::new(AtomicBool::new(false));
+        let (a2, o2) = (addr.clone(), owner.clone());
+        let start = Arc::new(move || {
             let mut eps = ENDPOINTS.lock().unwrap();
             let eps = eps.get_or_insert_with(HashMap::new);
             if eps.contains_key(&addr) {
@@ -99,16 +101,31 @@ impl PluginFactory for Setup {
             });
             let ep = http::serve(&addr, route).map_err(|e| format!("listen tcp {addr}: {e}"))?;
             eps.insert(addr.clone(), (ep, up));
+            o2.store(true, Ordering::Relaxed);
             Ok(())
         });
-        c.on_shutdown(move || {
-            if let Some(eps) = ENDPOINTS.lock().unwrap().as_mut()
-                && let Some((ep, up)) = eps.remove(&a2)
-            {
+        let stop = Arc::new(move || {
+            if !owner.swap(false, Ordering::Relaxed) {
+                return;
+            }
+            let running = ENDPOINTS.lock().unwrap().as_mut().and_then(|eps| eps.remove(&a2));
+            if let Some((ep, up)) = running {
                 up.store(false, Ordering::Relaxed);
                 ep.stop();
             }
         });
+        let s = start.clone();
+        c.on_startup(move || s());
+        // a reload stops the endpoint before the new configuration starts
+        // (`OnRestart`), a failed one starts it again (`OnRestartFailed`;
+        // the old readiness checks are back by then)
+        let s = stop.clone();
+        c.on_restart(move || {
+            s();
+            Ok(())
+        });
+        c.on_restart_failed(move || start());
+        c.on_shutdown(move || stop());
         Ok(())
     }
 }

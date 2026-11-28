@@ -53,6 +53,8 @@ pub struct Listener {
     pub settings: ListenerSettings,
     clients: Clients,
     quit: watch::Sender<bool>,
+    /// Listening (between `listen` and `close`).
+    open: std::sync::atomic::AtomicBool,
 }
 
 enum Accepting {
@@ -66,6 +68,7 @@ impl Listener {
             settings,
             clients: Default::default(),
             quit: watch::channel(false).0,
+            open: Default::default(),
         }
     }
 
@@ -101,6 +104,9 @@ impl Listener {
             }
         };
         let clients = self.clients.clone();
+        // listening again after `close`: the old accept loop saw the change
+        self.quit.send_replace(false);
+        self.open.store(true, std::sync::atomic::Ordering::Relaxed);
         let quit = self.quit.subscribe();
         let timeout = s.tcp_timeout;
         let logger = s.logger.clone();
@@ -120,6 +126,10 @@ impl Listener {
 
     /// Stop accepting and disconnect every sink (unlinking a unix socket).
     pub fn close(&self) {
+        // closed already: the socket file may be another listener's now
+        if !self.open.swap(false, std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
         let _ = self.quit.send(true);
         self.clients.lock().unwrap().clear();
         if self.settings.proto == Proto::Unix {

@@ -92,6 +92,30 @@ impl ListenerPlan {
 pub struct Plan {
     pub listeners: Vec<ListenerPlan>,
     pub hooks: Hooks,
+    /// What setup replaced of the running configuration's global state,
+    /// put back if this plan fails to start on reload.
+    pub(crate) previous: Option<Previous>,
+}
+
+/// The readiness checks and `reload` interval of the configuration that
+/// was running while a plan was loaded.
+pub(crate) struct Previous {
+    readiness: kerndns_core::readiness::Saved,
+    reload: Option<std::time::Duration>,
+}
+
+impl Previous {
+    fn save() -> Self {
+        Self {
+            readiness: kerndns_core::readiness::save(),
+            reload: kerndns_core::reload::interval(),
+        }
+    }
+
+    pub(crate) fn restore(self) {
+        kerndns_core::readiness::restore(self.readiness);
+        kerndns_core::reload::restore(self.reload);
+    }
 }
 
 /// The Corefile used when there is none, or it has no server blocks, like
@@ -103,23 +127,28 @@ pub fn default_corefile(port: &str) -> String {
 /// Parse a Corefile and run every plugin's setup.
 ///
 /// Setup registers readiness checks and the `reload` interval globally; if
-/// it fails, those of the running configuration are put back, so a failed
-/// reload leaves `ready` and `reload` as they were.
+/// it fails (or the plan fails to start on reload), those of the running
+/// configuration are put back, so a failed reload leaves `ready` and
+/// `reload` as they were.
 pub fn load(corefile: &str, path: &str, registry: &Registry, opts: &Options) -> Result<Plan, LoadError> {
     let mut blocks = parse(corefile, path)?;
     if blocks.is_empty() {
         // caddy loads the server type's DefaultInput then
         blocks = parse(&default_corefile(&opts.dns_port), "Corefile")?;
     }
-    let saved = (kerndns_core::readiness::save(), kerndns_core::reload::interval());
+    let saved = Previous::save();
     kerndns_core::readiness::reset();
     kerndns_core::reload::reset();
-    let plan = setup(&blocks, path, registry, opts);
-    if plan.is_err() {
-        kerndns_core::readiness::restore(saved.0);
-        kerndns_core::reload::restore(saved.1);
+    match setup(&blocks, path, registry, opts) {
+        Ok(mut plan) => {
+            plan.previous = Some(saved);
+            Ok(plan)
+        }
+        Err(e) => {
+            saved.restore();
+            Err(e)
+        }
     }
-    plan
 }
 
 fn setup(
@@ -209,6 +238,7 @@ fn setup(
     Ok(Plan {
         listeners: group_by_listener(&configs)?,
         hooks,
+        previous: None,
     })
 }
 

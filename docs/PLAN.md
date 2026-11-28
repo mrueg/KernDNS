@@ -480,6 +480,7 @@ strings) are not repeated.
 | `health`, `ready`, `prometheus`, `pprof` | `SO_REUSEPORT` on the HTTP listener, so several blocks can share an address | done |
 | `reload` | `Running configuration SHA512` hashes Go's `json.Marshal` of caddy's server blocks: the same hash as CoreDNS for the same Corefile | done |
 | `reload` | `coredns_reload_failed_total`, `coredns_reload_version_info{hash,value}`; a Corefile that failed to load isn't retried until it changes again | done |
+| `reload`, SIGUSR1, `-control` | a reload whose new configuration fails to start (a startup hook errors, a listener can't bind) kept the new configuration; caddy's `Instance.Restart` rolls back: the running configuration's `OnRestart` hooks, the new one's `OnStartup` hooks and binds, then on failure the old one's `OnRestartFailed` hooks, `[ERROR] Restart failed: starting with listener file descriptors: ...` (then `[ERROR] SIGUSR1: ...` or `plugin/reload`'s message and `coredns_reload_failed_total`); on success the old one's `OnShutdown` hooks | done (`Controller::on_restart`/`on_restart_failed`; `health`, `ready`, `prometheus` and `dnstap`'s listener stop on restart and start again when it fails). The old listeners answer throughout. Unlike caddy, the discarded configuration's shutdown hooks run, and its readiness checks and `reload` interval are replaced by the old ones; `dnstap`'s outgoing connection is closed by the old configuration's shutdown, not on restart, so it isn't lost on a failed reload. Go plugins in the bridge get no restart hooks |
 | `log` | `{>opcode}` is the number, as in CoreDNS (KernDNS printed `QUERY`); `class` filters classify with `response.Typify`/`Classify` (NOERROR without SOA is success, NXDOMAIN with answers an error, ...); `log/type` and `log/class` metadata; `unknown property` error | done |
 | `log` | `{duration}` counts from the start of the request, not from when `log` runs; `{rsize}` is `-` instead of `0` when nothing was written | not done: sub-millisecond differences, and `-` is what `{rcode}` shows in the same case |
 | `chaos` | a VERSION over 255 bytes given together with authors panicked on `version.bind`; now there is no answer, as in CoreDNS (the message can't be packed) | done |
@@ -786,8 +787,6 @@ Open:
 - The gaps marked "not done yet" in the parity table of the other
   plugins: `prometheus`'s `tls` option, PROXY protocol on QUIC
   listeners.
-- A reload whose startup hook fails keeps the new configuration, where
-  CoreDNS rolls back to the old one.
 
 ## Risks
 
