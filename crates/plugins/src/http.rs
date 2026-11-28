@@ -7,11 +7,14 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::server::conn::http1;
+use hyper::server::conn::{http1, http2};
 use hyper::service::service_fn;
 use hyper::{Request, Response};
-use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_rustls::LazyConfigAcceptor;
+
+use crate::webconfig::Web;
 
 /// Maps a request path and its `Accept` header to (status, content type, body).
 pub type Route = Arc<dyn Fn(&str, &str) -> (u16, String, Vec<u8>) + Send + Sync>;
@@ -100,6 +103,13 @@ fn bind_reuseport(addr: &str) -> std::io::Result<std::net::TcpListener> {
 
 /// Bind `addr` (falling back from `[::]` to `0.0.0.0`) and serve `route`.
 pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
+    serve_web(addr, route, None)
+}
+
+/// [`serve`] with a Prometheus web config (`prometheus { tls FILE }`):
+/// HTTPS if it has TLS settings, and its headers, users and rate limit on
+/// every request.
+pub fn serve_web(addr: &str, route: Route, web: Option<Arc<Web>>) -> std::io::Result<Endpoint> {
     let addr = listen_addr(addr);
     let std_listener = match bind_reuseport(&addr) {
         Ok(l) => l,
@@ -125,19 +135,12 @@ pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
             let Ok((stream, _)) = owned.listener.accept().await else {
                 continue;
             };
-            let route = route.clone();
+            let (route, web) = (route.clone(), web.clone());
             tokio::spawn(async move {
-                let svc = service_fn(move |req: Request<hyper::body::Incoming>| {
-                    let accept = req.headers().get("accept").and_then(|v| v.to_str().ok()).unwrap_or("");
-                    let (status, ctype, body) = route(req.uri().path(), accept);
-                    let resp = Response::builder()
-                        .status(status)
-                        .header("Content-Type", ctype)
-                        .body(Full::new(Bytes::from(body)))
-                        .expect("valid response");
-                    async move { Ok::<_, Infallible>(resp) }
-                });
-                let _ = http1::Builder::new().serve_connection(TokioIo::new(stream), svc).await;
+                match web.clone() {
+                    Some(w) if w.tls() => serve_tls(stream, route, w).await,
+                    _ => serve_conn(TokioIo::new(stream), route, web, false).await,
+                }
             });
         }
     });
@@ -146,6 +149,107 @@ pub fn serve(addr: &str, route: Route) -> std::io::Result<Endpoint> {
         task: task.abort_handle(),
         closed: Mutex::new(closed),
     })
+}
+
+/// A TLS connection: the certificates are loaded again for every
+/// handshake (the toolkit's `GetConfigForClient`), and plain HTTP gets
+/// Go's 400 answer.
+async fn serve_tls(stream: TcpStream, route: Route, web: Arc<Web>) {
+    // the first record header, waiting up to the 5 s read timeout of
+    // CoreDNS's metrics server
+    let mut head = [0u8; 5];
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match stream.peek(&mut head).await {
+            Ok(5) => break,
+            Ok(n) if n > 0 && tokio::time::Instant::now() < deadline => {
+                tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+            }
+            _ => return,
+        }
+    }
+    if looks_like_http(&head) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut stream = stream;
+        let _ = stream.write_all(HTTP_TO_HTTPS).await;
+        // read what the client sent before closing, so the close doesn't
+        // reset the connection before the client has read the answer
+        let _ = stream.shutdown().await;
+        let mut sink = [0u8; 4096];
+        let drain = async { while matches!(stream.read(&mut sink).await, Ok(n) if n > 0) {} };
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(1), drain).await;
+        return;
+    }
+    let Ok(start) = LazyConfigAcceptor::new(rustls::server::Acceptor::default(), stream).await else {
+        return;
+    };
+    let cfg = match web.server_config() {
+        Ok(c) => c,
+        Err(e) => {
+            kerndns_core::error!("http: TLS handshake error: {}", e);
+            return;
+        }
+    };
+    let Ok(tls) = start.into_stream(cfg).await else {
+        return;
+    };
+    let h2 = tls.get_ref().1.alpn_protocol() == Some(b"h2");
+    serve_conn(TokioIo::new(tls), route, Some(web), h2).await;
+}
+
+/// What Go's HTTPS server answers a plain HTTP request with.
+const HTTP_TO_HTTPS: &[u8] = b"HTTP/1.0 400 Bad Request\r\n\r\nClient sent an HTTP request to an HTTPS server.\n";
+
+/// `tlsRecordHeaderLooksLikeHTTP`.
+fn looks_like_http(h: &[u8; 5]) -> bool {
+    matches!(h, b"GET /" | b"HEAD " | b"POST " | b"PUT /" | b"OPTIO")
+}
+
+async fn serve_conn<I>(io: TokioIo<I>, route: Route, web: Option<Arc<Web>>, h2: bool)
+where
+    I: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let svc = service_fn(move |req: Request<hyper::body::Incoming>| {
+        let (route, web) = (route.clone(), web.clone());
+        async move { Ok::<_, Infallible>(respond(&req, &route, web.as_deref()).await) }
+    });
+    if h2 {
+        let _ = http2::Builder::new(TokioExecutor::new())
+            .serve_connection(io, svc)
+            .await;
+    } else {
+        let _ = http1::Builder::new().serve_connection(io, svc).await;
+    }
+}
+
+async fn respond(req: &Request<hyper::body::Incoming>, route: &Route, web: Option<&Web>) -> Response<Full<Bytes>> {
+    let header = |name: &str| req.headers().get(name).and_then(|v| v.to_str().ok());
+    let mut extra = Vec::new();
+    if let Some(w) = web {
+        match w.check(header("authorization")).await {
+            Ok(h) => extra = h,
+            Err(r) => {
+                // Go's http.Error
+                let mut b = Response::builder().status(r.status);
+                for (k, v) in r.headers {
+                    b = b.header(k, v);
+                }
+                return b
+                    .header("Content-Type", "text/plain; charset=utf-8")
+                    .header("X-Content-Type-Options", "nosniff")
+                    .body(Full::new(Bytes::from(r.body)))
+                    .expect("valid response");
+            }
+        }
+    }
+    let (status, ctype, body) = route(req.uri().path(), header("accept").unwrap_or(""));
+    let mut b = Response::builder().status(status);
+    for (k, v) in extra {
+        b = b.header(k, v);
+    }
+    b.header("Content-Type", ctype)
+        .body(Full::new(Bytes::from(body)))
+        .expect("valid response")
 }
 
 #[cfg(test)]

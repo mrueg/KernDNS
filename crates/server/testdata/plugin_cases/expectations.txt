@@ -115,7 +115,6 @@ skip metadata TestMetadataServeDNS/expectedMetadata values from Go test provider
 skip metadata TestLabelFormat/labels tests the Go IsLabel helper
 
 # metrics
-skip metrics TestMetricsTLS/tests starts the metrics HTTPS listener with the Go package's testdata certificates
 skip metrics TestMetrics/tests scrapes Go metric registries
 skip metrics TestRecorder_WriteMsg/tests tests the Go recorder
 
