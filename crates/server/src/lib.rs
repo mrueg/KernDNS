@@ -351,7 +351,7 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
                 d,
                 any_local,
                 tls(&[b"h2", b"http/1.1"]),
-                doh::Settings::new(&l.limits),
+                doh::Settings::new(&l.limits, &conn),
                 l.proxy_proto.clone(),
             ),
             Transport::Grpc => {
