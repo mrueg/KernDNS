@@ -15,6 +15,10 @@
 //! kind-test     Run coredns/ci's end-to-end Kubernetes tests against the
 //!               cluster DNS of a kind cluster and compare with
 //!               go/compat/expectations-kind.txt (CI job `kind`).
+//! k8s-conformance  Run Kubernetes' [sig-network] DNS e2e tests (e2e.test
+//!               of the matching release) against a kind cluster's DNS and
+//!               compare with go/compat/expectations-conformance.txt
+//!               (CI job `k8s-conformance`).
 //! k8s-cases     Regenerate crates/kubernetes/testdata/upstream_*cases.json by
 //!               running CoreDNS's kubernetes and k8s_external test suites in Go.
 //! plugin-cases  Regenerate crates/server/testdata/plugin_cases/*.json: the
@@ -29,6 +33,7 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 
 mod bench;
+mod conformance;
 mod difftest;
 mod fakeapi;
 mod kind;
@@ -42,6 +47,7 @@ const USAGE: &str =
        cargo xtask bench --check
        cargo xtask loadgen -m doq|doh3|grpc -p PORT -d QUERYFILE [-s IP] [-c CLIENTS] [-T THREADS] [-q OUTSTANDING] [-l SECONDS] [-Q QPS] [-t TIMEOUT] [--ca PEM] [--tls]
        cargo xtask kind-test --ci-dir PATH [--target kerndns|coredns] [--run REGEX] [--update]
+       cargo xtask k8s-conformance --e2e-dir PATH|--report FILE [--target kerndns|coredns] [--nodes N] [--update]
        cargo xtask k8s-cases
        cargo xtask plugin-cases [--plugins file,hosts,...]
        cargo xtask k8s-difftest [--context KUBECONTEXT] [--show N]
@@ -63,6 +69,7 @@ fn main() -> Result<()> {
         Some("bench") => bench::run(&args[1..]),
         Some("loadgen") => loadgen::run(&args[1..]),
         Some("kind-test") => kind::run(&args[1..]),
+        Some("k8s-conformance") => conformance::run(&args[1..]),
         Some("k8s-cases") => k8s_cases(),
         Some("plugin-cases") => plugin_cases(&args[1..]),
         Some("k8s-difftest") => difftest::k8s(&args[1..]),
