@@ -110,6 +110,9 @@ impl Handler for Chaos {
                 shuffle(&mut order);
                 m.answers = order.into_iter().map(|i| txt(&self.authors[i])).collect();
             }
+            // an untrimmed VERSION (given with authors) over 255 bytes can't be
+            // packed: CoreDNS's write fails and the client gets no answer
+            "version.bind." | "version.server." if self.version.len() > 255 => return Ok(ResponseCode::NoError),
             "version.bind." | "version.server." => m.answers = vec![txt(&self.version)],
             "hostname.bind." | "id.server." => m.answers = vec![txt(&trim(&hostname()))],
             _ => return next_or_failure("chaos", &self.next, ctx, w, req).await,
@@ -187,5 +190,18 @@ mod tests {
         // other classes go to the next plugin (none here)
         let req = query("version.bind.", RecordType::TXT, "10.0.0.1:1");
         assert!(serve(&h, &req).await.0.is_err());
+
+        // a VERSION over 255 bytes (not trimmed when authors are given)
+        // can't be packed: no answer, like CoreDNS, instead of a panic
+        let h = Chaos {
+            next: None,
+            version: Arc::new("v".repeat(300)),
+            authors: Arc::new(vec!["a".into()]),
+        };
+        let mut req = query("version.bind.", RecordType::TXT, "10.0.0.1:1");
+        req.msg.queries[0].set_query_class(DNSClass::CH);
+        let (rc, w) = serve(&h, &req).await;
+        assert_eq!(rc.unwrap(), ResponseCode::NoError);
+        assert!(w.msg().is_none());
     }
 }
