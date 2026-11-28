@@ -145,8 +145,13 @@ execution order at the same place (interface version 2, `kb_directives`).
   the Go handler on the calling thread and the Rust rest of the chain
   inline (`block_in_place`); it blocks a runtime worker while the Go
   plugin waits on the network, so it is meant for CPU-only plugins.
-- Not yet: third-party plugins outside plugin.cfg's order, Go metadata
-  flowing back to Rust, and the out-of-process mode (M5).
+- Third-party plugins outside plugin.cfg work too: the bridge exports
+  CoreDNS's directive order (`kb_directives`), and KernDNS places each
+  unknown directive after its predecessor there (`order::add_directives`).
+- Not yet: Go metadata flowing back to Rust; a Go plugin's `upstream`
+  lookups resolving through the Rust server (out-of-zone CNAME, SRV and MX
+  targets lose their addresses, the 188 differences of `etcd-difftest
+  --bridge`); and the out-of-process mode (M5).
 
 **Choosing per directive:** Rust port if one exists, else the bridge if it
 provides the plugin, else an error saying how to build the bridge with it.
@@ -533,8 +538,12 @@ Open: prometheus label lookups cost ~1.7k instructions per query.
    error, and a failed reload keeps the old configuration, as in CoreDNS.
    `chaos` reports the test binary's `caddy.AppName-caddy.AppVersion`
    through `$KERNDNS_CHAOS_VERSION`.
-2. **`coredns/ci` end-to-end tests** (kind-based, including Kubernetes):
-   a nightly job with the KernDNS image.
+2. **`coredns/ci` end-to-end tests** (`cargo xtask kind-test`, done): the CI
+   job `kind` runs coredns/ci's `test/kubernetes` on every PR with the
+   KernDNS image as a kind cluster's DNS, each test in its own process,
+   compared with `go/compat/expectations-kind.txt`. A second run with
+   CoreDNS's own image is the control: it separates failures of the
+   harness or the runner from KernDNS's.
 3. **Plugin unit tests** (`cargo xtask plugin-cases`, done): the tables of
    each plugin's `*_test.go` are extracted from the Go source into JSON
    fixtures and replayed against KernDNS through a Corefile
@@ -653,17 +662,43 @@ peak memory of a 100k-name zone are behind CoreDNS (in progress).
 
 ### M5 status
 
-Done: the drop-in image (`Dockerfile`, built in CI, not pushed yet):
-`/coredns` entrypoint, uid 65532, `cap_net_bind_service` on the binary,
-like CoreDNS's image. A copy of kubeadm's Deployment, Service, ConfigMap
-and RBAC in a kind cluster with only the image changed: probes, metrics,
-`reload` and `lameduck` work, and the answers match the cluster's
-CoreDNS. The kubeadm level 3 setup runs against the fake API server or,
-with `--kubeconfig`, a live cluster. The other level 3 setups are in
-too: forwarder, authoritative, split horizon, DoT/DoH frontend and the
-mixed bridge chain. Open: publishing the image, the
-nightly level 3 report, and running the `coredns/ci` kind tests with the
-image.
+Done:
+
+- **Wave 5:** `dnssec`, `sign`, `dnstap`, `grpc`, `siit`, `shed`,
+  `proxyproto`, `on`, `pprof`, `geoip`, `trace`, ACME certificates in
+  `tls`, and `etcd` in Rust. Every plugin in CoreDNS's `plugin.cfg` is
+  ported except the cloud backends `route53`, `clouddns`, `azure` and
+  `nomad`, which run through the bridge.
+- **Drop-in image:** `Dockerfile` (base images pinned by digest, updated by
+  Dependabot) with the `/coredns` entrypoint, uid 65532 and
+  `cap_net_bind_service` on the binary, like CoreDNS's image. CI builds it
+  on every PR and pushes `ghcr.io/mrueg/kerndns` on pushes to `main`
+  (`main`, `latest`, `sha-<commit>`) and on `v*` tags. A copy of kubeadm's
+  Deployment, Service, ConfigMap and RBAC with only the image changed:
+  probes, metrics, `reload` and `lameduck` work, and the answers match the
+  cluster's CoreDNS.
+- **`coredns/ci` kind tests** in CI with the image: all 13 that exercise
+  the cluster DNS pass (the same as CoreDNS's own image); see Testing.
+- **Kubernetes parity** with CoreDNS 1.15.0 (see its parity table).
+- **Level 3 setups:** resolver, kubeadm, forwarder, authoritative, split
+  horizon, DoT/DoH frontend, etcd and the mixed bridge chain.
+- **Testing:** CoreDNS's integration tests at 108 pass / 2 expected
+  failures / 12 skipped, with in-place reload through `kerndns -control`;
+  CoreDNS's plugin table tests replayed (`cargo xtask plugin-cases`);
+  fuzzing in CI.
+
+Open:
+
+- The nightly level 3 report, and the CI regression gate (see
+  Benchmarks), which need a dedicated machine.
+- The optional out-of-process bridge, and the bridge gaps listed under M3.
+- Features the plugin table tests and `TestReadme` show as missing:
+  `errors { consolidate }`, `serve_stale` refresh options and
+  `serve_stale_policy`, `template` `var`/`expr`, `forward` `resolver` and
+  HTTPS/QUIC upstreams, `tls keylog`, RSASHA1 keys in `dnssec`, interface
+  names in `bind`.
+- A reload whose startup hook fails keeps the new configuration, where
+  CoreDNS rolls back to the old one.
 
 ## Risks
 
