@@ -89,7 +89,9 @@ impl Instance {
         Self::start_plan(plan).await
     }
 
-    /// Bind every listener of `plan`, then run the startup hooks.
+    /// Bind every listener of `plan`, run the startup hooks, then serve.
+    /// Queries that arrive before the hooks are done wait for them, as
+    /// CoreDNS starts its servers only after the `OnStartup` hooks.
     pub async fn start_plan(plan: Plan) -> Result<Self, StartError> {
         check_transports(&plan)?;
         let mut running = Vec::new();
@@ -117,6 +119,9 @@ impl Instance {
                 inst.stop().await;
                 return Err(StartError::Other(format!("plugin/{name}: {e}")));
             }
+        }
+        for r in &inst.running {
+            r.handle.open();
         }
         inst.emit(kerndns_core::Event::Startup).await;
         Ok(inst)
@@ -146,6 +151,13 @@ impl Instance {
 
         for (_, hook) in self.shutdown_hooks.drain(..) {
             let _ = tokio::task::spawn_blocking(hook).await;
+        }
+
+        // the new chains start before they serve (new listeners are held)
+        for (name, hook) in plan.hooks.startup {
+            if let Err(e) = hook() {
+                kerndns_core::error!("plugin/{name}: {e}");
+            }
         }
 
         let mut next: Vec<Running> = Vec::new();
@@ -199,10 +211,8 @@ impl Instance {
         self.shutdown_hooks = plan.hooks.shutdown;
         // the old configuration's final-shutdown hooks never run
         self.final_hooks = plan.hooks.final_shutdown;
-        for (name, hook) in plan.hooks.startup {
-            if let Err(e) = hook() {
-                kerndns_core::error!("plugin/{name}: {e}");
-            }
+        for r in &self.running {
+            r.handle.open();
         }
         self.event_hooks = plan.hooks.events;
         self.emit(kerndns_core::Event::Startup).await;
@@ -298,6 +308,8 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
         udp_local.unwrap_or(any_local),
         tcp_local.unwrap_or(any_local),
     );
+    // serving starts once the startup hooks have run
+    dispatcher.hold();
     let handle = dispatcher.handle();
     let conn = tcp::Limits::from(&l.conn);
     let tls = |alpn: &[&[u8]]| {
