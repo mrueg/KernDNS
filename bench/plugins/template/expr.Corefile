@@ -1,0 +1,12 @@
+# about: template with var and expr: an expression computes the address from the named groups and a condition checks it
+# queries: {DIR}/queries.txt
+.:{PORT} {
+    template IN A example.org {
+        match ^ip-(?P<a>[0-9]+)-(?P<b>[0-9]+)\.example\.org\.$
+        var ip '10.0.' + group('a') + '.' + group('b')
+        expr "int(group('b')) < 256 && any(['10.0.0.0/8', '192.168.0.0/16'], incidr(ip, #))"
+        answer "{{ .Name }} 60 IN A {{ .Var.ip }}"
+        fallthrough
+    }
+    whoami
+}

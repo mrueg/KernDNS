@@ -114,6 +114,7 @@ fn go_data<'a>(msg: &'a Message, meta: &'a HashMap<String, String>) -> Data<'a> 
         }),
         remote: "10.240.0.1".into(),
         meta: Some(meta),
+        vars: Vec::new(),
     }
 }
 
@@ -281,9 +282,45 @@ fn setup_parse() {
         ("template ANY ANY {\n match (\n}", true),
         ("template ANY ANY {\n upstream\n}", false),
         ("template ANY ANY {\n upstream 8.8.8.8\n}", false),
-        // the expr language is not ported
-        ("template ANY ANY example. {\n var a 1\n}", true),
-        ("template ANY ANY example. {\n expr name() == 'a.example.'\n}", true),
+        // `TestSetupParseVar` and `TestSetupParseExpr`
+        ("template ANY ANY example. {\n var a 1\n}", false),
+        (
+            "template ANY ANY example. {\n var a 1\n var b a + 1\n var c 'x' + name()\n}",
+            false,
+        ),
+        (
+            "template ANY ANY example. {\n match ^(?P<a>[a-z]+)[.]example[.]$\n var a group(\"a\") + group(1) + group(0)\n}",
+            false,
+        ),
+        ("template ANY ANY example. {\n var\n}", true),
+        ("template ANY ANY example. {\n var a\n}", true),
+        ("template ANY ANY example. {\n var 1a 1\n}", true),
+        ("template ANY ANY example. {\n var a-b 1\n}", true),
+        ("template ANY ANY example. {\n var name 1\n}", true),
+        ("template ANY ANY example. {\n var group 1\n}", true),
+        ("template ANY ANY example. {\n var len 1\n}", true),
+        ("template ANY ANY example. {\n var true 1\n}", true),
+        ("template ANY ANY example. {\n var let 1\n}", true),
+        ("template ANY ANY example. {\n var a 1 +\n}", true),
+        ("template ANY ANY example. {\n var a invalid expression\n}", true),
+        ("template ANY ANY example. {\n var a b + 1\n var b 1\n}", true),
+        ("template ANY ANY example. {\n var a undefined\n}", true),
+        ("template ANY ANY example. {\n var a 1\n var a 2\n}", true),
+        (
+            "template ANY ANY example. {\n var a 1\n var b a + 1\n var c 'x' + b\n}",
+            true,
+        ),
+        ("template ANY ANY example. {\n expr name() == 'a.example.'\n}", false),
+        (
+            "template ANY ANY example. {\n expr name() == 'a.example.'\n expr incidr(client_ip(), '10.0.0.0/8')\n}",
+            false,
+        ),
+        ("template ANY ANY example. {\n var a 1\n expr a == 1\n}", false),
+        ("template ANY ANY example. {\n expr 1\n}", false),
+        ("template ANY ANY example. {\n expr\n}", true),
+        ("template ANY ANY example. {\n expr name() ==\n}", true),
+        ("template ANY ANY example. {\n expr undefined == 1\n}", true),
+        ("template ANY ANY example. {\n var a 1\n expr a + 'x'\n}", true),
     ];
     for (i, (input, should_err)) in cases.iter().enumerate() {
         let res = parse_with_keys(input, keys);
@@ -297,8 +334,12 @@ fn setup_parse() {
     assert_eq!(ts[1].qclass, DNSClass::CH);
     assert_eq!(ts[1].qtype, RecordType::TXT);
 
-    let err = parse_with_keys("template ANY ANY {\n var a 1\n}", keys).unwrap_err();
-    assert!(err.contains("var is not supported"), "{err}");
+    let err = parse_with_keys("template ANY ANY {\n var len 1\n}", keys).unwrap_err();
+    assert!(err.contains("variable name \"len\" is reserved"), "{err}");
+    let err = parse_with_keys("template ANY ANY {\n var 1a 1\n}", keys).unwrap_err();
+    assert!(err.contains("invalid variable name \"1a\""), "{err}");
+    let err = parse_with_keys("template ANY ANY {\n var a 'x' + 1\n}", keys).unwrap_err();
+    assert!(err.contains("could not compile expression: a, "), "{err}");
     let err = parse_with_keys("template ANY ANY {\n answer \"{{ range .Match }}{{ end }}\"\n}", keys).unwrap_err();
     assert!(
         err.contains("could not compile template") && err.contains("{{range}} is not supported"),
@@ -349,6 +390,8 @@ fn base(re: &str) -> Tmpl {
         qtype: RecordType::ANY,
         ederror: None,
         fall,
+        vars: Vec::new(),
+        exprs: Vec::new(),
     }
 }
 
@@ -689,4 +732,59 @@ async fn metrics() {
         ])
         .get();
     assert!(rr_fail >= 1.0);
+}
+
+/// `var` and `expr` with metadata (`TestVar` "Metadata", `TestExpr`
+/// "Metadata"/"MetadataMismatch"), the README's device example, and
+/// values of every type in `.Var`.
+#[tokio::test]
+async fn var_and_expr() {
+    let answer = |directive: &str, region: Option<&str>, qname: &str| {
+        let (_, ts) = parse_with_keys(directive, "example.").unwrap();
+        let h = handler(ts);
+        let qname = qname.to_string();
+        let region = region.map(str::to_string);
+        async move {
+            let mut ctx = Context::new(".", "dns://:53");
+            if let Some(r) = region {
+                ctx.metadata.insert("test/region".into(), r);
+            }
+            let (rc, w) = run(&h, &mut ctx, &qname, RecordType::A).await;
+            (
+                rc.unwrap(),
+                w.msg()
+                    .map(|m| m.answers.iter().map(|r| r.to_string()).collect::<Vec<_>>()),
+            )
+        }
+    };
+    let var = "template IN A example. {\n var region metadata('test/region')\n answer \"{{ .Var.region }}.{{ .Name }} 60 IN A 10.0.0.1\"\n}";
+    let (rc, ans) = answer(var, Some("eu"), "a.example.").await;
+    assert_eq!(rc, ResponseCode::NoError);
+    assert_eq!(ans.unwrap(), ["eu.a.example. 60 IN A 10.0.0.1"]);
+
+    let expr = "template IN A example. {\n expr metadata('test/region') == 'eu'\n answer \"{{ .Name }} 60 IN A 10.0.0.1\"\n fallthrough\n}";
+    let (_, ans) = answer(expr, Some("eu"), "a.example.").await;
+    assert_eq!(ans.unwrap(), ["a.example. 60 IN A 10.0.0.1"]);
+    let (_, ans) = answer(expr, Some("us"), "a.example.").await;
+    assert!(ans.is_none(), "falls through");
+
+    // the README's "Resolve device addresses for HTTPS on LAN"
+    let device = "template IN A example.com {\n match ^(?P<ip>[0-9]{1,3}(-[0-9]{1,3}){3})[.](?P<id>[a-z2-7]{26})[.]example[.]com[.]$\n var ip replace(group('ip'), '-', '.')\n expr \"any(['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16'], incidr(ip, #))\"\n answer \"{{ .Name }} 60 IN A {{ .Var.ip }}\"\n fallthrough\n}";
+    let id = "abcdefghijklmnopqrstuvwxyz";
+    let (_, ans) = answer(device, None, &format!("192-168-1-20.{id}.example.com.")).await;
+    assert_eq!(
+        ans.unwrap(),
+        [format!("192-168-1-20.{id}.example.com. 60 IN A 192.168.1.20")]
+    );
+    let (_, ans) = answer(device, None, &format!("8-8-8-8.{id}.example.com.")).await;
+    assert!(ans.is_none(), "a public address falls through");
+
+    let types = "template IN TXT example. {\n var i 7 / 2\n var b !false\n var l split('x.y', '.')\n var n nil\n answer \"{{ .Name }} 60 IN TXT \\\"{{ .Var.i }} {{ .Var.b }} {{ .Var.l }} {{ .Var.n }} {{ len .Var }}\\\"\"\n}";
+    let (_, ts) = parse_with_keys(types, "example.").unwrap();
+    let mut ctx = Context::new(".", "dns://:53");
+    let (_, w) = run(&handler(ts), &mut ctx, "a.example.", RecordType::TXT).await;
+    assert_eq!(
+        w.msg().unwrap().answers[0].to_string(),
+        "a.example. 60 IN TXT 3.5 true [x y] <nil> 4"
+    );
 }
