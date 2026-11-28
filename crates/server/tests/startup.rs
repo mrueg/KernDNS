@@ -199,8 +199,7 @@ async fn reload_runs_new_startup_hooks_while_old_config_serves() {
     let q = |p| tokio::task::spawn_blocking(move || udp_query(p));
     assert_eq!(q(port).await.unwrap(), Some(ResponseCode::NoError));
 
-    let new =
-        format!(".:{port} {{\n whoami new\n}}\n.:{port2} {{\n whoami new\n}}\n");
+    let new = format!(".:{port} {{\n whoami new\n}}\n.:{port2} {{\n whoami new\n}}\n");
     let plan = kerndns_server::load(&new, "Corefile", &registry, &opts).unwrap();
     inst.reload(plan).await.unwrap();
     let seen = rx
