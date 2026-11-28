@@ -220,13 +220,6 @@ skip cache TestCacheSeparatesQuestionClasses/classes an empty list of Go dns.Cla
 skip tsig TestParseKeyFileErrors/tests contents of key files for the Go key file parser (the test writes them to temp files)
 
 # rows (generated from the failures, grouped by cause)
-xfail errors TestErrorsParse/tests#14 errors { consolidate } is not supported by KernDNS yet
-xfail errors TestErrorsParse/tests#15 errors { consolidate } is not supported by KernDNS yet
-xfail errors TestErrorsParse/tests#16 errors { consolidate } is not supported by KernDNS yet
-xfail errors TestErrorsParse/tests#17 errors { consolidate } is not supported by KernDNS yet
-xfail errors TestErrorsParse/tests#18 errors { consolidate } is not supported by KernDNS yet
-xfail errors TestErrorsParse/tests#19 errors { consolidate } is not supported by KernDNS yet
-xfail errors TestErrorsParse/tests#20 errors { consolidate } is not supported by KernDNS yet
 skip geoip TestGeoIPParse/tests#0 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
 skip geoip TestGeoIPParse/tests#1 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
 skip geoip TestGeoIPParse/tests#2 needs the MaxMind databases in the Go package's testdata directory (relative to the Go test's working directory)
