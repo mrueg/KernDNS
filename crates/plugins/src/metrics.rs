@@ -176,13 +176,32 @@ impl Handler for Metrics {
         } else {
             status
         };
+        let plugin = writer_plugin(&self.next, rec.rcode.is_some());
         let view = ctx.view.clone().unwrap_or_default();
         // reported once the server has encoded the response, with its size
         let (server, req) = (ctx.server.clone(), req.clone());
         ctx.on_sent.push(Arc::new(move |size| {
-            report(&server, &req, &zone, &view, rcode, "", size, start)
+            report(&server, &req, &zone, &view, rcode, plugin, size, start)
         }));
         res
+    }
+}
+
+/// The `plugin` label of `coredns_dns_responses_total`: the plugin that
+/// wrote the response, as CoreDNS reports it.
+///
+/// CoreDNS's `plugin.NextOrFailure` wraps the writer it passes on in a
+/// `pluginWriter` named after the next plugin, which tags the writer it
+/// wraps on a write only if that writer is the metrics `Recorder`
+/// (`PluginTracker`). Only `prometheus`'s own `NextOrFailure` wraps the
+/// recorder directly, so every response that reaches it is tagged with the
+/// plugin right after `prometheus` in the chain, whichever plugin further
+/// down actually wrote it (`errors` in `prometheus; errors; forward`).
+/// Nothing written (the server writes the error response): empty.
+fn writer_plugin(next: &Next, written: bool) -> &'static str {
+    match next {
+        Some(h) if written => h.name(),
+        _ => "",
     }
 }
 
@@ -190,6 +209,96 @@ impl Handler for Metrics {
 mod tests {
     use super::*;
     use crate::testutil::*;
+    use kerndns_core::CaptureWriter;
+    use kerndns_core::proto::op::ResponseCode;
+    use kerndns_core::proto::rr::RecordType;
+
+    /// A plugin that calls `next` (wrapping the writer, like `cache` or
+    /// `log` do) or, with no next, answers with `rcode`.
+    struct Pass {
+        name: &'static str,
+        next: Next,
+        rcode: ResponseCode,
+    }
+
+    #[async_trait]
+    impl Handler for Pass {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+
+        async fn serve_dns(&self, ctx: &mut Context, w: &mut dyn ResponseWriter, req: &Request) -> HandlerResult {
+            if self.next.is_some() {
+                let mut rec = Recorder::new(w);
+                return next_or_failure(self.name, &self.next, ctx, &mut rec, req).await;
+            }
+            if client_write(self.rcode) {
+                let _ = w.write_msg(req.error_reply(self.rcode)).await;
+                return Ok(self.rcode);
+            }
+            Err(kerndns_core::PluginError::new(self.name, self.rcode, "failed"))
+        }
+    }
+
+    fn pass(name: &'static str, next: Next, rcode: ResponseCode) -> Next {
+        Some(Arc::new(Pass { name, next, rcode }))
+    }
+
+    /// Serve one query through `prometheus` in front of `next` and return
+    /// the label set that `coredns_dns_responses_total` counted it under.
+    async fn counted(server: &str, next: Next) -> (String, String) {
+        let m = Metrics {
+            next,
+            zones: ZoneNames::default(),
+        };
+        let mut ctx = Context::new(".", server);
+        let mut w = CaptureWriter::new();
+        let _ = m
+            .serve_dns(&mut ctx, &mut w, &query("example.org.", RecordType::A, "10.0.0.1:53"))
+            .await;
+        for hook in &ctx.on_sent {
+            hook(0);
+        }
+        let mut found = Vec::new();
+        for f in prometheus::gather() {
+            if f.name() != "coredns_dns_responses_total" {
+                continue;
+            }
+            for m in f.get_metric() {
+                let l: HashMap<_, _> = m.get_label().iter().map(|l| (l.name(), l.value())).collect();
+                if l["server"] == server {
+                    found.push((l["plugin"].to_string(), l["rcode"].to_string()));
+                }
+            }
+        }
+        assert_eq!(found.len(), 1, "{found:?}");
+        found.remove(0)
+    }
+
+    #[tokio::test]
+    async fn plugin_label() {
+        let nx = ResponseCode::NXDomain;
+        // the plugin after prometheus wrote it
+        let next = pass("whoami", None, ResponseCode::NoError);
+        assert_eq!(counted("dns://:1", next).await, ("whoami".into(), "NOERROR".into()));
+        // written further down the chain: still the plugin after prometheus,
+        // like CoreDNS (`prometheus; errors; log; whoami` counts "errors")
+        let next = pass("errors", pass("log", pass("template", None, nx), nx), nx);
+        assert_eq!(counted("dns://:2", next).await, ("errors".into(), "NXDOMAIN".into()));
+        // nothing written (the server writes the SERVFAIL): no plugin
+        let next = pass("cache", pass("forward", None, ResponseCode::ServFail), nx);
+        assert_eq!(counted("dns://:3", next).await, (String::new(), "SERVFAIL".into()));
+        // no next plugin
+        assert_eq!(counted("dns://:4", None).await, (String::new(), "SERVFAIL".into()));
+    }
+
+    #[test]
+    fn writer_plugin_needs_a_write() {
+        let next = pass("whoami", None, ResponseCode::NoError);
+        assert_eq!(writer_plugin(&next, true), "whoami");
+        assert_eq!(writer_plugin(&next, false), "");
+        assert_eq!(writer_plugin(&None, true), "");
+    }
 
     #[test]
     fn setup() {

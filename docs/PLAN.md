@@ -485,7 +485,7 @@ strings) are not repeated.
 | `chaos` | a VERSION over 255 bytes given together with authors panicked on `version.bind`; now there is no answer, as in CoreDNS (the message can't be packed) | done |
 | `chaos` | default authors are KernDNS's, not CoreDNS's OWNERS | not done, deliberate |
 | `timeouts` | `read`, `write` and `idle` apply to DoH (`https://`) listeners as on CoreDNS's `http.Server` (defaults 3 s/5 s/10 s): TLS handshake within the shorter of read and write; HTTP/1 requests within read, answers within write after the headers (else the connection closes), kept-alive connections closed after idle; HTTP/2 bodies within read, answers within write (else `RST_STREAM` `INTERNAL_ERROR`), connections without streams closed after idle. A late body is a 400. DoH3 uses only idle, DoQ read and idle, as in CoreDNS | done |
-| `prometheus` | the `plugin` label of `coredns_dns_responses_total` (the plugin that wrote the response) is always empty | not done yet: needs the writer to know the plugin, like CoreDNS's `pluginWriter` |
+| `prometheus` | the `plugin` label of `coredns_dns_responses_total` (the plugin that wrote the response) was always empty | done, as CoreDNS fills it: the plugin right after `prometheus` in the chain whenever a response was written below it (CoreDNS's `pluginWriter` only tags the metrics recorder it wraps directly, so `prometheus; errors; forward` counts `errors`), empty when the server writes the error response |
 | `prometheus` | `tls` block option (a Prometheus web config file for HTTPS) | not done yet: setup error |
 | `debug` | hex dumps of mismatched upstream replies (`forward`, `grpc`) | not done: only the dump, the FORMERR answer is the same |
 | `cancel` | stops the rest of the chain at the timeout instead of cancelling a context plugins watch | not done: same SERVFAIL for the client |
@@ -784,9 +784,8 @@ Open:
   RSASHA1 keys in `dnssec` (which ring can't sign; see the parity table
   of the other plugins).
 - The gaps marked "not done yet" in the parity table of the other
-  plugins: the `plugin` label of
-  `coredns_dns_responses_total`, `prometheus`'s `tls` option, PROXY
-  protocol on QUIC listeners.
+  plugins: `prometheus`'s `tls` option, PROXY protocol on QUIC
+  listeners.
 - A reload whose startup hook fails keeps the new configuration, where
   CoreDNS rolls back to the old one.
 
