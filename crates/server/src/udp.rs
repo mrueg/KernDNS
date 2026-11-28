@@ -3,12 +3,19 @@
 //! hickory-server's UDP loop receives and sends every packet on one task,
 //! which caps throughput. Here each listener has several `SO_REUSEPORT`
 //! sockets (the kernel spreads clients across them), one receive loop per
-//! socket, and every request runs in its own task that answers directly
-//! with `send_to`. Each request is parsed once and each response encoded
-//! once (re-encoded only if it has to be truncated).
+//! socket. Requests are answered directly with `send_to`. While no other
+//! packet is waiting, a request runs on its receive loop; one that has to
+//! wait (an upstream, a timer), or arrives with more behind it, gets a task
+//! of its own so the other workers can share the load. Each request is
+//! parsed once and each response encoded once (re-encoded only if it has to
+//! be truncated).
 
+use std::future::Future;
 use std::net::SocketAddr;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Poll;
 
 use kerndns_core::proto::op::{Header, Message, MessageType, ResponseCode};
 use kerndns_core::proto::serialize::binary::{BinDecodable, BinDecoder};
@@ -70,10 +77,15 @@ pub fn serve(
         });
         set.spawn(async move {
             let mut buf = vec![0u8; 65535];
+            // a packet already read while checking for a backlog
+            let mut queued = None;
             loop {
-                let (n, src) = match sock.recv_from(&mut buf).await {
-                    Ok(x) => x,
-                    Err(_) => continue,
+                let (n, src) = match queued.take() {
+                    Some(x) => x,
+                    None => match sock.recv_from(&mut buf).await {
+                        Ok(x) => x,
+                        Err(_) => continue,
+                    },
                 };
                 // PROXY protocol: the client is the header's source
                 let (packet, client, tlvs) = match &proxy {
@@ -90,8 +102,8 @@ pub fn serve(
                         }
                     },
                 };
-                let (sock, d, writer) = (sock.clone(), d.clone(), writer.clone());
-                tokio::spawn(async move {
+                let (sock2, d, writer) = (sock.clone(), d.clone(), writer.clone());
+                let fut = Box::pin(async move {
                     let conn = ConnInfo {
                         udp_writer: writer.clone(),
                         proxy_tlvs: tlvs,
@@ -101,15 +113,39 @@ pub fn serve(
                         match &writer {
                             Some(w) => w.write(wire, src),
                             None => {
-                                let _ = sock.send_to(&wire, src).await;
+                                let _ = sock2.send_to(&wire, src).await;
                             }
                         }
                     }
                 });
+                // More packets waiting: give this one a task of its own so
+                // idle workers can take it. Otherwise answer it right here.
+                match sock.try_recv_from(&mut buf) {
+                    Ok(next) => {
+                        queued = Some(next);
+                        tokio::spawn(fut);
+                    }
+                    Err(_) => run_or_spawn(fut).await,
+                }
             }
         });
     }
     set
+}
+
+/// Run one request's future on the receive loop and spawn it as a task of
+/// its own only if it has to wait (an upstream, a timer, a lock).
+///
+/// Most chains answer without waiting (whoami, cache hits, file, hosts):
+/// they then cost no task (allocation, scheduling, moving the request's
+/// future into it) and no hand-off to another worker thread. A panic is
+/// contained like in a spawned task: the request is dropped and the
+/// receive loop goes on.
+async fn run_or_spawn(mut fut: Pin<Box<dyn Future<Output = ()> + Send>>) {
+    let polled = std::future::poll_fn(|cx| Poll::Ready(catch_unwind(AssertUnwindSafe(|| fut.as_mut().poll(cx))))).await;
+    if let Ok(Poll::Pending) = polled {
+        tokio::spawn(fut);
+    }
 }
 
 /// Answer one packet; returns the wire responses to send.
@@ -160,4 +196,44 @@ pub fn formerr(packet: &[u8]) -> Option<Vec<u8>> {
     let mut m = Message::new(header.metadata.id, MessageType::Response, header.metadata.op_code);
     m.metadata.response_code = ResponseCode::FormErr;
     m.to_vec().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[tokio::test]
+    async fn run_or_spawn_runs_inline_spawns_waiting_and_contains_panics() {
+        let done = Arc::new(AtomicUsize::new(0));
+
+        // ready at once: done before run_or_spawn returns
+        let d = done.clone();
+        run_or_spawn(Box::pin(async move {
+            d.fetch_add(1, Ordering::SeqCst);
+        }))
+        .await;
+        assert_eq!(done.load(Ordering::SeqCst), 1);
+
+        // has to wait: finishes later in a task of its own
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let d = done.clone();
+        run_or_spawn(Box::pin(async move {
+            let _ = rx.await;
+            d.fetch_add(1, Ordering::SeqCst);
+        }))
+        .await;
+        assert_eq!(done.load(Ordering::SeqCst), 1);
+        tx.send(()).unwrap();
+        for _ in 0..100 {
+            if done.load(Ordering::SeqCst) == 2 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(done.load(Ordering::SeqCst), 2);
+
+        // a panic is contained, like in a spawned task
+        run_or_spawn(Box::pin(async { panic!("plugin bug") })).await;
+    }
 }
