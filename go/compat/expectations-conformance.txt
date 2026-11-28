@@ -1,0 +1,31 @@
+# Expected results of Kubernetes' [sig-network] DNS end-to-end tests (e2e.test of the
+# Kubernetes release matching kind's node image) with KernDNS as the cluster DNS of a kind
+# cluster (CI job `k8s-conformance`). Maintained by `cargo xtask k8s-conformance --update`;
+# edit reasons by hand.
+#
+#   pass   must pass
+#   xfail  fails today; the run fails if it starts passing, so it gets promoted
+#   skip   result ignored
+#
+# <status> <full ginkgo spec text> [# reason]
+pass  [sig-network] DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy: ClusterFirstWithHostNet [LinuxOnly]
+pass  [sig-network] DNS HostNetwork spec.Hostname field is not silently ignored and is used for hostname for a Pod
+pass  [sig-network] DNS HostNetwork spec.Hostname field is silently ignored and the node hostname is used when hostNetwork is set to true for a Pod
+pass  [sig-network] DNS configMap nameserver Change stubDomain should be able to change stubDomain configuration [Serial] [Slow]
+pass  [sig-network] DNS configMap nameserver Forward PTR lookup should forward PTR records lookup to upstream nameserver [Serial] [Slow]
+pass  [sig-network] DNS configMap nameserver Forward external name lookup should forward externalname lookup to upstream nameserver [Serial] [Slow]
+pass  [sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]
+pass  [sig-network] DNS should provide DNS for ExternalName services [Conformance]
+pass  [sig-network] DNS should provide DNS for a service with multiple EndpointSlices and no Endpoints
+pass  [sig-network] DNS should provide DNS for pods for Hostname [Conformance]
+pass  [sig-network] DNS should provide DNS for pods for Subdomain [Conformance]
+pass  [sig-network] DNS should provide DNS for services [Conformance]
+pass  [sig-network] DNS should provide DNS for the cluster [Conformance]
+pass  [sig-network] DNS should resolve DNS of partial qualified names for services [LinuxOnly] [Conformance]
+pass  [sig-network] DNS should resolve DNS of partial qualified names for the cluster [LinuxOnly]
+pass  [sig-network] DNS should support configurable pod DNS nameservers [Conformance]
+pass  [sig-network] DNS should support configurable pod resolv.conf
+pass  [sig-network] DNS should work with a search path containing an underscore and a search path with a single dot
+pass  [sig-network] DNS should work with a service name that starts with a digit [FeatureGate:RelaxedServiceNameValidation]
+pass  [sig-network] DNS should work with the pod containing more than 6 DNS search paths and longer than 256 search list characters
+pass  [sig-network] Networking should provider Internet connection for containers using DNS [Feature:Networking-DNS]
