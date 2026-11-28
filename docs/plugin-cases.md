@@ -74,7 +74,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `auto` | 44 | 19 | 0 | 25 | 0 | `setup_test.go` | `auto_test.go`, `regexp_test.go`, `walk_test.go`, `xfr_test.go`, `zone_test.go` |
 | `autopath` | 7 | 3 | 0 | 4 | 1 | `autopath_test.go` | `setup_test.go` |
 | `bufsize` | 6 | 6 | 0 | 0 | 0 | `setup_test.go` | - |
-| `cache` | 177 | 100 | 16 | 61 | 1 | `cache_test.go`, `setup_test.go` | `dnssec_test.go`, `prefetch_test.go`, `qclass_test.go`, `serve_stale_recheck_test.go` |
+| `cache` | 177 | 116 | 0 | 61 | 1 | `cache_test.go`, `setup_test.go` | `dnssec_test.go`, `prefetch_test.go`, `qclass_test.go`, `serve_stale_recheck_test.go` |
 | `chaos` | 6 | 6 | 0 | 0 | 0 | `chaos_test.go`, `setup_test.go` | - |
 | `debug` | 2 | 2 | 0 | 0 | 0 | `debug_test.go` | - |
 | `dns64` | 31 | 31 | 0 | 0 | 0 | `dns64_test.go`, `setup_test.go` | - |
@@ -120,7 +120,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `tsig` | 38 | 0 | 0 | 38 | 1 | - | `setup_test.go`, `tsig_test.go` |
 | `view` | 11 | 7 | 0 | 4 | 0 | `setup_test.go` | `view_test.go` |
 | `whoami` | 4 | 4 | 0 | 0 | 0 | `whoami_test.go` | - |
-| **total** | **1962** | **1197** | **73** | **692** | **13** | | |
+| **total** | **1962** | **1213** | **57** | **692** | **13** | | |
 
 `etcd` and `kubernetes` are covered elsewhere (the etcd port, and
 `cargo xtask k8s-cases`). `bind`, `cancel` and `reload` have no table
@@ -134,15 +134,16 @@ fakes; see the kubernetes crate), `deprecated`, `import`.
   (`replaceWithAsteriskLabel`, `computeTTL`, `splitZone`, ...) test Go
   code, not behaviour a server shows.
 - **Mocked clocks and Go internals.** The cache's stale and prefetch
-  tests move the cache's clock; KernDNS's cache has none to move. Tests
+  tests move the cache's clock, which only a unit test can reach; they
+  are ported as Rust unit tests with the cache's test clock
+  (`crates/plugins/src/cache/tests.rs`) and skipped here. Tests
   that read Go metrics registries, mock tracers, Go loggers or parsed
   structs are skipped.
 - **Values computed at run time.** Tables that use a temp file name, a
   test server's address or another local value can't be evaluated outside
   the test; the fixture lists them with the compiler's message.
 - **Features KernDNS doesn't have yet** are `xfail` rows, each with the
-  missing feature: `errors { consolidate }`, `serve_stale` refresh and
-  recheck options, `serve_stale_policy`, `template` `var`/`expr`, `forward` `resolver` and
+  missing feature: `errors { consolidate }`, `template` `var`/`expr`, `forward` `resolver` and
   `https://`/`quic://` upstreams, `tls keylog`, RSASHA1 signing keys.
 - **Files from the Go package directory.** Setup rows that read
   `testdata/...` or files the Go test writes into its working directory

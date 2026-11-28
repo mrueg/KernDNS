@@ -1,0 +1,8 @@
+# about: cache capped at a 1s TTL with serve_stale (immediate, 30s stale TTL, 30s failure recheck): expired answers are served while one background refresh per name runs
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    cache 1 {
+        serve_stale 1h immediate 30s 30s
+    }
+    forward . 127.0.0.1:{BACKEND}
+}

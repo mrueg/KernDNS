@@ -1,0 +1,9 @@
+# about: cache capped at a 1s TTL with serve_stale verify (100ms verify timeout, 30s stale TTL) and serve_stale_policy prefer_positive: an expired answer waits for one upstream check, concurrent queries get it stale
+# queries: {FIX}/q-file.txt
+.:{PORT} {
+    cache 1 {
+        serve_stale 1h verify 100ms 30s
+        serve_stale_policy prefer_positive
+    }
+    forward . 127.0.0.1:{BACKEND}
+}
