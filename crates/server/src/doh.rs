@@ -110,11 +110,31 @@ pub async fn respond<B>(
 where
     B: Future<Output = Result<Vec<u8>, ()>>,
 {
-    let resp = respond_inner(d, method, uri, body, src, local, protocol).await;
+    respond_with_tlvs(d, method, uri, body, src, local, protocol, responses, None).await
+}
+
+/// [`respond`] for a client whose PROXY header had `proxy_tlvs`.
+#[allow(clippy::too_many_arguments)]
+pub async fn respond_with_tlvs<B>(
+    d: &Dispatcher,
+    method: &Method,
+    uri: &Uri,
+    body: B,
+    src: SocketAddr,
+    local: SocketAddr,
+    protocol: Protocol,
+    responses: &CounterVec,
+    proxy_tlvs: Option<Arc<[u8]>>,
+) -> Response<Bytes>
+where
+    B: Future<Output = Result<Vec<u8>, ()>>,
+{
+    let resp = respond_inner(d, method, uri, body, src, local, protocol, proxy_tlvs).await;
     responses.with_label_values(&[d.label(), resp.status().as_str()]).inc();
     resp
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn respond_inner<B>(
     d: &Dispatcher,
     method: &Method,
@@ -123,6 +143,7 @@ async fn respond_inner<B>(
     src: SocketAddr,
     local: SocketAddr,
     protocol: Protocol,
+    proxy_tlvs: Option<Arc<[u8]>>,
 ) -> Response<Bytes>
 where
     B: Future<Output = Result<Vec<u8>, ()>>,
@@ -143,6 +164,7 @@ where
     };
     let mut r = Request::new(msg, local, src, protocol);
     r.wire = Some(Arc::from(raw.as_slice()));
+    r.conn.proxy_tlvs = proxy_tlvs;
     let answer = d.answer(&r).await;
     // like CoreDNS, only the last message written is returned
     let age = answer

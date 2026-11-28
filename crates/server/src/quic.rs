@@ -17,20 +17,25 @@
 //!   server's (`timeouts`, default 10s), and 0-RTT is accepted.
 //! - `coredns_dns_quic_responses_total{server,status}` counts streams by
 //!   the code they ended with (`0x0`, `0x1`, `0x2`).
+//! - With `proxyproto`, datagrams may carry PROXY v2 headers
+//!   ([`crate::proxyproto::QuicSocket`]); the client is the header's
+//!   source.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::FutureExt;
-use kerndns_core::Protocol;
 use kerndns_core::plugin::ListenerLimits;
 use kerndns_core::proto::op::Message;
+use kerndns_core::proxyproto::ProxyProtoConfig;
+use kerndns_core::{ConnInfo, Protocol};
 use quinn::{ConnectionError, Endpoint, ReadError, ReadExactError, RecvStream, SendStream, VarInt};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::dispatch::Dispatcher;
+use crate::proxyproto::QuicSocket;
 use crate::udp::answer;
 use crate::unpack::unpack_request;
 
@@ -47,14 +52,17 @@ const EDNS_TCP_KEEPALIVE: u16 = 11;
 
 /// A QUIC server endpoint on `sock` with the `tls` certificate, offering
 /// `alpn`. `max_streams` limits concurrent bidirectional and unidirectional
-/// streams per connection (`None` keeps quinn's default of 100).
+/// streams per connection (`None` keeps quinn's default of 100). With
+/// `proxy`, the socket takes PROXY v2 headers; the [`QuicSocket`] is
+/// returned for the connections' TLVs.
 pub fn endpoint(
     sock: std::net::UdpSocket,
     tls: &rustls::ServerConfig,
     alpn: &[&[u8]],
     max_streams: Option<u64>,
     idle: Duration,
-) -> Result<Endpoint, String> {
+    proxy: Option<Arc<ProxyProtoConfig>>,
+) -> Result<(Endpoint, Option<Arc<QuicSocket>>), String> {
     let mut tls = tls.clone();
     tls.alpn_protocols = alpn.iter().map(|a| a.to_vec()).collect();
     // accept 0-RTT, like CoreDNS's Allow0RTT
@@ -70,7 +78,16 @@ pub fn endpoint(
     transport.max_idle_timeout(Some(quinn::IdleTimeout::try_from(idle).map_err(|e| e.to_string())?));
     cfg.transport_config(Arc::new(transport));
     let runtime = quinn::default_runtime().ok_or("no async runtime")?;
-    Endpoint::new(quinn::EndpointConfig::default(), Some(cfg), sock, runtime).map_err(|e| e.to_string())
+    let Some(proxy) = proxy else {
+        let ep =
+            Endpoint::new(quinn::EndpointConfig::default(), Some(cfg), sock, runtime).map_err(|e| e.to_string())?;
+        return Ok((ep, None));
+    };
+    let inner = runtime.wrap_udp_socket(sock).map_err(|e| e.to_string())?;
+    let sock = Arc::new(QuicSocket::new(inner, proxy, idle));
+    let ep = Endpoint::new_with_abstract_socket(quinn::EndpointConfig::default(), Some(cfg), sock.clone(), runtime)
+        .map_err(|e| e.to_string())?;
+    Ok((ep, Some(sock)))
 }
 
 /// Closes the endpoint (and with it every connection) when the listener's
@@ -109,6 +126,7 @@ impl Settings {
 struct Shared {
     d: Dispatcher,
     local: SocketAddr,
+    proxy: Option<Arc<QuicSocket>>,
     workers: Arc<Semaphore>,
     read_timeout: Duration,
 }
@@ -130,10 +148,17 @@ impl Shared {
 }
 
 /// Serve DoQ on `ep` until the returned tasks are aborted.
-pub fn serve(ep: Endpoint, d: Dispatcher, local: SocketAddr, s: Settings) -> JoinSet<()> {
+pub fn serve(
+    ep: Endpoint,
+    d: Dispatcher,
+    local: SocketAddr,
+    s: Settings,
+    proxy: Option<Arc<QuicSocket>>,
+) -> JoinSet<()> {
     let shared = Arc::new(Shared {
         d,
         local,
+        proxy,
         workers: Arc::new(Semaphore::new(s.workers.min(Semaphore::MAX_PERMITS as u64) as usize)),
         read_timeout: s.read_timeout,
     });
@@ -178,6 +203,8 @@ fn expected(e: &ConnectionError) -> bool {
 }
 
 async fn connection(shared: &Arc<Shared>, conn: quinn::Connection) {
+    // like the remote address, the TLVs are those of the connection's start
+    let tlvs = shared.proxy.as_ref().and_then(|p| p.tlvs(conn.remote_address()));
     loop {
         let (mut send, recv) = match conn.accept_bi().await {
             Ok(s) => s,
@@ -197,9 +224,9 @@ async fn connection(shared: &Arc<Shared>, conn: quinn::Connection) {
                 return;
             }
         };
-        let (shared, conn) = (shared.clone(), conn.clone());
+        let (shared, conn, tlvs) = (shared.clone(), conn.clone(), tlvs.clone());
         tokio::spawn(async move {
-            stream(&shared, &conn, send, recv).await;
+            stream(&shared, &conn, send, recv, tlvs).await;
             drop(permit);
         });
     }
@@ -246,7 +273,13 @@ fn valid_request(m: &Message) -> bool {
     true
 }
 
-async fn stream(shared: &Shared, conn: &quinn::Connection, mut send: SendStream, mut recv: RecvStream) {
+async fn stream(
+    shared: &Shared,
+    conn: &quinn::Connection,
+    mut send: SendStream,
+    mut recv: RecvStream,
+    tlvs: Option<Arc<[u8]>>,
+) {
     let raw = match tokio::time::timeout(shared.read_timeout, read_message(&mut recv)).await {
         Ok(Ok(raw)) => raw,
         Err(_) | Ok(Err(ReadFail::Transient)) => {
@@ -274,7 +307,10 @@ async fn stream(shared: &Shared, conn: &quinn::Connection, mut send: SendStream,
         conn.remote_address(),
         shared.local,
         Protocol::Quic,
-        Default::default(),
+        ConnInfo {
+            proxy_tlvs: tlvs,
+            ..Default::default()
+        },
     )
     .await;
     // the writer closes the stream after the first message, so later ones

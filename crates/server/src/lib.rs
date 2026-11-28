@@ -335,21 +335,27 @@ async fn start_listener(l: &config::ListenerPlan) -> Result<Running, StartError>
         ),
         Transport::Quic => {
             let s = quic::Settings::new(&l.limits, &conn);
-            let ep = quic::endpoint(
+            let (ep, proxy) = quic::endpoint(
                 quic_socket(udp)?,
                 l.tls.as_ref().expect("checked"),
                 &[b"doq"],
                 Some(s.max_streams),
                 s.idle_timeout,
+                l.proxy_proto.clone(),
             )
             .map_err(|e| StartError::Other(format!("{label}: {e}")))?;
-            quic::serve(ep, dispatcher.clone(), any_local, s)
+            quic::serve(ep, dispatcher.clone(), any_local, s, proxy)
         }
         Transport::Https3 => {
             let s = doh3::Settings::new(&l.limits, &conn);
-            let ep = doh3::endpoint(quic_socket(udp)?, l.tls.as_ref().expect("checked"), &s)
-                .map_err(|e| StartError::Other(format!("{label}: {e}")))?;
-            doh3::serve(ep, dispatcher.clone(), any_local, s)
+            let (ep, proxy) = doh3::endpoint(
+                quic_socket(udp)?,
+                l.tls.as_ref().expect("checked"),
+                &s,
+                l.proxy_proto.clone(),
+            )
+            .map_err(|e| StartError::Other(format!("{label}: {e}")))?;
+            doh3::serve(ep, dispatcher.clone(), any_local, s, proxy)
         }
         Transport::Tls | Transport::Https | Transport::Grpc => tokio::task::JoinSet::new(),
     };
