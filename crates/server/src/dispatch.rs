@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use arc_swap::ArcSwap;
@@ -142,6 +143,9 @@ struct Inner {
     tcp_local: SocketAddr,
     /// Handed to plugins in `Context::upstream`; holds a weak reference back.
     upstream: Arc<dyn Upstream>,
+    /// Requests are served; until then they wait (see [`Dispatcher::hold`]).
+    open: AtomicBool,
+    opened: tokio::sync::Notify,
 }
 
 /// Re-enters the dispatcher for internal lookups, like CoreDNS's
@@ -184,16 +188,42 @@ impl Dispatcher {
             udp_local,
             tcp_local,
             upstream: Arc::new(SelfUpstream(weak.clone())),
+            open: AtomicBool::new(true),
+            opened: tokio::sync::Notify::new(),
         }))
+    }
+
+    /// Make requests wait until [`DispatcherHandle::open`]: the listener's
+    /// sockets are bound, but its plugins' startup hooks haven't run yet.
+    /// CoreDNS (caddy) runs the `OnStartup` hooks before it starts the
+    /// servers, so no query sees a plugin that isn't started (e.g. `hosts`
+    /// before it read its file).
+    pub fn hold(&self) {
+        self.0.open.store(false, Ordering::Release);
+    }
+
+    async fn wait_open(&self) {
+        let inner = &self.0;
+        while !inner.open.load(Ordering::Acquire) {
+            let opened = inner.opened.notified();
+            tokio::pin!(opened);
+            opened.as_mut().enable();
+            if inner.open.load(Ordering::Acquire) {
+                break;
+            }
+            opened.await;
+        }
     }
 
     /// Serve one request and return the messages to send.
     pub async fn serve(&self, req: &Request) -> Vec<Message> {
+        self.wait_open().await;
         self.0.serve(req, None).await.into_msgs(req)
     }
 
     /// Serve one request; the answer may come with a signer (TSIG).
     pub async fn answer(&self, req: &Request) -> Answer {
+        self.wait_open().await;
         self.0.serve(req, None).await
     }
 
@@ -215,6 +245,12 @@ pub struct DispatcherHandle(Arc<Inner>);
 impl DispatcherHandle {
     pub fn update(&self, zones: &[(String, Arc<ZoneHandler>)], class_chaos: bool) {
         self.0.routes.store(Arc::new(routes(zones, class_chaos)));
+    }
+
+    /// Serve the requests [`Dispatcher::hold`] kept waiting, and all later ones.
+    pub fn open(&self) {
+        self.0.open.store(true, Ordering::Release);
+        self.0.opened.notify_waiters();
     }
 }
 
