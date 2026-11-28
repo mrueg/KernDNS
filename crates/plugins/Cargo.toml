@@ -41,6 +41,10 @@ idna = "1"
 serde_json = "1"
 if-addrs = "0.15"
 socket2.workspace = true
+# prometheus's `tls` web config file (exporter-toolkit's format)
+serde-saphyr = { version = "2.2", default-features = false, features = ["deserialize"] }
+x509-parser = "0.18"
+bcrypt = { version = "0.19", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }

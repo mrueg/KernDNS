@@ -4,8 +4,13 @@
 //! ```text
 //! prometheus [ADDRESS] {
 //!     runtime_metrics
+//!     tls WEB_CONFIG_FILE
 //! }
 //! ```
+//!
+//! `tls` serves the endpoint as configured by a Prometheus web config file
+//! (HTTPS, client certificates, basic auth, headers, a rate limit); see
+//! [`crate::webconfig`].
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -20,8 +25,9 @@ use kerndns_core::{
 
 use crate::http::{self, Endpoint};
 
-/// One endpoint per address, shared by all server blocks.
-static ENDPOINTS: Mutex<Option<HashMap<String, Endpoint>>> = Mutex::new(None);
+/// One endpoint per address, shared by all server blocks (`None`: its web
+/// config was invalid, nothing serves the address until the next load).
+static ENDPOINTS: Mutex<Option<HashMap<String, Option<Endpoint>>>> = Mutex::new(None);
 
 pub const DEFAULT_ADDR: &str = "localhost:9153";
 
@@ -35,6 +41,7 @@ impl PluginFactory for Setup {
     fn setup(&self, c: &mut Controller<'_>) -> Result<(), SetupError> {
         crate::pluginmetrics::register_process_wide();
         let mut addr = DEFAULT_ADDR.to_string();
+        let mut tls_config = String::new();
         let mut seen = false;
         while c.next() {
             if seen {
@@ -66,8 +73,18 @@ impl PluginFactory for Setup {
                             "runtime_metrics has no effect: KernDNS has no Go runtime to report on"
                         );
                     }
+                    "tls" => {
+                        if !tls_config.is_empty() {
+                            return Err(c.errf("tls block already specified"));
+                        }
+                        let args = c.remaining_args();
+                        if args.len() != 1 {
+                            return Err(c.arg_err());
+                        }
+                        tls_config = args[0].clone();
+                    }
                     other => {
-                        let msg = format!("unknown property '{other}'");
+                        let msg = format!("unknown option: {other}");
                         return Err(c.errf(msg));
                     }
                 }
@@ -81,6 +98,22 @@ impl PluginFactory for Setup {
             if eps.contains_key(&addr) {
                 return Ok(());
             }
+            // The web config is checked before the address is taken. Like
+            // CoreDNS (whose `uniq.ForEach` drops the startup error), an
+            // invalid one is logged and the server runs without the
+            // endpoint.
+            let web = if tls_config.is_empty() {
+                None
+            } else {
+                match crate::webconfig::Web::new(&tls_config) {
+                    Ok(w) => Some(Arc::new(w)),
+                    Err(e) => {
+                        kerndns_core::error!("{}", e);
+                        eps.insert(addr.clone(), None);
+                        return Ok(());
+                    }
+                }
+            };
             let route: http::Route = Arc::new(|path, accept| match path {
                 "/metrics" => {
                     let (ctype, body) = metrics::gather(accept);
@@ -90,14 +123,14 @@ impl PluginFactory for Setup {
             });
             // "localhost" binds the loopback address, like Go's listener
             let bind = addr.replacen("localhost:", "127.0.0.1:", 1);
-            let ep = http::serve(&bind, route).map_err(|e| format!("listen tcp {addr}: {e}"))?;
+            let ep = http::serve_web(&bind, route, web).map_err(|e| format!("listen tcp {addr}: {e}"))?;
             metrics::add_listen_addr(ep.addr.to_string());
-            eps.insert(addr.clone(), ep);
+            eps.insert(addr.clone(), Some(ep));
             Ok(())
         });
         c.on_shutdown(move || {
             if let Some(eps) = ENDPOINTS.lock().unwrap().as_mut()
-                && let Some(ep) = eps.remove(&a2)
+                && let Some(Some(ep)) = eps.remove(&a2)
             {
                 ep.stop();
             }
@@ -200,6 +233,11 @@ mod tests {
         // CoreDNS 1.15: Go runtime metrics, accepted (no effect)
         assert!(setup_ok(&Setup, "prometheus {\n runtime_metrics\n}"));
         assert!(setup_err(&Setup, "prometheus {\n runtime_metrics x\n}").contains("Wrong argument count"));
-        assert!(setup_err(&Setup, "prometheus {\n bogus\n}").contains("unknown property"));
+        assert!(setup_err(&Setup, "prometheus {\n bogus\n}").contains("unknown option: bogus"));
+        // CoreDNS 1.15: a Prometheus web config file
+        assert!(setup_ok(&Setup, "prometheus {\n tls web.yml\n}"));
+        assert!(setup_err(&Setup, "prometheus {\n tls\n}").contains("Wrong argument count"));
+        assert!(setup_err(&Setup, "prometheus {\n tls a b\n}").contains("Wrong argument count"));
+        assert!(setup_err(&Setup, "prometheus {\n tls a\n tls b\n}").contains("tls block already specified"));
     }
 }

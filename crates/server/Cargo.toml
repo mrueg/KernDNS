@@ -32,3 +32,4 @@ rustls-pki-types.workspace = true
 kerndns-plugins.workspace = true
 kerndns-go-bridge.workspace = true
 serde_json = "1"
+rcgen = { version = "0.14", default-features = false, features = ["pem", "ring"] }

@@ -64,6 +64,7 @@ pub mod trace;
 pub mod transfer;
 pub mod tsig;
 pub mod view;
+pub mod webconfig;
 pub mod whoami;
 
 #[cfg(test)]
