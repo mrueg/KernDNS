@@ -31,6 +31,7 @@ pprof.workspace = true
 flate2.workspace = true
 maxminddb.workspace = true
 serde.workspace = true
+rand.workspace = true
 # ACME (tls plugin): ring only, no aws-lc-rs
 instant-acme = { version = "0.8.5", default-features = false, features = ["hyper-rustls", "ring", "rcgen"] }
 hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "http2", "ring", "tls12"] }

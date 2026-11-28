@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use kerndns_core::proto::op::{Message, MessageType, OpCode, Query};
 use kerndns_core::proto::rr::{Name, RecordType};
+use kerndns_core::random::rand_id;
 use rustls::ClientConfig;
 use rustls_pki_types::ServerName;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -610,37 +611,4 @@ async fn framed_exchange<S: AsyncRead + AsyncWrite + Unpin>(
             return Ok(m);
         }
     }
-}
-
-/// A random 16-bit message id.
-pub fn rand_id() -> u16 {
-    use std::cell::Cell;
-    thread_local! {
-        static STATE: Cell<u64> = Cell::new(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos() as u64)
-                .unwrap_or(0x9e3779b97f4a7c15)
-                ^ (std::process::id() as u64) << 32
-                | 1,
-        );
-    }
-    STATE.with(|s| {
-        // xorshift64*
-        let mut x = s.get();
-        x ^= x >> 12;
-        x ^= x << 25;
-        x ^= x >> 27;
-        s.set(x);
-        (x.wrapping_mul(0x2545F4914F6CDD1D) >> 48) as u16
-    })
-}
-
-/// A random index below `n`.
-pub fn rand_below(n: usize) -> usize {
-    if n <= 1 {
-        return 0;
-    }
-    let v = ((rand_id() as u64) << 16) | rand_id() as u64;
-    (v % n as u64) as usize
 }

@@ -388,7 +388,7 @@ fn dns_lookup(hostname: &str, resolvers: &[String]) -> Result<Vec<String>, Strin
 /// One query with a 2s read and write timeout, like `dns.Client`.
 fn query(addr: SocketAddr, hostname: &str, qtype: RecordType) -> Result<Vec<String>, String> {
     let name = Name::from_ascii(fqdn(hostname)).map_err(|e| e.to_string())?;
-    let id = super::proxy::rand_id();
+    let id = kerndns_core::random::rand_id();
     let mut m = Message::new(id, MessageType::Query, OpCode::Query);
     m.metadata.recursion_desired = true;
     m.add_query(Query::query(name, qtype));

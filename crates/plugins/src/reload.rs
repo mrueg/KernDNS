@@ -57,7 +57,7 @@ impl PluginFactory for Setup {
         }
         if !j.is_zero() {
             let n = j.as_nanos() as i128;
-            let r = crate::forward::proxy::rand_below(n as usize) as i128 - n / 2;
+            let r = kerndns_core::random::rand_below(n as usize) as i128 - n / 2;
             i = Duration::from_nanos((i.as_nanos() as i128 + r).max(0) as u64);
         }
         kerndns_core::reload::enable(i);

@@ -15,6 +15,7 @@ use std::time::Duration;
 
 use kerndns_core::proto::op::{Message, MessageType, OpCode, Query, ResponseCode};
 use kerndns_core::proto::rr::{Name, RData, Record, RecordType};
+use kerndns_core::random::rand_id;
 use kerndns_core::transfer::{Notifier, TransferError, TransferRegistry};
 use kerndns_core::wire::{self, RecordSizer};
 use kerndns_core::zones;
@@ -22,8 +23,6 @@ use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
     async_trait, next_or_failure,
 };
-
-use crate::forward::proxy::rand_id;
 
 /// Messages stay below this many bytes of (uncompressed) records.
 const BATCH_BYTES: usize = 63000;

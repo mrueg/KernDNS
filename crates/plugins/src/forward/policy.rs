@@ -3,10 +3,9 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use kerndns_core::random::rand_below;
 use kerndns_core::zones::is_subdomain;
 use kerndns_core::{Controller, SetupError};
-
-use super::proxy::rand_below;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Policy {

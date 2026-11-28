@@ -8,12 +8,12 @@ use std::time::Duration;
 
 use kerndns_core::proto::op::{Message, MessageType, OpCode, Query, ResponseCode};
 use kerndns_core::proto::rr::{RData, RecordType};
+use kerndns_core::random::{rand_below, rand_id};
 use kerndns_core::{Request, proto::rr::Record};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use super::zone::{Zone, ZoneData};
-use crate::forward::proxy::{rand_below, rand_id};
 
 /// Sees every zone version transferred in, before it goes live
 /// (`TransferInWithRecords`' validate function).

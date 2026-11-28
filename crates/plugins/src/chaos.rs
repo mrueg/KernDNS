@@ -16,6 +16,7 @@ use kerndns_core::{
     Context, Controller, Handler, HandlerResult, Next, PluginError, PluginFactory, Request, ResponseWriter, SetupError,
     async_trait, next_or_failure,
 };
+use rand::seq::SliceRandom;
 
 /// Default answer for `authors.bind.`.
 pub const OWNERS: &[&str] = &["The KernDNS authors"];
@@ -107,7 +108,8 @@ impl Handler for Chaos {
         match req.name().as_str() {
             "authors.bind." => {
                 let mut order: Vec<usize> = (0..self.authors.len()).collect();
-                shuffle(&mut order);
+                // CoreDNS: rnd.Perm(len(c.Authors))
+                order.shuffle(&mut rand::rng());
                 m.answers = order.into_iter().map(|i| txt(&self.authors[i])).collect();
             }
             // an untrimmed VERSION (given with authors) over 255 bytes can't be
@@ -131,21 +133,6 @@ fn hostname() -> String {
         .filter(|s| !s.is_empty())
         .or_else(|| std::env::var("HOSTNAME").ok())
         .unwrap_or_else(|| "localhost".into())
-}
-
-/// A small non-cryptographic shuffle (CoreDNS shuffles authors too).
-fn shuffle(v: &mut [usize]) {
-    let mut seed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(1)
-        | 1;
-    for i in (1..v.len()).rev() {
-        seed ^= seed << 13;
-        seed ^= seed >> 7;
-        seed ^= seed << 17;
-        v.swap(i, (seed % (i as u64 + 1)) as usize);
-    }
 }
 
 #[cfg(test)]
