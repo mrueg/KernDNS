@@ -62,6 +62,7 @@ In detail:
 | Differential test of `etcd` against CoreDNS (one throwaway etcd: 500 services plus the unit tests' records, leases, weights, out-of-zone targets, broken JSON; 2 Corefiles, 32k queries) | no differences |
 | CoreDNS's plugin table tests: 51 plugins' test tables extracted from the Go source (`cargo xtask plugin-cases`) and replayed through KernDNS | 1,197 of 1,962 rows pass, 73 expected failures (features not ported yet), the rest skipped with a reason; see [docs/plugin-cases.md](docs/plugin-cases.md) |
 | CoreDNS's end-to-end Kubernetes tests ([coredns/ci](https://github.com/coredns/ci) `test/kubernetes`) with the KernDNS image as a kind cluster's DNS (CI job `kind`, with CoreDNS's own image as a control) | all 13 that exercise the cluster DNS pass; 2 skipped (one depends on the CI runner's resolv.conf and fails for CoreDNS too, one tests an in-process Go CoreDNS), see [expectations](go/compat/expectations-kind.txt) |
+| Kubernetes' own `[sig-network] DNS` end-to-end tests (test/e2e/network/dns*.go: all 8 DNS `[Conformance]` specs and the 12 others that run on kind, incl. the `[Serial]` ConfigMap stubDomain/upstream tests) plus the `[sig-network] Services` conformance tests, from the `e2e.test` of Kubernetes v1.37.0, with the KernDNS image swapped into kind's kube-system/coredns Deployment and kubeadm's Corefile unchanged (CI job `k8s-conformance`, with CoreDNS 1.15.0's image as a control) | all 37 pass, the same as CoreDNS; see [expectations](go/compat/expectations-conformance.txt) |
 | Fuzzing (`fuzz/`: Corefile setup, the request path, the Go bridge's messages; CI runs each target for a minute) | done; the crashes found are fixed with regression tests |
 | Benchmarks against CoreDNS (`cargo xtask bench`) | a level 2 scenario for every plugin and level 3 common setups, see below |
 | `kubernetes` + `k8s_external` | every option of CoreDNS 1.15.0 incl. `multicluster`, `zonal`, `apiserver_*` limits, zone transfers, `kubernetes/*` metadata and `coredns_kubernetes_*` metrics ([parity table](docs/PLAN.md#parity-with-coredns-1150-pluginkubernetes-plugink8s_external)); CoreDNS's own tests replay with identical results (130 kubernetes and 38 k8s_external handler cases, transfers, metadata); 57k queries against a live kind cluster match CoreDNS exactly (4 Corefile variants); coredns/ci's end-to-end tests run in CI ([expectations](go/compat/expectations-kind.txt)) |
@@ -333,6 +334,12 @@ CI also runs CoreDNS's end-to-end Kubernetes tests
 image as the cluster DNS of a kind cluster, set up the way coredns/ci sets
 it up for CoreDNS (one replica, its Deployment and ClusterRole patches, its
 test namespaces and workloads).
+
+And it runs Kubernetes' own `[sig-network] DNS` and `[sig-network]
+Services` conformance tests (`cargo xtask k8s-conformance`, the `e2e.test`
+and `ginkgo` of the Kubernetes release matching the kind node image) with
+only the image of kind's kube-system/coredns Deployment replaced
+(`kubectl set image`), kubeadm's Corefile unchanged.
 
 ## Layout
 
