@@ -1,6 +1,13 @@
 //! One upstream: its connection pool, query exchange and health checking,
 //! ported from CoreDNS's `plugin/pkg/proxy` and `plugin/pkg/up`.
+//!
+//! Plain DNS and DoT keep idle connections in a FIFO pool (the oldest is
+//! reused first, for source port diversity) for `expire`, at most
+//! `max_age` old and at most `max_idle_conns` per protocol. DoH uses
+//! hyper's pool ([`super::doh`]), DoQ one shared QUIC connection
+//! ([`super::doq`]).
 
+use std::collections::VecDeque;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -18,6 +25,8 @@ use tokio_rustls::client::TlsStream;
 
 /// Write deadline for a query (CoreDNS `maxTimeout`).
 const MAX_TIMEOUT: Duration = Duration::from_secs(2);
+/// Health check timeout (`defaultTimeout` in `pkg/proxy/health.go`).
+const HC_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Proto {
@@ -68,6 +77,13 @@ pub enum ExchangeError {
     CachedClosed,
     #[error("bad response: {0}")]
     BadResponse(String),
+    /// The transport can't carry the request (AXFR over DoQ): NOTIMP.
+    #[error("{0}")]
+    Unsupported(String),
+    #[error("{0}")]
+    Http(String),
+    #[error("{0}")]
+    Quic(String),
 }
 
 enum Stream {
@@ -93,8 +109,8 @@ struct Pooled<T> {
 /// Idle connections, reused for `expire` (and at most `max_age` old).
 #[derive(Default)]
 struct Pool {
-    udp: Vec<Pooled<UdpSocket>>,
-    stream: Vec<Pooled<Stream>>,
+    udp: VecDeque<Pooled<UdpSocket>>,
+    stream: VecDeque<Pooled<Stream>>,
 }
 
 pub struct TlsSettings {
@@ -102,14 +118,43 @@ pub struct TlsSettings {
     pub server_name: ServerName<'static>,
 }
 
+/// How an upstream is reached.
+pub enum Transport {
+    /// `dns://`: UDP or TCP.
+    Dns,
+    /// `tls://`: DNS over TLS.
+    Tls(TlsSettings),
+    /// `https://`: DNS over HTTPS, with the health check's own client.
+    Https {
+        client: Box<super::doh::DohClient>,
+        hc: Box<super::doh::DohClient>,
+    },
+    /// `quic://`: DNS over QUIC.
+    Quic(Box<super::doq::DoqTransport>),
+}
+
+impl Transport {
+    /// CoreDNS's transport name.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Transport::Dns => "dns",
+            Transport::Tls(_) => "tls",
+            Transport::Https { .. } => "https",
+            Transport::Quic(_) => "quic",
+        }
+    }
+}
+
 /// One upstream server.
 pub struct Proxy {
     pub addr: SocketAddr,
-    tls: Option<TlsSettings>,
+    transport: Transport,
     fails: AtomicU32,
     pool: Mutex<Pool>,
     pub expire: Duration,
     pub max_age: Duration,
+    /// Idle connections kept per protocol, 0 is unlimited.
+    pub max_idle_conns: usize,
     pub read_timeout: Duration,
     pub source: Option<IpAddr>,
     // health checking
@@ -120,14 +165,15 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    pub fn new(addr: SocketAddr, tls: Option<TlsSettings>) -> Self {
+    pub fn new(addr: SocketAddr, transport: Transport) -> Self {
         Self {
             addr,
-            tls,
+            transport,
             fails: AtomicU32::new(0),
             pool: Mutex::new(Pool::default()),
             expire: Duration::from_secs(10),
             max_age: Duration::ZERO,
+            max_idle_conns: 0,
             read_timeout: Duration::from_secs(2),
             source: None,
             hc_interval: Mutex::new(Duration::from_millis(500)),
@@ -137,17 +183,31 @@ impl Proxy {
         }
     }
 
-    pub fn is_tls(&self) -> bool {
-        self.tls.is_some()
+    fn tls(&self) -> Option<&TlsSettings> {
+        match &self.transport {
+            Transport::Tls(t) => Some(t),
+            _ => None,
+        }
     }
 
-    /// `tls://1.2.3.4:853` or `1.2.3.4:53`.
-    pub fn display_addr(&self) -> String {
-        if self.tls.is_some() {
-            format!("tls://{}", self.addr)
-        } else {
-            self.addr.to_string()
+    pub fn transport(&self) -> &Transport {
+        &self.transport
+    }
+
+    /// The protocol a query asked to go over `proto` really uses: DoT and
+    /// DoH run over TCP, DoQ over UDP.
+    pub fn effective_proto(&self, proto: Proto) -> Proto {
+        match self.transport {
+            Transport::Dns => proto,
+            Transport::Tls(_) | Transport::Https { .. } => Proto::Tcp,
+            Transport::Quic(_) => Proto::Udp,
         }
+    }
+
+    /// The upstream's address without its transport (`Proxy.Addr`), for
+    /// metadata and metric labels.
+    pub fn display_addr(&self) -> String {
+        self.addr.to_string()
     }
 
     pub fn set_health_options(&self, interval: Duration, opts: Options) {
@@ -169,6 +229,9 @@ impl Proxy {
         let mut p = self.pool.lock().unwrap();
         p.udp.clear();
         p.stream.clear();
+        if let Transport::Quic(q) = &self.transport {
+            q.stop();
+        }
     }
 
     /// Start probing until the upstream answers, unless already probing,
@@ -193,43 +256,63 @@ impl Proxy {
         });
     }
 
-    /// One health check: `<domain> NS` over a fresh connection.
+    /// One health check: `<domain> NS` over a fresh connection (DNS,
+    /// DoT), the health check's HTTP client (DoH, always POST) or the
+    /// shared QUIC connection (DoQ, retried once if it was closed). Any
+    /// answer is healthy.
     async fn check(&self) -> Result<(), ExchangeError> {
         let opts = self.opts.lock().unwrap().clone();
         let mut ping = Message::new(rand_id(), MessageType::Query, OpCode::Query);
         ping.metadata.recursion_desired = opts.hc_recursion_desired;
         ping.add_query(Query::query(opts.hc_domain.clone(), RecordType::NS));
-        let wire = ping
-            .to_vec()
-            .map_err(|e| ExchangeError::InvalidRequest(e.to_string()))?;
-        let proto = if opts.force_tcp || self.tls.is_some() {
-            Proto::Tcp
-        } else {
-            Proto::Udp
+        let res = match &self.transport {
+            Transport::Https { hc, .. } => {
+                ping.metadata.id = 0;
+                let wire = ping
+                    .to_vec()
+                    .map_err(|e| ExchangeError::InvalidRequest(e.to_string()))?;
+                // bounded by the client's own timeout
+                hc.exchange(wire).await.and_then(|(body, _)| {
+                    Message::from_vec(&body)
+                        .map(|_| ())
+                        .map_err(|e| ExchangeError::BadResponse(e.to_string()))
+                })
+            }
+            Transport::Quic(q) => tokio::time::timeout(HC_TIMEOUT, async {
+                let mut r = q.exchange(&ping, HC_TIMEOUT).await;
+                if matches!(r, Err(ExchangeError::CachedClosed)) {
+                    r = q.exchange(&ping, HC_TIMEOUT).await;
+                }
+                r.map(|_| ())
+            })
+            .await
+            .unwrap_or(Err(ExchangeError::Timeout)),
+            Transport::Dns | Transport::Tls(_) => {
+                let wire = ping
+                    .to_vec()
+                    .map_err(|e| ExchangeError::InvalidRequest(e.to_string()))?;
+                let proto = if opts.force_tcp || self.tls().is_some() {
+                    Proto::Tcp
+                } else {
+                    Proto::Udp
+                };
+                tokio::time::timeout(HC_TIMEOUT, self.exchange_fresh(proto, &wire, ping.metadata.id))
+                    .await
+                    .unwrap_or(Err(ExchangeError::Timeout))
+                    .map(|_| ())
+            }
         };
-        let res = tokio::time::timeout(
-            Duration::from_secs(1),
-            self.exchange_fresh(proto, &wire, ping.metadata.id),
-        )
-        .await;
         match res {
-            Ok(Ok(_)) => {
+            Ok(()) => {
                 self.fails.store(0, Ordering::Relaxed);
                 Ok(())
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 crate::pluginmetrics::PROXY_HC_FAILURES
                     .with_label_values(&["forward", &self.display_addr()])
                     .inc();
                 self.fails.fetch_add(1, Ordering::Relaxed);
                 Err(e)
-            }
-            Err(_) => {
-                crate::pluginmetrics::PROXY_HC_FAILURES
-                    .with_label_values(&["forward", &self.display_addr()])
-                    .inc();
-                self.fails.fetch_add(1, Ordering::Relaxed);
-                Err(ExchangeError::Timeout)
             }
         }
     }
@@ -271,7 +354,7 @@ impl Proxy {
             .await
             .map_err(|_| ExchangeError::Timeout)??;
         let _ = tcp.set_nodelay(true);
-        match &self.tls {
+        match self.tls() {
             None => Ok(Stream::Tcp(tcp)),
             Some(t) => {
                 let connector = TlsConnector::from(t.config.clone());
@@ -283,26 +366,75 @@ impl Proxy {
         }
     }
 
-    fn take_udp(&self) -> Option<UdpSocket> {
-        let mut p = self.pool.lock().unwrap();
-        let now = Instant::now();
-        while let Some(c) = p.udp.pop() {
-            if self.fresh(&c, now) {
-                return Some(c.conn);
+    /// The oldest idle UDP socket that is still fresh, like `Transport.dial`.
+    fn take_udp(&self) -> Option<(UdpSocket, Instant)> {
+        let r = {
+            let mut p = self.pool.lock().unwrap();
+            let now = Instant::now();
+            let mut r = None;
+            while let Some(c) = p.udp.pop_front() {
+                if self.fresh(&c, now) {
+                    r = Some((c.conn, c.created));
+                    break;
+                }
             }
-        }
-        None
+            r
+        };
+        self.cache_metric(r.is_some(), "udp");
+        r
     }
 
     fn take_stream(&self) -> Option<(Stream, Instant)> {
-        let mut p = self.pool.lock().unwrap();
-        let now = Instant::now();
-        while let Some(c) = p.stream.pop() {
-            if self.fresh(&c, now) {
-                return Some((c.conn, c.created));
+        let r = {
+            let mut p = self.pool.lock().unwrap();
+            let now = Instant::now();
+            let mut r = None;
+            while let Some(c) = p.stream.pop_front() {
+                if self.fresh(&c, now) {
+                    r = Some((c.conn, c.created));
+                    break;
+                }
             }
+            r
+        };
+        let proto = if self.tls().is_some() { "tcp-tls" } else { "tcp" };
+        self.cache_metric(r.is_some(), proto);
+        r
+    }
+
+    fn cache_metric(&self, hit: bool, proto: &str) {
+        let m = if hit {
+            &crate::pluginmetrics::PROXY_CONN_CACHE_HITS
+        } else {
+            &crate::pluginmetrics::PROXY_CONN_CACHE_MISSES
+        };
+        m.with_label_values(&["forward", &self.display_addr(), proto]).inc();
+    }
+
+    /// `Transport.Yield`: back into the pool, unless it holds
+    /// `max_idle_conns` already.
+    fn yield_udp(&self, conn: UdpSocket, created: Instant) {
+        let mut p = self.pool.lock().unwrap();
+        if self.max_idle_conns > 0 && p.udp.len() >= self.max_idle_conns {
+            return;
         }
-        None
+        p.udp.push_back(Pooled {
+            conn,
+            created,
+            used: Instant::now(),
+        });
+    }
+
+    fn yield_stream(&self, conn: Stream, created: Instant) {
+        let mut p = self.pool.lock().unwrap();
+        if self.max_idle_conns > 0 && p.stream.len() >= self.max_idle_conns {
+            return;
+        }
+        p.stream.push_back(Pooled {
+            conn,
+            created,
+            used: Instant::now(),
+        });
     }
 
     fn fresh<T>(&self, c: &Pooled<T>, now: Instant) -> bool {
@@ -310,11 +442,10 @@ impl Proxy {
             && (self.max_age.is_zero() || now.duration_since(c.created) < self.max_age)
     }
 
-    /// Send `req` (whose id is replaced for the upstream and restored in
-    /// the answer) over `proto`, reusing pooled connections, like
-    /// `Proxy.Connect` + `lookupDNS`. Returns the answer and the protocol
-    /// used; `local` gets our address on the upstream socket (for dnstap)
-    /// once there is one.
+    /// Send `req` (its id is restored in the answer) over `proto`, like
+    /// `Proxy.Connect`. Returns the answer and the protocol used; `local`
+    /// gets our address on the upstream socket (for dnstap) once there is
+    /// one.
     pub async fn connect(
         &self,
         req: &Message,
@@ -322,23 +453,54 @@ impl Proxy {
         local: &mut Option<SocketAddr>,
     ) -> Result<(Message, Proto), ExchangeError> {
         let start = Instant::now();
-        let origin_id = req.metadata.id;
+        let proto = self.effective_proto(proto);
+        let mut ret = match &self.transport {
+            Transport::Https { client, .. } => {
+                // RFC 8484: ID 0
+                let mut m = req.clone();
+                m.metadata.id = 0;
+                let wire = kerndns_core::wire::to_wire(&m).map_err(|e| ExchangeError::InvalidRequest(e.to_string()))?;
+                let (body, l) = client.exchange(wire).await?;
+                *local = l;
+                Message::from_vec(&body).map_err(|e| ExchangeError::BadResponse(e.to_string()))?
+            }
+            Transport::Quic(q) => {
+                let (m, l) = q.exchange(req, self.read_timeout).await?;
+                *local = l;
+                m
+            }
+            Transport::Dns | Transport::Tls(_) => self.lookup_dns(req, proto, local).await?,
+        };
+        ret.metadata.id = req.metadata.id;
+        crate::pluginmetrics::PROXY_REQUEST_DURATION
+            .with_label_values(&[
+                "forward",
+                &self.display_addr(),
+                &kerndns_core::metrics::rcode_string(ret.metadata.response_code),
+            ])
+            .observe(start.elapsed().as_secs_f64());
+        Ok((ret, proto))
+    }
+
+    /// `lookupDNS`: plain DNS or DoT over pooled connections, with a random
+    /// id towards the upstream.
+    async fn lookup_dns(
+        &self,
+        req: &Message,
+        proto: Proto,
+        local: &mut Option<SocketAddr>,
+    ) -> Result<Message, ExchangeError> {
         let id = rand_id();
         let mut m = req.clone();
         m.metadata.id = id;
         let wire = kerndns_core::wire::to_wire(&m).map_err(|e| ExchangeError::InvalidRequest(e.to_string()))?;
-
-        // DoT always uses the stream transport
-        let proto = if self.tls.is_some() { Proto::Tcp } else { proto };
-        let mut ret = match proto {
+        Ok(match proto {
             Proto::Udp => {
-                let (sock, cached) = match self.take_udp() {
-                    Some(s) => (s, true),
-                    None => (self.dial_udp().await?, false),
+                let (sock, created) = match self.take_udp() {
+                    Some(s) => s,
+                    None => (self.dial_udp().await?, Instant::now()),
                 };
-                let _ = cached;
                 *local = sock.local_addr().ok();
-                let created = Instant::now();
                 // like `pc.c.UDPSize = max(state.Size(), 512)`: the upstream
                 // answers within the client's EDNS size
                 let size = req
@@ -347,11 +509,7 @@ impl Proxy {
                     .map_or(0, |e| e.max_payload() as usize)
                     .max(MIN_UDP_SIZE);
                 let r = udp_exchange(&sock, &wire, id, self.read_timeout, size).await?;
-                self.pool.lock().unwrap().udp.push(Pooled {
-                    conn: sock,
-                    created,
-                    used: Instant::now(),
-                });
+                self.yield_udp(sock, created);
                 r
             }
             Proto::Tcp => {
@@ -362,27 +520,14 @@ impl Proxy {
                 *local = s.local_addr();
                 match stream_exchange(&mut s, &wire, id, self.read_timeout).await {
                     Ok(r) => {
-                        self.pool.lock().unwrap().stream.push(Pooled {
-                            conn: s,
-                            created,
-                            used: Instant::now(),
-                        });
+                        self.yield_stream(s, created);
                         r
                     }
                     Err(ExchangeError::Io(e)) if cached && is_closed(&e) => return Err(ExchangeError::CachedClosed),
                     Err(e) => return Err(e),
                 }
             }
-        };
-        ret.metadata.id = origin_id;
-        crate::pluginmetrics::PROXY_REQUEST_DURATION
-            .with_label_values(&[
-                "forward",
-                &self.display_addr(),
-                &kerndns_core::metrics::rcode_string(ret.metadata.response_code),
-            ])
-            .observe(start.elapsed().as_secs_f64());
-        Ok((ret, proto))
+        })
     }
 }
 

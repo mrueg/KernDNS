@@ -120,6 +120,22 @@ pub static PROXY_HC_FAILURES: LazyLock<CounterVec> = LazyLock::new(|| {
         &["proxy_name", "to"],
     )
 });
+pub static PROXY_CONN_CACHE_HITS: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "proxy",
+        "conn_cache_hits_total",
+        "Counter of connection cache hits per upstream and protocol.",
+        &["proxy_name", "to", "proto"],
+    )
+});
+pub static PROXY_CONN_CACHE_MISSES: LazyLock<CounterVec> = LazyLock::new(|| {
+    counter(
+        "proxy",
+        "conn_cache_misses_total",
+        "Counter of connection cache misses per upstream and protocol.",
+        &["proxy_name", "to", "proto"],
+    )
+});
 pub static FORWARD_HC_BROKEN: LazyLock<IntCounter> = LazyLock::new(|| {
     register_int_counter!(
         Opts::new(

@@ -196,9 +196,9 @@ skip grpc TestProxy/tests Go proxy structs with a fake gRPC client
 skip forward TestList/expect Go proxy structs
 skip forward TestForward_Regression_NoBusyLoop/tests counts upstream attempts on Go proxies
 skip forward TestForward_NextOnNodata/tests not driven yet: needs a dnstest upstream and next_on_nodata
-skip forward TestClassifyToAddrs/tests tests the Go resolver helper (upstreams given as hostnames are not supported by KernDNS yet)
-skip forward TestParseAsHostEntry/tests tests the Go resolver helper (hostnames are not supported by KernDNS yet)
-skip forward TestFormatResolvedAddr/tests tests the Go resolver helper
+skip forward TestClassifyToAddrs/tests tests the Go resolver helper (ported as unit tests in forward::resolve)
+skip forward TestParseAsHostEntry/tests tests the Go resolver helper (ported as unit tests in forward::resolve)
+skip forward TestFormatResolvedAddr/tests tests the Go resolver helper (ported as unit tests in forward::resolve)
 skip forward TestExpandAndDedup/entries input of the Go resolver helper
 skip forward TestExpandAndDedup/expected output of the Go resolver helper
 skip forward TestExpandAndDedupOrderPreserved/entries input of the Go resolver helper
@@ -206,7 +206,7 @@ skip forward TestExpandAndDedupTLS/entries input of the Go resolver helper
 skip forward TestExpandAndDedupTLS/expected output of the Go resolver helper
 skip forward TestExpandAndDedupKeepsDistinctDoTAndDoQEndpoints/entries input of the Go resolver helper
 skip forward TestExpandAndDedupKeepsDistinctDoTAndDoQEndpoints/want output of the Go resolver helper
-skip forward TestSplitZone/tests tests the Go splitZone helper
+skip forward TestSplitZone/tests tests the Go splitZone helper (ported as a unit test in forward::resolve)
 skip forward TestSetupTLSclientSessionCacheCount/tests checks the parsed Go TLS session cache
 skip forward TestNextAlternate/testsValid checks parsed rcodes (Go internals)
 skip forward TestFailfastAllUnhealthyUpstreams/tests checks the parsed flag
@@ -240,12 +240,6 @@ skip tls TestTLS/tests#6 needs test_cert.pem/test_key.pem/test_ca.pem from the G
 skip template TestVar/tests#5 sets metadata in the Go test context, which no plugin of a server sets (the template unit tests cover metadata in var)
 skip template TestExpr/tests#10 sets metadata in the Go test context, which no plugin of a server sets (the template unit tests cover metadata in expr)
 skip grpc TestSetupResolvconf/tests#0 the Go test writes the resolv.conf into its working directory
-xfail forward TestSetupResolver/tests#0 forward { resolver } is not supported by KernDNS yet
-xfail forward TestSetupResolver/tests#1 forward { resolver } is not supported by KernDNS yet
-xfail forward TestSetupResolver/tests#2 forward { resolver } is not supported by KernDNS yet
-xfail forward TestSetup/tests#15 forward https:// (DoH) upstreams are not supported by KernDNS yet
-xfail forward TestSetup/tests#16 forward quic:// (DoQ) upstreams are not supported by KernDNS yet
-xfail forward TestSetupTLS/tests#4 forward quic:// (DoQ) upstreams are not supported by KernDNS yet
 skip forward TestSetupResolvconf/tests#0 the Go test writes the resolv.conf into its working directory
 skip forward TestSetupResolvconf/tests#2 the Go test writes the resolv.conf into its working directory
 skip forward TestSetupResolvconf/tests#3 the Go test writes the resolv.conf into its working directory
