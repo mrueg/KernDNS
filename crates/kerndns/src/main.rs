@@ -4,6 +4,7 @@
 use std::io::{BufRead, Read};
 use std::process::ExitCode;
 
+use kerndns_plugins::pluginmetrics as pm;
 use kerndns_server::{Instance, Options};
 
 const USAGE: &str = "Usage of kerndns:
@@ -348,26 +349,101 @@ async fn reload(
     }
 }
 
-/// SHA-512 of the parsed Corefile (keys and directive tokens), so comment
-/// and whitespace changes don't trigger a reload, like the `reload` plugin.
+/// SHA-512 of the parsed Corefile, so comment and whitespace changes don't
+/// trigger a reload. Like the `reload` plugin it hashes Go's
+/// `json.Marshal` of caddy's server blocks (`[{"Keys":[...],"Tokens":
+/// {"directive":[{"File":...,"Line":...,"Text":...}]}}]`), so the logged
+/// hash and `coredns_reload_version_info` match CoreDNS's for the same
+/// Corefile.
 fn config_hash(corefile: &str, path: &str) -> Option<String> {
     use sha2::{Digest, Sha512};
     let blocks = kerndns_core::corefile::parse(corefile, path).ok()?;
-    let mut h = Sha512::new();
-    for b in &blocks {
-        for k in &b.keys {
-            h.update(k.as_bytes());
-            h.update([0]);
+    let json = caddy_json(&blocks, path);
+    Some(
+        Sha512::digest(json.as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+    )
+}
+
+/// `json.Marshal([]caddyfile.ServerBlock)` of the parsed Corefile `path`.
+fn caddy_json(blocks: &[kerndns_core::corefile::ServerBlock], path: &str) -> String {
+    use std::collections::BTreeMap;
+    // the file caddy records for a token: none for the Corefile itself
+    // (its lexer doesn't set one), the absolute path for imported files,
+    // and for snippet tokens that of the file the snippet is in
+    let file_of = |label: &str| -> String {
+        let f = label.split(" (snippet ").next().unwrap_or(label);
+        if f == path {
+            String::new()
+        } else {
+            std::path::absolute(f).map_or_else(|_| f.to_string(), |p| p.display().to_string())
         }
-        for d in &b.directives {
-            for t in &d.tokens {
-                h.update(t.text.as_bytes());
-                h.update([1]);
+    };
+    let mut out = String::from("[");
+    for (i, b) in blocks.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str("{\"Keys\":[");
+        for (j, k) in b.keys.iter().enumerate() {
+            if j > 0 {
+                out.push(',');
             }
+            go_json_string(&mut out, k);
         }
-        h.update([2]);
+        out.push_str("],\"Tokens\":{");
+        let mut by_dir: BTreeMap<&str, Vec<&kerndns_core::corefile::Token>> = BTreeMap::new();
+        for d in &b.directives {
+            by_dir.entry(d.name.as_str()).or_default().extend(d.tokens.iter());
+        }
+        for (j, (name, toks)) in by_dir.iter().enumerate() {
+            if j > 0 {
+                out.push(',');
+            }
+            go_json_string(&mut out, name);
+            out.push_str(":[");
+            for (n, t) in toks.iter().enumerate() {
+                if n > 0 {
+                    out.push(',');
+                }
+                out.push_str("{\"File\":");
+                go_json_string(&mut out, &file_of(&t.file));
+                out.push_str(&format!(",\"Line\":{},\"Text\":", t.line));
+                go_json_string(&mut out, &t.text);
+                out.push('}');
+            }
+            out.push(']');
+        }
+        out.push_str("}}");
     }
-    Some(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
+    out.push(']');
+    out
+}
+
+/// A JSON string the way Go's `encoding/json` writes it (HTML characters
+/// and U+2028/U+2029 escaped).
+fn go_json_string(out: &mut String, s: &str) {
+    use std::fmt::Write as _;
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '<' | '>' | '&' | '\u{2028}' | '\u{2029}' => {
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
+            c if (c as u32) < 0x20 => {
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
 }
 
 /// Serve until SIGTERM/SIGINT, reloading on SIGUSR1 and, with the `reload`
@@ -468,17 +544,42 @@ async fn serve_until_shutdown(
             }
             continue;
         }
-        match reload(inst, &text, path, opts, registry).await {
+        // like the reload plugin: don't retry the same file, even if it fails
+        let changed = !force && new_hash != hash;
+        if changed {
+            if let Some(old) = &hash {
+                let _ = pm::RELOAD_INFO.remove_label_values(&["sha512", old]);
+            }
+            hash = new_hash.clone();
+        }
+        if changed {
+            // caddy's Instance.Restart logs this
+            kerndns_core::info!("Reloading");
+        }
+        let res = reload(inst, &text, path, opts, registry).await;
+        if changed && let Some(h) = &new_hash {
+            pm::RELOAD_INFO.with_label_values(&["sha512", h]).set(1.0);
+        }
+        match res {
             Ok(()) => {
-                hash = new_hash;
-                kerndns_core::info!("Reloading complete");
+                if force {
+                    hash = new_hash;
+                }
+                // the new instance's startup logs its hash, then caddy says it's done
                 if let Some(h) = &hash
                     && kerndns_core::reload::interval().is_some()
                 {
                     kerndns_core::info!(plugin = "reload", "Running configuration SHA512 = {h}");
                 }
+                kerndns_core::info!("Reloading complete");
             }
-            Err(e) => kerndns_core::error!(plugin = "reload", "Corefile changed but reload failed: {e}"),
+            Err(e) => {
+                if changed {
+                    pm::RELOAD_FAILED.inc();
+                    kerndns_core::error!("Restart failed: {e}");
+                }
+                kerndns_core::error!(plugin = "reload", "Corefile changed but reload failed: {e}")
+            }
         }
     }
 }
@@ -489,6 +590,27 @@ mod tests {
 
     fn p(args: &[&str]) -> Result<Flags, String> {
         parse_flags(args.iter().map(|s| s.to_string()))
+    }
+
+    /// The JSON CoreDNS's `reload` hashes, as Go's `json.Marshal` of
+    /// caddy's server blocks writes it for the same Corefile (checked with
+    /// caddy v1.1.4): no file for the Corefile's own tokens and snippets
+    /// defined in it, the absolute path for imported files, directives
+    /// sorted by name, HTML characters escaped.
+    #[test]
+    fn reload_hash_input_matches_caddy() {
+        let dir = std::env::temp_dir().join(format!("kerndns-hash-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("extra.conf"), "whoami\n").unwrap();
+        let corefile = "(snip) {\n    log\n}\nexample.org:1053 example.net:1053 {\n    reload 2s\n    import snip\n    whoami\n    template IN TXT example.org {\n        answer \"{{ .Name }} 60 IN TXT \\\"a<b>&c\\\"\"\n    }\n    errors\n}\n.:1053 {\n    import extra.conf\n    reload\n}\n";
+        let path = dir.join("Corefile").display().to_string();
+        let blocks = kerndns_core::corefile::parse(corefile, &path).unwrap();
+        let extra = dir.join("extra.conf").display().to_string();
+        let want = format!(
+            r#"[{{"Keys":["example.org:1053","example.net:1053"],"Tokens":{{"errors":[{{"File":"","Line":11,"Text":"errors"}}],"log":[{{"File":"","Line":2,"Text":"log"}}],"reload":[{{"File":"","Line":5,"Text":"reload"}},{{"File":"","Line":5,"Text":"2s"}}],"template":[{{"File":"","Line":8,"Text":"template"}},{{"File":"","Line":8,"Text":"IN"}},{{"File":"","Line":8,"Text":"TXT"}},{{"File":"","Line":8,"Text":"example.org"}},{{"File":"","Line":8,"Text":"{{"}},{{"File":"","Line":9,"Text":"answer"}},{{"File":"","Line":9,"Text":"{{{{ .Name }}}} 60 IN TXT \"a\u003cb\u003e\u0026c\""}},{{"File":"","Line":10,"Text":"}}"}}],"whoami":[{{"File":"","Line":7,"Text":"whoami"}}]}}}},{{"Keys":[".:1053"],"Tokens":{{"reload":[{{"File":"","Line":15,"Text":"reload"}}],"whoami":[{{"File":"{extra}","Line":1,"Text":"whoami"}}]}}}}]"#
+        );
+        assert_eq!(caddy_json(&blocks, &path), want);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
