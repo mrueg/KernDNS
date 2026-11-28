@@ -1,4 +1,5 @@
-//! `forward`: proxies queries to upstream resolvers over UDP, TCP or TLS.
+//! `forward`: proxies queries to upstream resolvers over UDP, TCP, TLS
+//! (`tls://`), HTTPS (`https://`, DoH) or QUIC (`quic://`, DoQ).
 //! Port of `plugin/forward`.
 //!
 //! ```text
@@ -8,8 +9,10 @@
 //!     prefer_udp
 //!     expire DURATION
 //!     max_age DURATION
+//!     max_idle_conns INTEGER
 //!     max_fails INTEGER
 //!     max_connect_attempts INTEGER
+//!     doh_method GET|POST
 //!     tls [CERT KEY CA]
 //!     tls_servername NAME
 //!     policy random|round_robin|sequential
@@ -21,18 +24,22 @@
 //!     failfast_all_unhealthy_upstreams
 //!     read_timeout DURATION
 //!     source_address IP
+//!     resolver IP[:PORT]...
 //! }
 //! ```
 //!
+//! **TO** is an IP address (`[scheme://]IP[%servername][:port]`), a
+//! resolv.conf-like file or a host name, resolved once at startup with the
+//! system resolver or the `resolver` addresses ([`resolve`]).
+//!
 //! Queries and answers are logged to the block's `dnstap` plugins as
 //! FORWARDER_QUERY / FORWARDER_RESPONSE, like CoreDNS's `dnstap.go`.
-//!
-//! Not ported yet: `https://` and `quic://` upstreams (`doh_method`) and
-//! upstreams given as hostnames (`resolver`).
-//! These are rejected with an error rather than ignored.
 
+pub mod doh;
+pub mod doq;
 pub mod policy;
 pub mod proxy;
+pub mod resolve;
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -51,7 +58,7 @@ use rustls_pki_types::ServerName;
 
 use policy::Picker;
 pub use policy::Policy;
-use proxy::{ExchangeError, Options, Proto, Proxy, TlsSettings, rand_below};
+use proxy::{ExchangeError, Options, Proto, Proxy, TlsSettings, Transport, rand_below};
 
 use crate::dnstap::Taps;
 
@@ -60,6 +67,10 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_CONNECT_ATTEMPTS_PER_UPSTREAM: u64 = 2;
 /// Maximum number of upstreams per stanza.
 const MAX_UPSTREAMS: usize = 15;
+/// DoH request timeout (the `http.Client` timeout in `setup.go`).
+const DOH_TIMEOUT: Duration = Duration::from_secs(2);
+/// DoH health check timeout.
+const DOH_HC_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// One `forward` stanza: its upstreams and settings.
 pub struct ForwardCore {
@@ -109,72 +120,56 @@ fn parse_rcode(s: &str) -> Option<ResponseCode> {
     })
 }
 
-/// An upstream: `IP`, `IP:port`, `[v6]:port`, `dns://…`, `tls://…[%servername]`.
+/// One upstream after `splitZone` and `parse.Transport`.
+#[derive(Debug, PartialEq)]
 struct To {
+    /// `dns`, `tls`, `https` or `quic`.
+    transport: &'static str,
     addr: SocketAddr,
-    tls: bool,
+    /// The `%servername` of a `tls://` or `quic://` upstream.
     server_name: Option<String>,
+    /// The upstream as CoreDNS prints it in errors (`tls://1.2.3.4:853`).
+    host: String,
 }
 
-fn parse_to(s: &str) -> Result<Vec<To>, String> {
-    let (scheme, rest) = match s.split_once("://") {
-        Some((sch, r)) => (sch.to_ascii_lowercase(), r),
-        None => (String::from("dns"), s),
-    };
-    let tls = match scheme.as_str() {
-        "dns" => false,
-        "tls" => true,
-        "https" | "quic" | "grpc" | "https3" => {
-            return Err(format!("'{scheme}' upstreams are not supported by KernDNS yet: {s}"));
-        }
-        other => {
+/// The upstreams of `TO...`, like `parseStanza`: no paths in `https://`
+/// upstreams, IPs and files as they are, host names resolved with
+/// `lookup`, duplicates dropped. Also returns the number of `TO` entries.
+fn parse_tos(to: &[String], lookup: &dyn Fn(&str) -> Result<Vec<String>, String>) -> Result<(Vec<To>, usize), String> {
+    for a in to {
+        let (t, h) = resolve::transport(a);
+        if t == resolve::HTTPS && h.contains('/') {
             return Err(format!(
-                "'{other}' is not supported as a destination protocol in forward: {s}"
+                "paths are not allowed in HTTPS upstream addresses (the /dns-query path is used by default): {a}"
             ));
         }
-    };
-    // a resolv.conf-style file
-    if !tls && std::path::Path::new(rest).is_file() {
-        let text = std::fs::read_to_string(rest).map_err(|e| format!("{rest}: {e}"))?;
-        let mut out = Vec::new();
-        for line in text.lines() {
-            let mut f = line.split_whitespace();
-            if f.next() == Some("nameserver")
-                && let Some(ip) = f.next()
-            {
-                out.extend(parse_to(ip)?);
-            }
-        }
-        return Ok(out);
     }
-    // TLS server name after '%', like CoreDNS's splitZone:
-    // tls://1.2.3.4%dns.example, tls://1.2.3.4%dns.example:853, tls://[::1%dns.example]:853
-    let (host, server_name) = match rest.rfind('%') {
-        Some(i) if tls => {
-            let mut host = rest[..i].to_string();
-            let mut name = rest[i + 1..].to_string();
-            if host.starts_with('[') {
-                host.push(']');
-            }
-            if let Some(j) = name.rfind(':') {
-                host.push_str(&name[j..]);
-                name.truncate(j);
-            }
-            (host, Some(name.trim_end_matches(']').to_string()))
+    let entries = resolve::classify_to_addrs(to)?;
+    let hosts = resolve::expand_and_dedup(&entries, lookup)?;
+    if hosts.is_empty() {
+        return Err("no valid upstream addresses found".into());
+    }
+    let mut out = Vec::new();
+    for hz in hosts {
+        let (host, zone) = resolve::split_zone(&hz);
+        let (transport, h) = resolve::transport(&host);
+        if ![resolve::DNS, resolve::TLS, resolve::QUIC, resolve::HTTPS].contains(&transport) {
+            return Err(format!(
+                "'{transport}' is not supported as a destination protocol in forward: {host}"
+            ));
         }
-        _ => (rest.to_string(), None),
-    };
-    let default_port = if tls { 853 } else { 53 };
-    let addr = if let Ok(sa) = host.parse::<SocketAddr>() {
-        sa
-    } else if let Ok(ip) = host.trim_start_matches('[').trim_end_matches(']').parse::<IpAddr>() {
-        SocketAddr::new(ip, default_port)
-    } else {
-        return Err(format!(
-            "not an IP address or file: {s:?} (upstreams given as hostnames are not supported by KernDNS yet)"
-        ));
-    };
-    Ok(vec![To { addr, tls, server_name }])
+        let addr = h
+            .parse::<SocketAddr>()
+            .map_err(|_| format!("invalid upstream address: {host}"))?;
+        let server_name = (matches!(transport, resolve::TLS | resolve::QUIC) && !zone.is_empty()).then_some(zone);
+        out.push(To {
+            transport,
+            addr,
+            server_name,
+            host,
+        });
+    }
+    Ok((out, entries.len()))
 }
 
 impl PluginFactory for Setup {
@@ -241,10 +236,13 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
     let mut max_connect_attempts = None;
     let mut hc_interval = Duration::from_millis(500);
     let mut opts = Options::default();
-    let mut tls_args: Option<Vec<String>> = None;
+    let mut tls_config: Option<Arc<rustls::ClientConfig>> = None;
     let mut tls_server_name: Option<String> = None;
     let mut expire = Duration::from_secs(10);
     let mut max_age = Duration::ZERO;
+    let mut max_idle_conns = 0usize;
+    let mut doh_method = doh::Method::Post;
+    let mut resolvers: Vec<String> = Vec::new();
     let mut read_timeout = Duration::from_secs(2);
     let mut policy = Policy::Random;
     let mut max_concurrent = 0i64;
@@ -325,7 +323,8 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
                         }
                     }
                 }
-                tls_args = Some(a);
+                // like pkgtls.NewTLSConfigFromArgs: the files are read now
+                tls_config = Some(crate::tlsconfig::client_config(&a).map_err(err)?);
             }
             "tls_servername" => {
                 if !c.next_arg() {
@@ -363,6 +362,29 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
                 if n < 0 {
                     return Err(err(format!("max_idle_conns can't be negative: {n}")));
                 }
+                max_idle_conns = n as usize;
+            }
+            "doh_method" => {
+                if !c.next_arg() {
+                    return Err(c.arg_err());
+                }
+                doh_method = match c.val() {
+                    "POST" => doh::Method::Post,
+                    "GET" => doh::Method::Get,
+                    _ => return Err(err("doh_method must be either POST or GET".into())),
+                };
+            }
+            "resolver" => {
+                let a = c.remaining_args();
+                if a.is_empty() {
+                    return Err(c.arg_err());
+                }
+                for r in &a {
+                    if resolve::resolver_addr(r).is_none() {
+                        return Err(err(format!("resolver must be an IP address or IP:port: {r:?}")));
+                    }
+                }
+                resolvers = a;
             }
             "policy" => policy = Policy::parse(c)?,
             "max_concurrent" => {
@@ -413,9 +435,6 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
                     c.errf(msg)
                 })?);
             }
-            "doh_method" | "resolver" => {
-                return Err(err(format!("'{opt}' is not supported by KernDNS yet")));
-            }
             other => {
                 let msg = format!("unknown property '{other}'");
                 return Err(c.errf(msg));
@@ -430,46 +449,68 @@ fn parse_stanza(c: &mut Controller<'_>) -> Result<ForwardCore, SetupError> {
         )));
     }
 
-    let mut tos = Vec::new();
-    for t in &to {
-        tos.extend(parse_to(t).map_err(err)?);
-    }
-    if tos.is_empty() {
-        return Err(err("no valid upstream addresses found".into()));
-    }
-    if tos.len() > MAX_UPSTREAMS {
-        return Err(err(format!("more than {MAX_UPSTREAMS} TOs configured: {}", tos.len())));
-    }
+    let lookup = |h: &str| resolve::lookup_host(h, &resolvers);
+    let (tos, entries) = parse_tos(&to, &lookup).map_err(err)?;
 
     let mut proxies = Vec::new();
     for t in tos {
-        let tls = if t.tls {
-            if t.server_name.is_some() && tls_server_name.is_some() {
-                return Err(err(format!(
-                    "both forward ('{}') and proxy level ('{}') TLS servernames are set for upstream proxy '{}'",
-                    tls_server_name.as_deref().unwrap_or_default(),
-                    t.server_name.as_deref().unwrap_or_default(),
-                    t.addr
-                )));
-            }
-            let config = crate::tlsconfig::client_config(tls_args.as_deref().unwrap_or(&[])).map_err(err)?;
-            let name = t
-                .server_name
-                .clone()
-                .or_else(|| tls_server_name.clone())
-                .unwrap_or_else(|| t.addr.ip().to_string());
-            let server_name =
-                ServerName::try_from(name.clone()).map_err(|e| err(format!("invalid TLS server name {name}: {e}")))?;
-            Some(TlsSettings { config, server_name })
-        } else {
-            None
+        if t.server_name.is_some() && tls_server_name.is_some() {
+            return Err(err(format!(
+                "both forward ('{}') and proxy level ('{}') TLS servernames are set for upstream proxy '{}'",
+                tls_server_name.as_deref().unwrap_or_default(),
+                t.server_name.as_deref().unwrap_or_default(),
+                t.host
+            )));
+        }
+        // without a `tls` line: no client certificate, the system roots
+        let config = || match &tls_config {
+            Some(c) => Ok(c.clone()),
+            None => crate::tlsconfig::client_config(&[]).map_err(err),
         };
-        let mut p = Proxy::new(t.addr, tls);
+        // the per-upstream name, tls_servername or the address
+        let name = t
+            .server_name
+            .clone()
+            .or_else(|| tls_server_name.clone())
+            .unwrap_or_else(|| t.addr.ip().to_string());
+        let transport = match t.transport {
+            resolve::TLS => {
+                let server_name = ServerName::try_from(name.clone())
+                    .map_err(|e| err(format!("invalid TLS server name {name}: {e}")))?;
+                Transport::Tls(TlsSettings {
+                    config: config()?,
+                    server_name,
+                })
+            }
+            resolve::HTTPS => {
+                let s = doh::DohSettings {
+                    addr: t.addr,
+                    tls: config()?,
+                    server_name: tls_server_name.clone(),
+                    source,
+                    max_idle_conns,
+                };
+                Transport::Https {
+                    client: Box::new(doh::DohClient::new(&s, doh_method, DOH_TIMEOUT).map_err(err)?),
+                    hc: Box::new(doh::DohClient::new(&s, doh::Method::Post, DOH_HC_TIMEOUT).map_err(err)?),
+                }
+            }
+            resolve::QUIC => Transport::Quic(Box::new({
+                ServerName::try_from(name.clone()).map_err(|e| err(format!("invalid TLS server name {name}: {e}")))?;
+                doq::DoqTransport::new(t.addr, &*config()?, name, source, expire, max_age, read_timeout).map_err(err)?
+            })),
+            _ => Transport::Dns,
+        };
+        let mut p = Proxy::new(t.addr, transport);
         p.expire = expire;
         p.max_age = max_age;
+        p.max_idle_conns = max_idle_conns;
         p.read_timeout = read_timeout;
         p.source = source;
         proxies.push(Arc::new(p));
+    }
+    if entries > MAX_UPSTREAMS {
+        return Err(err(format!("more than {MAX_UPSTREAMS} TOs configured: {entries}")));
     }
 
     let core = ForwardCore {
@@ -592,7 +633,7 @@ impl Handler for Forward {
                 {
                     e.set_max_payload(512);
                 }
-                used = if proxy.is_tls() { Proto::Tcp } else { proto };
+                used = proxy.effective_proto(proto);
                 match proxy.connect(&msg, proto, &mut local).await {
                     Err(ExchangeError::CachedClosed) => continue,
                     Ok((ret, _)) if ret.metadata.truncation && !force_tcp && f.opts.prefer_udp => {
@@ -613,6 +654,9 @@ impl Handler for Forward {
                 Ok((ret, _)) => ret,
                 Err(ExchangeError::InvalidRequest(e)) => {
                     return Err(PluginError::new("forward", ResponseCode::FormErr, e));
+                }
+                Err(ExchangeError::Unsupported(e)) => {
+                    return Err(PluginError::new("forward", ResponseCode::NotImp, e));
                 }
                 Err(e) => {
                     upstream_err = Some(e.to_string());
@@ -753,8 +797,31 @@ mod tests {
             "forward example.org 127.0.0.1 {\n except a.example.org\n next NXDOMAIN SERVFAIL\n}"
         ));
         assert!(setup_err(&Setup, "forward .").contains("Wrong argument count"));
-        assert!(setup_err(&Setup, "forward . dns.google").contains("not an IP address or file"));
-        assert!(setup_err(&Setup, "forward . https://1.1.1.1").contains("not supported by KernDNS yet"));
+        assert!(setup_ok(&Setup, "forward . https://1.1.1.1"));
+        assert!(setup_ok(
+            &Setup,
+            "forward . https://9.9.9.9 quic://94.140.14.14 {\n tls_servername dns.example\n doh_method GET\n}"
+        ));
+        assert!(setup_err(&Setup, "forward . https://1.1.1.1/dns-query").contains("paths are not allowed"));
+        assert!(setup_err(&Setup, "forward . grpc://1.1.1.1").contains("'grpc' is not supported"));
+        assert!(
+            setup_err(&Setup, "forward . 127.0.0.1 {\n doh_method PUT\n}")
+                .contains("doh_method must be either POST or GET")
+        );
+        assert!(
+            setup_err(&Setup, "forward . 127.0.0.1 {\n resolver dns.example.com\n}")
+                .contains("resolver must be an IP address")
+        );
+        assert!(setup_ok(
+            &Setup,
+            "forward . 127.0.0.1 {\n resolver 10.0.0.1 [::1]:53 ::1\n max_idle_conns 4\n}"
+        ));
+        // pkgtls.NewTLSConfigFromArgs reads the files whatever the upstreams
+        assert!(setup_err(&Setup, "forward . 127.0.0.1 {\n tls /nonexistent/ca.pem\n}").contains("could not load"));
+        let sixteen: Vec<String> = (1..=16).map(|i| format!("127.0.0.{i}")).collect();
+        assert!(
+            setup_err(&Setup, &format!("forward . {}", sixteen.join(" "))).contains("more than 15 TOs configured: 16")
+        );
         assert!(setup_err(&Setup, "forward . 127.0.0.1 {\n policy foo\n}").contains("unknown policy 'foo'"));
         assert!(setup_err(&Setup, "forward . 127.0.0.1 {\n failover NOERROR\n}").contains("NoError cannot be used"));
         assert!(
@@ -766,23 +833,62 @@ mod tests {
 
     #[test]
     fn upstream_parsing() {
-        let p = |s: &str| {
-            parse_to(s).map(|v| {
+        let lookup = |h: &str| -> Result<Vec<String>, String> {
+            match h {
+                "dns.example" => Ok(vec!["192.0.2.1".into(), "2001:db8::1".into()]),
+                _ => Err(format!("lookup {h}: no such host")),
+            }
+        };
+        let p = |s: &[&str]| {
+            let to: Vec<String> = s.iter().map(|x| x.to_string()).collect();
+            parse_tos(&to, &lookup).map(|(v, _)| {
                 v.iter()
-                    .map(|t| (t.addr.to_string(), t.tls, t.server_name.clone()))
+                    .map(|t| (t.transport, t.addr.to_string(), t.server_name.clone()))
                     .collect::<Vec<_>>()
             })
         };
-        assert_eq!(p("1.2.3.4").unwrap(), vec![("1.2.3.4:53".into(), false, None)]);
-        assert_eq!(p("[::1]:1053").unwrap(), vec![("[::1]:1053".into(), false, None)]);
-        assert_eq!(p("tls://1.1.1.1").unwrap(), vec![("1.1.1.1:853".into(), true, None)]);
+        assert_eq!(p(&["1.2.3.4"]).unwrap(), vec![("dns", "1.2.3.4:53".into(), None)]);
+        assert_eq!(p(&["[::1]:1053"]).unwrap(), vec![("dns", "[::1]:1053".into(), None)]);
         assert_eq!(
-            p("tls://1.1.1.1%cloudflare-dns.com").unwrap(),
-            vec![("1.1.1.1:853".into(), true, Some("cloudflare-dns.com".into()))]
+            p(&["tls://1.1.1.1"]).unwrap(),
+            vec![("tls", "1.1.1.1:853".into(), None)]
         );
         assert_eq!(
-            p("dns://8.8.8.8:5353").unwrap(),
-            vec![("8.8.8.8:5353".into(), false, None)]
+            p(&["tls://1.1.1.1%cloudflare-dns.com"]).unwrap(),
+            vec![("tls", "1.1.1.1:853".into(), Some("cloudflare-dns.com".into()))]
+        );
+        assert_eq!(
+            p(&["dns://8.8.8.8:5353"]).unwrap(),
+            vec![("dns", "8.8.8.8:5353".into(), None)]
+        );
+        assert_eq!(
+            p(&["https://9.9.9.9"]).unwrap(),
+            vec![("https", "9.9.9.9:443".into(), None)]
+        );
+        // the %servername of DoH upstreams is dropped, like CoreDNS
+        assert_eq!(
+            p(&["https://9.9.9.9%dns.quad9.net:8443"]).unwrap(),
+            vec![("https", "9.9.9.9:8443".into(), None)]
+        );
+        assert_eq!(
+            p(&["quic://[2001:db8::2%doq.example]:8853"]).unwrap(),
+            vec![("quic", "[2001:db8::2]:8853".into(), Some("doq.example".into()))]
+        );
+        assert_eq!(
+            p(&["quic://dns.example%doq.example", "quic://192.0.2.1%doq.example:853"]).unwrap(),
+            vec![
+                ("quic", "192.0.2.1:853".into(), Some("doq.example".into())),
+                ("quic", "[2001:db8::1]:853".into(), Some("doq.example".into())),
+            ]
+        );
+        assert_eq!(
+            p(&["a27.0.0.1"]).unwrap_err(),
+            "failed to resolve \"a27.0.0.1\": lookup a27.0.0.1: no such host"
+        );
+        assert!(p(&["https://1.1.1.1/"]).unwrap_err().contains("paths are not allowed"));
+        assert_eq!(
+            p(&["unix:///run/dns.sock"]).unwrap_err(),
+            "'unix' is not supported as a destination protocol in forward: unix:///run/dns.sock"
         );
     }
 

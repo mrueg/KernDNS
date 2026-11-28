@@ -84,7 +84,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `erratic` | 18 | 18 | 0 | 0 | 0 | `erratic_test.go`, `setup_test.go` | - |
 | `errors` | 44 | 26 | 0 | 18 | 0 | `setup_test.go` | `errors_test.go` |
 | `file` | 153 | 115 | 0 | 38 | 4 | `alias_delegation_test.go`, `delegation_test.go`, `dnssec_test.go`, `ds_test.go`, `ent_test.go`, `escape_test.go`, `file_test.go`, `glue_test.go`, `lookup_test.go`, `svcb_test.go`, `wildcard_test.go` | `closest_test.go`, `reload_test.go`, `setup_test.go`, `zone_test.go` |
-| `forward` | 201 | 87 | 6 | 108 | 0 | `resolve_test.go`, `setup_policy_test.go`, `setup_test.go` | `forward_test.go` |
+| `forward` | 201 | 93 | 0 | 108 | 0 | `resolve_test.go`, `setup_policy_test.go`, `setup_test.go` | `forward_test.go` |
 | `geoip` | 27 | 8 | 0 | 19 | 0 | `setup_test.go` | `geoip_test.go` |
 | `grpc` | 32 | 23 | 0 | 9 | 1 | `setup_policy_test.go`, `setup_test.go` | `grpc_test.go`, `policy_test.go`, `proxy_test.go` |
 | `grpc_server` | 13 | 13 | 0 | 0 | 0 | `setup_test.go` | - |
@@ -120,7 +120,7 @@ extractable* are listed in the fixture with the reason. Totals from
 | `tsig` | 38 | 0 | 0 | 38 | 1 | - | `setup_test.go`, `tsig_test.go` |
 | `view` | 11 | 7 | 0 | 4 | 0 | `setup_test.go` | `view_test.go` |
 | `whoami` | 4 | 4 | 0 | 0 | 0 | `whoami_test.go` | - |
-| **total** | **1962** | **1257** | **10** | **695** | **13** | | |
+| **total** | **1962** | **1263** | **4** | **695** | **13** | | |
 
 `etcd` and `kubernetes` are covered elsewhere (the etcd port, and
 `cargo xtask k8s-cases`). `bind`, `cancel` and `reload` have no table
@@ -143,8 +143,7 @@ fakes; see the kubernetes crate), `deprecated`, `import`.
   test server's address or another local value can't be evaluated outside
   the test; the fixture lists them with the compiler's message.
 - **Features KernDNS doesn't have yet** are `xfail` rows, each with the
-  missing feature: `forward` `resolver` and
-  `https://`/`quic://` upstreams, RSASHA1 signing keys.
+  missing feature: RSASHA1 signing keys.
 - **Files from the Go package directory.** Setup rows that read
   `testdata/...` or files the Go test writes into its working directory
   (resolv.conf, certificates, MaxMind databases) are skipped rows; files

@@ -25,8 +25,8 @@
 //! Placeholders: `{PORT}` (the server's port), `{DIR}` (the case's
 //! directory), `{BENCH}` (`bench/`), `{FIX}` (generated fixtures: zones of
 //! 100, 10k and 100k names, a hosts file and query files), `{BACKEND}`,
-//! `{BACKEND_DOT}` and `{BACKEND_GRPC}` (a shared upstream, CoreDNS serving
-//! the 10k zone over UDP/TCP, DoT and gRPC, with transfers allowed),
+//! `{BACKEND_DOT}`, `{BACKEND_DOH}`, `{BACKEND_DOQ}` and `{BACKEND_GRPC}` (a shared upstream, CoreDNS serving
+//! the 10k zone over UDP/TCP, DoT, DoH, DoQ and gRPC, with transfers allowed),
 //! `{DNSTAP}` (a unix socket where the harness accepts dnstap Frame
 //! Streams and counts the messages), `{KUBECONFIG}` (the fake API
 //! server, 1000 Services; with `--kubeconfig PATH`, that file instead, for
@@ -118,6 +118,8 @@ const PLACEHOLDERS: &[&str] = &[
     "FIX",
     "BACKEND",
     "BACKEND_DOT",
+    "BACKEND_DOH",
+    "BACKEND_DOQ",
     "BACKEND_GRPC",
     "DNSTAP",
     "KUBECONFIG",
@@ -870,12 +872,14 @@ pub fn run(args: &[String]) -> Result<()> {
     let backend_port = free_port()?;
     let backend_dot = free_port()?;
     let backend_grpc = free_port()?;
+    let backend_doh = free_port()?;
+    let backend_doq = free_port()?;
     let tls = bench.join("shared/tls");
     let backend_cf = work.join("backend.conf");
     fs::write(
         &backend_cf,
         format!(
-            "example.org:{backend_port} {{\n    file {fix}/db.example.org\n    transfer {{\n        to *\n    }}\n}}\ntls://example.org:{backend_dot} {{\n    tls {tls}/cert.pem {tls}/key.pem\n    file {fix}/db.example.org\n}}\ngrpc://example.org:{backend_grpc} {{\n    file {fix}/db.example.org\n}}\n",
+            "example.org:{backend_port} {{\n    file {fix}/db.example.org\n    transfer {{\n        to *\n    }}\n}}\ntls://example.org:{backend_dot} {{\n    tls {tls}/cert.pem {tls}/key.pem\n    file {fix}/db.example.org\n}}\nhttps://example.org:{backend_doh} {{\n    tls {tls}/cert.pem {tls}/key.pem\n    file {fix}/db.example.org\n}}\nquic://example.org:{backend_doq} {{\n    tls {tls}/cert.pem {tls}/key.pem\n    file {fix}/db.example.org\n}}\ngrpc://example.org:{backend_grpc} {{\n    file {fix}/db.example.org\n}}\n",
             fix = fix.display(),
             tls = tls.display()
         ),
@@ -940,6 +944,8 @@ pub fn run(args: &[String]) -> Result<()> {
     vars.insert("FIX", fix.display().to_string());
     vars.insert("BACKEND", backend_port.to_string());
     vars.insert("BACKEND_DOT", backend_dot.to_string());
+    vars.insert("BACKEND_DOH", backend_doh.to_string());
+    vars.insert("BACKEND_DOQ", backend_doq.to_string());
     vars.insert("BACKEND_GRPC", backend_grpc.to_string());
     vars.insert("DNSTAP", dnstap_sock.display().to_string());
     vars.insert("KUBECONFIG", kubeconfig.display().to_string());

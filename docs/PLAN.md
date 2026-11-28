@@ -765,10 +765,13 @@ Done:
   `[sig-network] DNS` and `Services` conformance specs of Kubernetes
   v1.37.0 pass, the same as CoreDNS's own image; see Testing.
 - **Kubernetes parity** with CoreDNS 1.15.0 (see its parity table).
+- **`forward` parity:** DoH (`https://`, `doh_method`) and DoQ (`quic://`)
+  upstreams, upstreams given as host names (resolved at startup with
+  `resolver` or the system resolver), `max_idle_conns`.
 - **Level 3 setups:** resolver, kubeadm, forwarder, authoritative, split
   horizon, DoT/DoH frontend, etcd and the mixed bridge chain.
-- **Testing:** CoreDNS's integration tests at 108 pass / 2 expected
-  failures / 12 skipped, with in-place reload through `kerndns -control`;
+- **Testing:** CoreDNS's integration tests at 109 pass / 1 expected
+  failure / 12 skipped, with in-place reload through `kerndns -control`;
   CoreDNS's plugin table tests replayed (`cargo xtask plugin-cases`);
   fuzzing in CI.
 
@@ -777,10 +780,9 @@ Open:
 - The nightly level 3 report, and the CI regression gate (see
   Benchmarks), which need a dedicated machine.
 - The optional out-of-process bridge, and the bridge gaps listed under M3.
-- Features the plugin table tests and `TestReadme` show as missing:
-  `forward` `resolver` and HTTPS/QUIC upstreams, and RSASHA1 keys in
-  `dnssec` (which ring can't sign; see the parity table of the other
-  plugins).
+- Features the plugin table tests show as missing:
+  RSASHA1 keys in `dnssec` (which ring can't sign; see the parity table
+  of the other plugins).
 - The gaps marked "not done yet" in the parity table of the other
   plugins: `timeouts` on DoH listeners, the `plugin` label of
   `coredns_dns_responses_total`, `prometheus`'s `tls` option, PROXY

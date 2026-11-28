@@ -164,3 +164,128 @@ async fn dnstap_client_and_forwarder_messages() {
     drop(front);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+async fn exchange_tcp(server: SocketAddr, name: &str, qtype: RecordType) -> Message {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut m = Message::new(4243, MessageType::Query, OpCode::Query);
+    m.add_query(Query::query(Name::from_ascii(name).unwrap(), qtype));
+    let wire = m.to_vec().unwrap();
+    let mut s = tokio::net::TcpStream::connect(server).await.unwrap();
+    let mut out = (wire.len() as u16).to_be_bytes().to_vec();
+    out.extend_from_slice(&wire);
+    s.write_all(&out).await.unwrap();
+    let mut len = [0u8; 2];
+    tokio::time::timeout(Duration::from_secs(6), s.read_exact(&mut len))
+        .await
+        .expect("answer")
+        .unwrap();
+    let mut buf = vec![0u8; u16::from_be_bytes(len) as usize];
+    s.read_exact(&mut buf).await.unwrap();
+    Message::from_vec(&buf).unwrap()
+}
+
+/// The transport whoami saw: `_tcp.` or `_udp.`.
+fn whoami_proto(m: &Message) -> Option<String> {
+    m.additionals
+        .iter()
+        .find(|r| r.record_type() == RecordType::SRV)
+        .map(|r| r.name.to_ascii()[..5].to_string())
+}
+
+/// `forward` to KernDNS's own DoH and DoQ listeners (like CoreDNS's
+/// TestProxyHTTPS and TestForwardDoQIntegration): answers come back with
+/// the client's ID, over both DoH methods and with a per-upstream DoQ
+/// server name.
+#[tokio::test]
+async fn forward_doh_and_doq_upstreams() {
+    let backend = start(&format!(
+        "https://example.org:0 {{\n tls {TLS_DIR}/cert.pem {TLS_DIR}/key.pem\n whoami\n}}\nquic://example.org:0 {{\n tls {TLS_DIR}/cert.pem {TLS_DIR}/key.pem\n whoami\n}}"
+    ))
+    .await;
+    let doh = backend.listeners()[0].port();
+    let doq = backend.listeners()[1].port();
+    for (to, extra) in [
+        (format!("https://127.0.0.1:{doh}"), ""),
+        (format!("https://127.0.0.1:{doh}"), "doh_method GET"),
+        (format!("quic://127.0.0.1:{doq}"), ""),
+        (format!("quic://127.0.0.1%kerndns.test:{doq}"), ""),
+    ] {
+        let servername = if to.contains('%') {
+            ""
+        } else {
+            "tls_servername kerndns.test"
+        };
+        let front = start(&format!(
+            ".:0 {{\n forward . {to} {{\n  tls {TLS_DIR}/ca.pem\n  {servername}\n  {extra}\n }}\n}}"
+        ))
+        .await;
+        let addr = udp_addr(&front);
+        for _ in 0..3 {
+            let m = exchange(addr, "whoami.example.org.").await;
+            assert_eq!(m.metadata.id, 4242, "{to}");
+            assert_eq!(m.metadata.response_code, ResponseCode::NoError, "{to}: {m:?}");
+            let want = if to.starts_with("https") { "_tcp." } else { "_udp." };
+            assert_eq!(whoami_proto(&m).as_deref(), Some(want), "{to}: {m:?}");
+        }
+        // DoQ can't carry zone transfers: NOTIMP, without dialing
+        if to.starts_with("quic") {
+            let tcp = SocketAddr::from(([127, 0, 0, 1], front.listeners()[0].tcp.unwrap().port()));
+            let m = exchange_tcp(tcp, "example.org.", RecordType::AXFR).await;
+            assert_eq!(m.metadata.response_code, ResponseCode::NotImp, "{m:?}");
+        }
+    }
+
+    // the wrong server name fails the handshake: SERVFAIL
+    for to in [format!("https://127.0.0.1:{doh}"), format!("quic://127.0.0.1:{doq}")] {
+        let bad = start(&format!(
+            ".:0 {{\n forward . {to} {{\n  tls {TLS_DIR}/ca.pem\n  tls_servername wrong.example\n }}\n}}"
+        ))
+        .await;
+        let m = exchange(udp_addr(&bad), "whoami.example.org.").await;
+        assert_eq!(m.metadata.response_code, ResponseCode::ServFail, "{to}");
+    }
+}
+
+/// An upstream that goes away: queries fail over to the next one, and once
+/// the health checks mark it down it costs no time any more.
+#[tokio::test]
+async fn forward_doh_doq_failover() {
+    let tls = format!("tls {TLS_DIR}/cert.pem {TLS_DIR}/key.pem");
+    let blocks = format!("https://example.org:0 {{\n {tls}\n whoami\n}}\nquic://example.org:0 {{\n {tls}\n whoami\n}}");
+    let good = start(&blocks).await;
+    let mut gone = start(&blocks).await;
+    let mut fronts = Vec::new();
+    for (i, scheme) in ["https", "quic"].iter().enumerate() {
+        let (dead, live) = (gone.listeners()[i].port(), good.listeners()[i].port());
+        let front = start(&format!(
+            ".:0 {{\n forward . {scheme}://127.0.0.1:{dead} {scheme}://127.0.0.1:{live} {{\n  tls {TLS_DIR}/ca.pem\n  tls_servername kerndns.test\n  policy sequential\n  health_check 100ms\n }}\n}}"
+        ))
+        .await;
+        let m = exchange(udp_addr(&front), "whoami.example.org.").await;
+        assert_eq!(m.metadata.response_code, ResponseCode::NoError, "{scheme}");
+        fronts.push((scheme, front));
+    }
+    gone.stop().await;
+    drop(gone);
+    for (scheme, front) in &fronts {
+        let addr = udp_addr(front);
+        // DoH: the refused connection fails over to the second upstream at
+        // once. DoQ: a handshake with the dead upstream takes up to its 5s
+        // timeout (as in CoreDNS), which can use up the query's budget.
+        let m = exchange(addr, "whoami.example.org.").await;
+        if **scheme == "https" {
+            assert_eq!(m.metadata.response_code, ResponseCode::NoError, "{scheme}: {m:?}");
+        }
+        // the health checks mark the dead upstream down: no time lost on it
+        let start = std::time::Instant::now();
+        loop {
+            let t = std::time::Instant::now();
+            let m = exchange(addr, "whoami.example.org.").await;
+            if m.metadata.response_code == ResponseCode::NoError && t.elapsed() < Duration::from_millis(300) {
+                break;
+            }
+            assert!(start.elapsed() < Duration::from_secs(20), "{scheme}: not marked down");
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    }
+}
