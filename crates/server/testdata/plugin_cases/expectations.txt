@@ -46,21 +46,21 @@ skip autopath TestInSearchPath/tests tests the Go AutoPath.FirstInSearchPath hel
 
 # cache
 skip cache TestCacheInsertion/cacheTestCases#8 the RRSIG is valid at the test's fixed 2017 clock only; through the server the cache sees the real time and (correctly) doesn't cache an expired signature
-skip cache TestServeFromStaleCache/tests moves the cache's clock forward (futureMinutes); KernDNS's cache has no injectable clock
-skip cache TestServeFromStaleCacheResponseTTL/tests moves the cache's clock forward; no injectable clock
-skip cache TestServeFromStaleCacheFetchVerify/tests moves the cache's clock forward; no injectable clock
+skip cache TestServeFromStaleCache/tests moves the cache's clock forward (futureMinutes); ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestServeFromStaleCacheResponseTTL/tests moves the cache's clock forward; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestServeFromStaleCacheFetchVerify/tests moves the cache's clock forward; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
 skip cache TestComputeTTL/tests tests the Go computeTTL helper
-skip cache TestCacheKeepTTL/tests moves the cache's clock forward; no injectable clock
-skip cache TestCacheSeparation/testCases inserts with Go's internal key function and checks the internal lookup
-skip cache TestPreferPositiveRetainsLKGAcrossNonAnswerSuccessRefreshes/refreshes moves the cache's clock and needs serve_stale verify options KernDNS doesn't have
-skip cache TestPreferPositiveVerifyKeepsStaleOnNonAnswers/tests needs serve_stale ... verify with a prefer-positive policy, not supported by KernDNS yet
-skip cache TestPreferPositiveVerifyRejectsInvalidFreshAnswers/modes needs serve_stale refresh options KernDNS doesn't have
+skip cache TestCacheKeepTTL/tests moves the cache's clock forward; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestCacheSeparation/testCases inserts with Go's internal key function and checks the internal lookup; ported as a Rust unit test (crates/plugins/src/cache/tests.rs)
+skip cache TestPreferPositiveRetainsLKGAcrossNonAnswerSuccessRefreshes/refreshes writes refreshes straight into the cache's ResponseWriter and moves its clock; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestPreferPositiveVerifyKeepsStaleOnNonAnswers/tests backends are Go handlers and the test moves the cache's clock; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestPreferPositiveVerifyRejectsInvalidFreshAnswers/modes sets the cache's verify timeout directly and moves its clock; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
 skip cache TestPreferPositiveVerifyRejectsInvalidFreshAnswers/invalidResponses response builders (Go closures) for the table above
 skip cache TestResponseWithDNSSEC/tcs runs against an in-process file plugin built in Go with a signed zone the test generates
 skip cache TestFilterRRSlice/rrs tests the Go filterRRSlice helper
-skip cache TestPrefetch/tests moves the cache's clock and counts upstream calls at given times; no injectable clock
-skip cache TestServeStaleFailureRecheckImmediate/tests needs serve_stale's failure recheck options, not supported by KernDNS yet
-skip cache TestServeStaleFailureRecheckRejectsInvalidRefresh/modes needs serve_stale's failure recheck options, not supported by KernDNS yet
+skip cache TestPrefetch/tests moves the cache's clock and counts upstream calls at given times; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestServeStaleFailureRecheckImmediate/tests moves the cache's clock and gates the backend with channels; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
+skip cache TestServeStaleFailureRecheckRejectsInvalidRefresh/modes moves the cache's clock and checks the item's retry deadline; ported as a Rust unit test with the cache's test clock (crates/plugins/src/cache/tests.rs)
 skip cache TestServeStaleFailureRecheckRejectsInvalidRefresh/invalidResponses response builders (Go closures) for the table above
 
 # debug: TestDebug runs as a setup table
@@ -244,22 +244,6 @@ skip tls TestTLS/tests#3 needs test_cert.pem/test_key.pem/test_ca.pem from the G
 skip tls TestTLS/tests#4 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
 skip tls TestTLS/tests#5 needs test_cert.pem/test_key.pem/test_ca.pem from the Go package directory (the Go test's working directory)
 xfail tls TestTLS/tests#6 tls { keylog } is not supported by KernDNS yet
-xfail cache TestServeStale/tests#8 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#9 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#10 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#11 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#12 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#13 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#14 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#15 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#16 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStale/tests#17 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStaleFailureRecheck/tests#0 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStaleFailureRecheck/tests#1 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStaleFailureRecheck/tests#2 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStaleFailureRecheck/tests#3 serve_stale's refresh and recheck arguments are not supported by KernDNS yet
-xfail cache TestServeStalePolicy/tests#0 cache { serve_stale_policy } is not supported by KernDNS yet
-xfail cache TestServeStalePolicy/tests#1 cache { serve_stale_policy } is not supported by KernDNS yet
 xfail template TestVar/tests#0 template var needs the expr language, not supported by KernDNS
 xfail template TestVar/tests#1 template var needs the expr language, not supported by KernDNS
 xfail template TestVar/tests#2 template var needs the expr language, not supported by KernDNS
